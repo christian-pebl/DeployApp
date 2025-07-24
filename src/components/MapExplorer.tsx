@@ -25,7 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, MapPin, Trash2, Menu, Crosshair, MoreVertical, Pencil } from 'lucide-react';
+import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -361,7 +361,7 @@ export default function MapExplorer() {
             </div>
             <DialogFooter>
               <Button type="submit">
-                <MapPin className="mr-2 h-4 w-4" /> Add Marker
+                <Pencil className="mr-2 h-4 w-4" /> Add Marker
               </Button>
             </DialogFooter>
           </form>
@@ -370,5 +370,3 @@ export default function MapExplorer() {
     </div>
   );
 }
-
-    

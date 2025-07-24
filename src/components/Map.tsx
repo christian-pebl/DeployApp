@@ -49,7 +49,7 @@ const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) =
             }).addTo(mapRef.current);
             
             const pane = mapRef.current.createPane('currentLocationPane');
-            pane.style.zIndex = '1000';
+            pane.style.zIndex = '650';
 
             L.control.zoom({ position: 'bottomright' }).addTo(mapRef.current);
 
