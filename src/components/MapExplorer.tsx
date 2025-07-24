@@ -146,10 +146,10 @@ export default function MapExplorer() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945],
-    zoom: 15,
+    zoom: 13,
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
+  const [isLocating, setIsLocating] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<LatLngExpression | null>(null);
   const [pendingMarker, setPendingMarker] = useState<LatLng | null>(null);
   const addMarkerInputRef = useRef<HTMLInputElement>(null);
@@ -167,13 +167,22 @@ export default function MapExplorer() {
       return;
     }
 
+    // This toast is shown on initial load
+    if (isLocating) {
+      toast({
+        title: 'Locating...',
+        description: "Attempting to find your current location.",
+      });
+    }
+
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
-        if (isLocating) { // Center map on first successful location
-          setView({ center: newPosition, zoom: 17 });
+
+        if (isLocating) {
+          setView({ center: newPosition, zoom: 13 });
           toast({
             title: 'Location Found',
             description: "Your current location is being shown on the map.",

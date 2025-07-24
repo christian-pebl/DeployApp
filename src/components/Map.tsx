@@ -106,7 +106,7 @@ const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) =
                 if (!currentLocationMarkerRef.current) {
                     const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
                     currentLocationMarkerRef.current = L.circleMarker(currentLocation, {
-                        radius: 8,
+                        radius: 6,
                         color: `hsl(${primaryColor})`,
                         weight: 2,
                         fillColor: `hsl(${primaryColor})`,
