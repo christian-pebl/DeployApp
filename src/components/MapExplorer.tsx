@@ -92,9 +92,7 @@ function SidebarContent({
                     <Tooltip>
                         <TooltipTrigger asChild>
                              <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
-                                <div className="relative h-6 w-6 flex items-center justify-center">
-                                    <Minus className="h-1 w-6 absolute rotate-45" />
-                                </div>
+                               <Spline className="h-6 w-6" />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
@@ -422,7 +420,7 @@ export default function MapExplorer() {
       {/* Sidebar for Desktop */}
       <div className={cn(
         "absolute top-0 left-0 h-full z-20 transition-transform duration-300 ease-in-out",
-        "w-80 lg:w-96 bg-card border-r",
+        "w-72 bg-card/80 backdrop-blur-sm border-r",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <SidebarContent {...sidebarProps} />
@@ -430,7 +428,7 @@ export default function MapExplorer() {
 
       {/* Mobile Sheet (now also a sidebar) */}
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-          <SheetContent side="left" className="w-80 p-0" onInteractOutside={(e) => {
+          <SheetContent side="left" className="w-80 p-0 bg-card/80 backdrop-blur-sm" onInteractOutside={(e) => {
               if (e.target === document.body) {
                   e.preventDefault();
               }
@@ -447,7 +445,7 @@ export default function MapExplorer() {
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           className={cn(
               "absolute top-1/2 -translate-y-1/2 z-30 h-16 w-8 rounded-l-none transition-all duration-300 ease-in-out",
-              isSidebarOpen ? "left-80 lg:left-96" : "left-0"
+              isSidebarOpen ? "left-72" : "left-0"
           )}
       >
           {isSidebarOpen ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
@@ -562,5 +560,6 @@ export default function MapExplorer() {
       </main>
     </div>
   );
+}
 
     
