@@ -144,7 +144,7 @@ function SidebarContent({
               ) : (
                 <ScrollArea className="h-40">
                   <div className="space-y-2">
-                    {markers.map((marker, index) => (
+                    {markers.map((marker) => (
                       <React.Fragment key={marker.id}>
                         <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
                           <button onClick={() => onPanTo(marker.position)} className="flex-1 text-left truncate pr-2">
@@ -159,10 +159,9 @@ function SidebarContent({
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        {index < markers.length - 1 && <Separator />}
                       </React.Fragment>
                     ))}
-                     {lines.map((line, index) => (
+                     {lines.map((line) => (
                       <React.Fragment key={line.id}>
                         <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
                           <button onClick={() => onPanTo(line.positions[0])} className="flex-1 text-left truncate pr-2">
@@ -177,7 +176,6 @@ function SidebarContent({
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        {index < lines.length - 1 && <Separator />}
                       </React.Fragment>
                     ))}
                   </div>
@@ -217,7 +215,7 @@ export default function MapExplorer() {
   const [pendingLine, setPendingLine] = useState<LineData | null>(null);
   const lineNameInputRef = useRef<HTMLInputElement>(null);
   
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const { toast } = useToast();
   const componentId = useId();
@@ -239,20 +237,21 @@ export default function MapExplorer() {
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
         if (isLocating) {
-            setView(prev => ({ ...prev, center: newPosition, zoom: 13 }));
+            setView(prev => ({ ...prev, center: newPosition, zoom: 15 }));
             setIsLocating(false);
         }
     };
 
     const handleError = (error: GeolocationPositionError) => {
-        if (isLocating) {
-            setIsLocating(false);
+        if (isLocating) setIsLocating(false);
+        // Only show toast if permission is denied, otherwise fail silently
+        if (error.code === error.PERMISSION_DENIED) {
+            toast({
+                variant: "destructive",
+                title: "Geolocation Error",
+                description: "Location access denied. Please enable it in your browser settings.",
+            });
         }
-        toast({
-            variant: "destructive",
-            title: "Geolocation Error",
-            description: `Could not get your location: ${error.message}.`,
-        });
     };
 
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -280,7 +279,6 @@ export default function MapExplorer() {
     if (isDrawingLine && drawingLine) {
         setDrawingLine(prev => {
             if (!prev) return null;
-            // The starting point is now fixed, only update the end point
             return {
                 ...prev,
                 positions: [prev.positions[0], newCenter]
@@ -290,13 +288,14 @@ export default function MapExplorer() {
   };
 
   const handleMapClick = (latlng: LatLng) => {
-    // This is now disabled in favor of adding marker at center
+    if (isSidebarOpen) {
+      setIsSidebarOpen(false);
+    }
   };
   
-  // Marker Handlers
   const handleCenterMarker = () => {
     setPendingMarker(view.center);
-    setIsSheetOpen(false);
+    setIsSidebarOpen(false);
   };
   
   const handleAddMarkerSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -313,7 +312,6 @@ export default function MapExplorer() {
     }
   };
 
-  // Line Handlers
   const handleStartLine = () => {
     if(isDrawingLine) { // Cancel drawing
       setIsDrawingLine(false);
@@ -321,7 +319,7 @@ export default function MapExplorer() {
       return;
     }
     
-    setIsSheetOpen(false);
+    setIsSidebarOpen(false);
     setIsDrawingLine(true);
     const startPoint = view.center;
     const newLine: LineData = {
@@ -390,6 +388,7 @@ export default function MapExplorer() {
 
   const handlePanTo = (position: LatLngExpression) => {
     setView(prevView => ({ ...prevView, center: position, zoom: 15 }));
+    setIsSidebarOpen(false);
   };
   
   const handleDeleteMarker = (id: string) => {
@@ -422,7 +421,7 @@ export default function MapExplorer() {
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
   };
-
+  
   const sidebarProps = {
     onGeocode: handleGeocode,
     isGeocoding,
@@ -438,23 +437,38 @@ export default function MapExplorer() {
   };
 
   return (
-    <div className="h-screen w-screen flex bg-background font-body">
-      <div className="hidden md:block md:w-80 lg:w-96 border-r">
+    <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
+      
+      {/* Sidebar for Desktop */}
+      <div className={cn(
+        "absolute top-0 left-0 h-full z-20 transition-transform duration-300 ease-in-out",
+        "w-80 lg:w-96 bg-card border-r",
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
         <SidebarContent {...sidebarProps} />
       </div>
-      <main className="flex-1 flex flex-col relative">
-        <div className="md:hidden absolute top-4 left-4 z-[1001]">
-            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-lg">
-                        <Menu className="h-6 w-6" />
-                    </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-80">
-                     <SidebarContent {...sidebarProps} />
-                </SheetContent>
-            </Sheet>
-        </div>
+
+      {/* Mobile Sheet (now also a sidebar) */}
+      <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+          <SheetContent side="left" className="w-80 p-0" onInteractOutside={() => setIsSidebarOpen(false)}>
+                <SidebarContent {...sidebarProps} />
+          </SheetContent>
+      </Sheet>
+
+      {/* Sidebar Toggle */}
+      <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className={cn(
+              "absolute top-1/2 -translate-y-1/2 z-30 h-16 w-8 rounded-l-none transition-all duration-300 ease-in-out",
+              isSidebarOpen ? "left-80 lg:left-96" : "left-0"
+          )}
+      >
+          {isSidebarOpen ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
+      </Button>
+
+      <main className="flex-1 flex flex-col relative h-full">
         <div className="flex-1 relative">
             <Map
               center={view.center}
@@ -564,3 +578,5 @@ export default function MapExplorer() {
     </div>
   );
 }
+
+    
