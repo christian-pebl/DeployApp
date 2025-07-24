@@ -26,7 +26,11 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
 import { Download, Loader2, LocateFixed, MapPin, Trash2, Menu, Crosshair } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -63,7 +67,7 @@ function SidebarContent({
 }) {
   const addressInputRef = useRef<HTMLInputElement>(null);
 
-  const handleGeocodeSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleGeocodeSubmit = (e: React.FormEvent<HTMLFormEvent>) => {
     e.preventDefault();
     const address = addressInputRef.current?.value;
     if (address) {
@@ -142,7 +146,7 @@ export default function MapExplorer() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945], // Default to Paris
-    zoom: 10,
+    zoom: 13,
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
@@ -165,12 +169,11 @@ export default function MapExplorer() {
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
         if (isLocating) {
-          setView({ center: newPosition, zoom: 12 });
+          setView({ center: newPosition, zoom: 13 });
           setIsLocating(false);
         }
       },
       () => {
-        // Error or permission denied
         if (isLocating) {
             setIsLocating(false);
         }
@@ -284,16 +287,16 @@ export default function MapExplorer() {
       </div>
       <main className="flex-1 flex flex-col relative">
          <div className="md:hidden absolute top-2 left-2 z-[1001]">
-             <Sheet>
-                <SheetTrigger asChild>
-                    <Button variant="default" size="icon" className="h-8 w-8 rounded-full shadow-lg bg-white/30 backdrop-blur-sm">
+             <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="default" size="icon" className="h-7 w-7 rounded-full shadow-lg bg-white/40 backdrop-blur-sm">
                         <Menu className="h-4 w-4" />
                     </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-80">
+                </PopoverTrigger>
+                <PopoverContent side="bottom" align="start" className="p-0 w-80 h-[calc(100vh-100px)]">
                     <SidebarContent {...sidebarProps} />
-                </SheetContent>
-            </Sheet>
+                </PopoverContent>
+            </Popover>
         </div>
         <div className="flex-1 relative">
             <Map
@@ -309,7 +312,7 @@ export default function MapExplorer() {
                   <Button 
                     variant="default" 
                     size="icon" 
-                    className="absolute top-4 right-4 h-8 w-8 rounded-full shadow-lg z-[1000]"
+                    className="absolute top-2 right-2 h-7 w-7 rounded-full shadow-lg z-[1000]"
                     onClick={handleLocateMe}
                     disabled={isLocating}
                   >
@@ -353,3 +356,5 @@ export default function MapExplorer() {
     </div>
   );
 }
+
+    
