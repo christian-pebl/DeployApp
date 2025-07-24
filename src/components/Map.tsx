@@ -2,14 +2,16 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker } from 'leaflet';
+import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline } from 'leaflet';
 
 interface MapProps {
     center: LatLngExpression;
     zoom: number;
     markers: { id: string; position: LatLngExpression; label: string }[];
+    lines: { id: string; positions: LatLngExpression[]; label: string }[];
     currentLocation: LatLngExpression | null;
     onMapClick: (latlng: LatLng) => void;
+    onMapMove: (center: LatLng, zoom: number) => void;
 }
 
 const createCustomIcon = (color: string) => {
@@ -26,10 +28,11 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
-const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) => {
+const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick, onMapMove }: MapProps) => {
     const mapRef = useRef<LeafletMap | null>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const markersRef = useRef<{ [key: string]: LeafletMarker }>({});
+    const linesRef = useRef<{ [key: string]: Polyline }>({});
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
 
     useEffect(() => {
@@ -56,6 +59,12 @@ const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) =
             mapRef.current.on('click', (e) => {
                 onMapClick(e.latlng);
             });
+
+            mapRef.current.on('move', () => {
+                if (mapRef.current) {
+                    onMapMove(mapRef.current.getCenter(), mapRef.current.getZoom());
+                }
+            });
         }
 
         return () => {
@@ -68,9 +77,17 @@ const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) =
 
     useEffect(() => {
         if (mapRef.current) {
-            mapRef.current.setView(center, zoom, { animate: true, pan: { duration: 0.5 } });
+            // Only pan, don't re-zoom programmatically when center changes unless explicitly told
+            mapRef.current.panTo(center, { animate: true, duration: 0.5 });
         }
-    }, [center, zoom]);
+    }, [center]);
+
+    useEffect(() => {
+        if (mapRef.current) {
+            mapRef.current.setZoom(zoom, { animate: true });
+        }
+    }, [zoom]);
+
 
     useEffect(() => {
         if (mapRef.current && typeof window.L !== 'undefined') {
@@ -105,15 +122,49 @@ const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) =
     useEffect(() => {
         if (mapRef.current && typeof window.L !== 'undefined') {
             const map = mapRef.current;
+            const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
+
+            const existingLineIds = Object.keys(linesRef.current);
+            const newLineIds = lines.map(l => l.id);
+
+            existingLineIds.forEach(lineId => {
+                if (!newLineIds.includes(lineId)) {
+                    linesRef.current[lineId].remove();
+                    delete linesRef.current[lineId];
+                }
+            });
+
+            lines.forEach(lineData => {
+                const lineOptions = {
+                    color: `hsl(${primaryColor})`,
+                    weight: 3,
+                    opacity: 0.8
+                };
+                if (!linesRef.current[lineData.id]) {
+                    const newLine = L.polyline(lineData.positions, lineOptions).addTo(map);
+                    newLine.bindPopup(`<b class="font-sans">${lineData.label}</b>`);
+                    linesRef.current[lineData.id] = newLine;
+                } else {
+                    const existingLine = linesRef.current[lineData.id];
+                    existingLine.setLatLngs(lineData.positions);
+                    existingLine.getPopup()?.setContent(`<b class="font-sans">${lineData.label}</b>`);
+                }
+            });
+        }
+    }, [lines]);
+
+    useEffect(() => {
+        if (mapRef.current && typeof window.L !== 'undefined') {
+            const map = mapRef.current;
             if (currentLocation) {
                 if (!currentLocationMarkerRef.current) {
                     const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
                     currentLocationMarkerRef.current = L.circleMarker(currentLocation, {
-                        radius: 5.2,
+                        radius: 8,
                         color: `hsl(${primaryColor})`,
-                        weight: 2,
+                        weight: 3,
                         fillColor: `hsl(${primaryColor})`,
-                        fillOpacity: 0.8,
+                        fillOpacity: 0.2,
                         pane: 'currentLocationPane'
                     }).addTo(map);
                 } else {

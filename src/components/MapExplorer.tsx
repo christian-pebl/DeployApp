@@ -49,20 +49,30 @@ type MarkerData = {
   label: string;
 };
 
+type LineData = {
+  id: string;
+  positions: LatLngExpression[];
+  label: string;
+};
+
 function SidebarContent({
   onGeocode,
   isGeocoding,
   markers,
-  onPanToMarker,
+  lines,
+  onPanTo,
   onDeleteMarker,
+  onDeleteLine,
   onExport,
   onAddMarker,
 }: {
   onGeocode: (address: string) => void;
   isGeocoding: boolean;
   markers: MarkerData[];
-  onPanToMarker: (position: LatLngExpression) => void;
+  lines: LineData[];
+  onPanTo: (position: LatLngExpression) => void;
   onDeleteMarker: (id: string) => void;
+  onDeleteLine: (id: string) => void;
   onExport: () => void;
   onAddMarker: () => void;
 }) {
@@ -100,12 +110,12 @@ function SidebarContent({
 
           <Card className="bg-transparent border-0 shadow-none">
             <CardHeader className="p-2">
-              <CardTitle className="text-base">Your Markers</CardTitle>
+              <CardTitle className="text-base">Your Items</CardTitle>
             </CardHeader>
             <CardContent className="p-2">
-              {markers.length === 0 ? (
+              {markers.length === 0 && lines.length === 0 ? (
                 <div className="text-center text-muted-foreground py-4 text-xs">
-                  <p>Add a marker to see it here.</p>
+                  <p>Add an item to see it here.</p>
                 </div>
               ) : (
                 <ScrollArea className="h-40">
@@ -113,8 +123,8 @@ function SidebarContent({
                     {markers.map((marker, index) => (
                       <React.Fragment key={marker.id}>
                         <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
-                          <button onClick={() => onPanToMarker(marker.position)} className="flex-1 text-left truncate pr-2">
-                            <span className="font-medium text-sm">{marker.label}</span>
+                          <button onClick={() => onPanTo(marker.position)} className="flex-1 text-left truncate pr-2">
+                            <span className="font-medium text-sm"><MapPin className="inline-block mr-2 h-4 w-4"/>{marker.label}</span>
                           </button>
                           <Button
                             variant="ghost"
@@ -126,6 +136,24 @@ function SidebarContent({
                           </Button>
                         </div>
                         {index < markers.length - 1 && <Separator />}
+                      </React.Fragment>
+                    ))}
+                     {lines.map((line, index) => (
+                      <React.Fragment key={line.id}>
+                        <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
+                          <button onClick={() => onPanTo(line.positions[0])} className="flex-1 text-left truncate pr-2">
+                            <span className="font-medium text-sm"><Spline className="inline-block mr-2 h-4 w-4"/>{line.label}</span>
+                          </button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => onDeleteLine(line.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {index < lines.length - 1 && <Separator />}
                       </React.Fragment>
                     ))}
                   </div>
@@ -146,6 +174,7 @@ function SidebarContent({
 
 export default function MapExplorer() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
+  const [lines, setLines] = useState<LineData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945], // Default to Paris
     zoom: 13,
@@ -153,8 +182,19 @@ export default function MapExplorer() {
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<LatLngExpression | null>(null);
+  
+  // Marker states
   const [pendingMarker, setPendingMarker] = useState<LatLngExpression | null>(null);
   const addMarkerInputRef = useRef<HTMLInputElement>(null);
+  
+  // Line states
+  const [isDrawingLine, setIsDrawingLine] = useState(false);
+  const [drawingLine, setDrawingLine] = useState<LineData | null>(null);
+  const [pendingLine, setPendingLine] = useState<LatLngExpression[] | null>(null);
+  const [namingLine, setNamingLine] = useState<LineData | null>(null);
+  const lineNameInputRef = useRef<HTMLInputElement>(null);
+  
+
   const { toast } = useToast();
   const componentId = useId();
   const watchIdRef = useRef<number | null>(null);
@@ -194,11 +234,23 @@ export default function MapExplorer() {
     };
   }, [isLocating]);
 
+  const handleMapMove = (center: LatLng, zoom: number) => {
+    const newCenter: LatLngExpression = [center.lat, center.lng];
+    setView({ center: newCenter, zoom });
+
+    if (isDrawingLine && drawingLine) {
+        setDrawingLine({
+            ...drawingLine,
+            positions: [drawingLine.positions[0], newCenter]
+        });
+    }
+  };
 
   const handleMapClick = (latlng: LatLng) => {
     // This is now disabled in favor of adding marker at center
   };
-
+  
+  // Marker Handlers
   const handleCenterMarker = () => {
     setPendingMarker(view.center);
   };
@@ -216,6 +268,47 @@ export default function MapExplorer() {
       setPendingMarker(null);
     }
   };
+
+  // Line Handlers
+  const handleStartLine = () => {
+    if(isDrawingLine) { // Cancel drawing
+      setIsDrawingLine(false);
+      setDrawingLine(null);
+      return;
+    }
+
+    setIsDrawingLine(true);
+    const startPoint = view.center;
+    const newLine: LineData = {
+        id: `line-${componentId}-${Date.now()}`,
+        positions: [startPoint, startPoint],
+        label: 'New Line'
+    };
+    setDrawingLine(newLine);
+  };
+  
+  const handleConfirmLine = () => {
+    if (drawingLine) {
+        setPendingLine(drawingLine.positions);
+        setIsDrawingLine(false);
+        setDrawingLine(null);
+    }
+  };
+
+  const handleAddLineSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const label = lineNameInputRef.current?.value;
+    if (label && pendingLine) {
+        const newLine = {
+            id: `line-${componentId}-${Date.now()}`,
+            positions: pendingLine,
+            label: label,
+        };
+        setLines(prev => [...prev, newLine]);
+        setPendingLine(null);
+    }
+  };
+
 
   const handleGeocode = async (address: string) => {
     setIsGeocoding(true);
@@ -244,13 +337,13 @@ export default function MapExplorer() {
 
   const handleLocateMe = () => {
     if (currentLocation) {
-        setView(prevView => ({ ...prevView, center: currentLocation }));
+        setView(prevView => ({ ...prevView, center: currentLocation, zoom: 15 }));
     } else {
         setIsLocating(true); 
     }
   };
 
-  const handlePanToMarker = (position: LatLngExpression) => {
+  const handlePanTo = (position: LatLngExpression) => {
     setView(prevView => ({ ...prevView, center: position, zoom: 15 }));
   };
   
@@ -258,18 +351,27 @@ export default function MapExplorer() {
     setMarkers((prev) => prev.filter((m) => m.id !== id));
   };
 
+  const handleDeleteLine = (id: string) => {
+    setLines((prev) => prev.filter((l) => l.id !== id));
+  };
+
+
   const handleExport = () => {
-    if (markers.length === 0) {
+    const exportData = {
+      markers,
+      lines
+    }
+    if (exportData.markers.length === 0 && exportData.lines.length === 0) {
       toast({
-        title: 'No markers to export',
-        description: 'Add some markers to the map first.',
+        title: 'No items to export',
+        description: 'Add some markers or lines to the map first.',
         variant: 'destructive'
       });
       return;
     }
-    const dataStr = JSON.stringify(markers, null, 2);
+    const dataStr = JSON.stringify(exportData, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = 'map_markers.json';
+    const exportFileDefaultName = 'map_items.json';
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
@@ -280,8 +382,10 @@ export default function MapExplorer() {
     onGeocode: handleGeocode,
     isGeocoding,
     markers,
-    onPanToMarker: handlePanToMarker,
+    lines,
+    onPanTo: handlePanTo,
     onDeleteMarker: handleDeleteMarker,
+    onDeleteLine: handleDeleteLine,
     onExport: handleExport,
     onAddMarker: handleCenterMarker,
   };
@@ -304,7 +408,7 @@ export default function MapExplorer() {
                         <Button onClick={handleCenterMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full">
                             <MapPin className="h-6 w-6"/>
                         </Button>
-                        <Button onClick={() => {}} variant="outline" size="icon" className="h-12 w-12 rounded-full">
+                        <Button onClick={handleStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full">
                             <Spline className="h-6 w-6"/>
                         </Button>
                      </div>
@@ -316,12 +420,21 @@ export default function MapExplorer() {
               center={view.center}
               zoom={view.zoom}
               markers={markers}
+              lines={drawingLine ? [...lines, drawingLine] : lines}
               onMapClick={handleMapClick}
+              onMapMove={handleMapMove}
               currentLocation={currentLocation}
             />
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
               <Crosshair className="h-6 w-6 text-primary opacity-80" />
             </div>
+            {isDrawingLine && (
+                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[1001]">
+                    <Button onClick={handleConfirmLine} size="lg" className="shadow-lg">
+                        Confirm Line
+                    </Button>
+                </div>
+            )}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -365,6 +478,34 @@ export default function MapExplorer() {
             <DialogFooter>
               <Button type="submit">
                 <MapPin className="mr-2 h-4 w-4" /> Add Marker
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={!!pendingLine} onOpenChange={(isOpen) => !isOpen && setPendingLine(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Name Your Line</DialogTitle>
+            <DialogDescription>
+              Enter a label for the newly created line.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddLineSubmit}>
+            <div className="grid gap-4 py-4">
+              <Input
+                ref={lineNameInputRef}
+                id="line-label"
+                defaultValue="My new line"
+                required
+                autoFocus
+                onFocus={(e) => e.target.select()}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit">
+                <Spline className="mr-2 h-4 w-4" /> Save Line
               </Button>
             </DialogFooter>
           </form>
