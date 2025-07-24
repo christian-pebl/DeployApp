@@ -147,7 +147,7 @@ export default function MapExplorer() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945],
-    zoom: 13,
+    zoom: 12,
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
@@ -183,7 +183,7 @@ export default function MapExplorer() {
         setCurrentLocation(newPosition);
 
         if (isLocating) {
-          setView({ center: newPosition, zoom: 13 });
+          setView({ center: newPosition, zoom: 12 });
           toast({
             title: 'Location Found',
             description: "Your current location is being shown on the map.",
