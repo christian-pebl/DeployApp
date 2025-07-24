@@ -147,7 +147,7 @@ export default function MapExplorer() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945],
-    zoom: 12,
+    zoom: 13,
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
@@ -170,7 +170,7 @@ export default function MapExplorer() {
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
         if (isLocating) {
-          setView({ center: newPosition, zoom: 12 });
+          setView({ center: newPosition, zoom: 13 });
           setIsLocating(false);
         }
       },
@@ -192,7 +192,7 @@ export default function MapExplorer() {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
     };
-  }, [isLocating, toast]);
+  }, [isLocating]);
 
 
   const handleMapClick = (latlng: LatLng) => {
@@ -210,10 +210,6 @@ export default function MapExplorer() {
       };
       setMarkers((prev) => [...prev, newMarker]);
       setPendingMarker(null);
-      toast({
-        title: "Marker Added",
-        description: `"${label}" has been added to the map.`,
-      });
     }
   };
 
@@ -230,10 +226,6 @@ export default function MapExplorer() {
           label: address,
         };
         setMarkers((prev) => [...prev, newMarker]);
-        toast({
-          title: "Location Found",
-          description: `Map centered on "${address}".`,
-        });
       }
     } catch (error) {
       console.error("Geocoding failed:", error);
@@ -261,10 +253,6 @@ export default function MapExplorer() {
   
   const handleDeleteMarker = (id: string) => {
     setMarkers((prev) => prev.filter((m) => m.id !== id));
-    toast({
-        title: "Marker Removed",
-        description: "The marker has been removed from the map.",
-    });
   };
 
   const handleExport = () => {
@@ -300,10 +288,10 @@ export default function MapExplorer() {
         <SidebarContent {...sidebarProps} />
       </div>
       <main className="flex-1 flex flex-col">
-        <header className="md:hidden p-2 border-b flex items-center">
-            <Sheet>
+         <div className="md:hidden absolute top-2 left-2 z-[1001]">
+             <Sheet>
                 <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="default" size="icon" className="rounded-full shadow-lg">
                         <Menu />
                     </Button>
                 </SheetTrigger>
@@ -311,8 +299,7 @@ export default function MapExplorer() {
                     <SidebarContent {...sidebarProps} />
                 </SheetContent>
             </Sheet>
-            <h1 className="text-lg font-bold ml-4">Map Explorer</h1>
-        </header>
+        </div>
         <div className="flex-1 relative">
             <Map
               center={view.center}

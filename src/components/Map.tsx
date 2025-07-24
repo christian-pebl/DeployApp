@@ -48,7 +48,6 @@ const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) =
                 maxZoom: 20
             }).addTo(mapRef.current);
             
-            // Create a pane for the current location marker to ensure it's on top
             mapRef.current.createPane('currentLocationPane');
             const pane = mapRef.current.getPane('currentLocationPane');
             if(pane) pane.style.zIndex = '601';
@@ -111,12 +110,12 @@ const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) =
                 if (!currentLocationMarkerRef.current) {
                     const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
                     currentLocationMarkerRef.current = L.circleMarker(currentLocation, {
-                        radius: 8, // A bit larger for visibility
+                        radius: 5.2,
                         color: `hsl(${primaryColor})`,
                         weight: 2,
                         fillColor: `hsl(${primaryColor})`,
                         fillOpacity: 0.8,
-                        pane: 'currentLocationPane' // Use the custom pane
+                        pane: 'currentLocationPane'
                     }).addTo(map);
                 } else {
                     currentLocationMarkerRef.current.setLatLng(currentLocation);
