@@ -286,16 +286,12 @@ export default function MapExplorer() {
          <div className="md:hidden absolute top-2 left-2 z-[1001]">
              <Popover>
                 <PopoverTrigger asChild>
-                    <Button variant="default" size="icon" className="h-8 w-8 rounded-full shadow-lg bg-white/80 backdrop-blur-sm">
+                    <Button variant="default" size="icon" className="h-8 w-8 rounded-full shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white/90">
                         <Menu className="h-4 w-4" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent side="bottom" align="start" className="p-0 w-80 bg-card/90 backdrop-blur-sm border-border/50">
-                    <div className="space-y-2">
-                        <h3 className="font-semibold text-center text-card-foreground p-4">Tools</h3>
-                        <Separator />
-                        <SidebarContent {...sidebarProps} />
-                    </div>
+                <PopoverContent side="bottom" align="start" className="p-0 w-80 bg-card/95 backdrop-blur-sm border-border/50">
+                     <SidebarContent {...sidebarProps} />
                 </PopoverContent>
             </Popover>
         </div>
@@ -307,6 +303,9 @@ export default function MapExplorer() {
               onMapClick={handleMapClick}
               currentLocation={currentLocation}
             />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
+              <Crosshair className="h-8 w-8 text-primary opacity-80" />
+            </div>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
