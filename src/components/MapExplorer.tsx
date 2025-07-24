@@ -25,7 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, MapPin, Trash2, Menu, Crosshair } from 'lucide-react';
+import { Download, Loader2, LocateFixed, MapPin, Trash2, Menu, Crosshair, MoreVertical, Pencil } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -57,6 +57,7 @@ function SidebarContent({
   onPanToMarker,
   onDeleteMarker,
   onExport,
+  onAddMarker,
 }: {
   onGeocode: (address: string) => void;
   isGeocoding: boolean;
@@ -64,6 +65,7 @@ function SidebarContent({
   onPanToMarker: (position: LatLngExpression) => void;
   onDeleteMarker: (id: string) => void;
   onExport: () => void;
+  onAddMarker: () => void;
 }) {
   const addressInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,8 +79,12 @@ function SidebarContent({
 
   return (
     <div className="flex flex-col h-full text-card-foreground">
-        <div className="p-4 space-y-6">
-          <Card className="bg-transparent border-0 shadow-none">
+        <div className="p-4 space-y-2">
+            <Button onClick={onAddMarker} className="w-full">
+                <Pencil className="mr-2 h-4 w-4" /> Add Marker at Center
+            </Button>
+            <Separator />
+            <Card className="bg-transparent border-0 shadow-none">
             <CardHeader className="p-2">
               <CardTitle className="text-base">Find Location</CardTitle>
             </CardHeader>
@@ -100,7 +106,7 @@ function SidebarContent({
             <CardContent className="p-2">
               {markers.length === 0 ? (
                 <div className="text-center text-muted-foreground py-4 text-xs">
-                  <p>Click on the map to add a marker.</p>
+                  <p>Add a marker to see it here.</p>
                 </div>
               ) : (
                 <ScrollArea className="h-40">
@@ -129,7 +135,7 @@ function SidebarContent({
             </CardContent>
           </Card>
         </div>
-      <div className="p-4 border-t border-border/50">
+      <div className="p-4 mt-auto border-t border-border/50">
         <Button onClick={onExport} className="w-full" variant="secondary">
           <Download className="mr-2 h-4 w-4" /> Export Markers
         </Button>
@@ -143,12 +149,12 @@ export default function MapExplorer() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945], // Default to Paris
-    zoom: 13,
+    zoom: 12, // Zoom level for approx 5km
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<LatLngExpression | null>(null);
-  const [pendingMarker, setPendingMarker] = useState<LatLng | null>(null);
+  const [pendingMarker, setPendingMarker] = useState<LatLngExpression | null>(null);
   const addMarkerInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const componentId = useId();
@@ -191,10 +197,14 @@ export default function MapExplorer() {
 
 
   const handleMapClick = (latlng: LatLng) => {
-    setPendingMarker(latlng);
+    // This is now disabled in favor of adding marker at center
   };
 
-  const handleAddMarker = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCenterMarker = () => {
+    setPendingMarker(view.center);
+  };
+  
+  const handleAddMarkerSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const label = addMarkerInputRef.current?.value;
     if (label && pendingMarker) {
@@ -243,7 +253,7 @@ export default function MapExplorer() {
   };
 
   const handlePanToMarker = (position: LatLngExpression) => {
-    setView(prevView => ({ ...prevView, center: position }));
+    setView(prevView => ({ ...prevView, center: position, zoom: 15 }));
   };
   
   const handleDeleteMarker = (id: string) => {
@@ -275,6 +285,7 @@ export default function MapExplorer() {
     onPanToMarker: handlePanToMarker,
     onDeleteMarker: handleDeleteMarker,
     onExport: handleExport,
+    onAddMarker: handleCenterMarker,
   };
 
   return (
@@ -286,12 +297,14 @@ export default function MapExplorer() {
          <div className="md:hidden absolute top-2 left-2 z-[1001]">
              <Popover>
                 <PopoverTrigger asChild>
-                    <Button variant="default" size="icon" className="h-8 w-8 rounded-full shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white/90">
-                        <Menu className="h-4 w-4" />
+                    <Button variant="default" size="icon" className="h-9 w-9 rounded-full shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white/90">
+                        <MoreVertical className="h-5 w-5" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent side="bottom" align="start" className="p-0 w-80 bg-card/95 backdrop-blur-sm border-border/50">
-                     <SidebarContent {...sidebarProps} />
+                <PopoverContent side="bottom" align="start" className="p-2 w-auto bg-card/95 backdrop-blur-sm border-border/50">
+                     <Button onClick={handleCenterMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full">
+                        <Pencil className="h-6 w-6"/>
+                     </Button>
                 </PopoverContent>
             </Popover>
         </div>
@@ -304,7 +317,7 @@ export default function MapExplorer() {
               currentLocation={currentLocation}
             />
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
-              <Crosshair className="h-8 w-8 text-primary opacity-80" />
+              <Crosshair className="h-6 w-6 text-primary opacity-80" />
             </div>
             <TooltipProvider>
               <Tooltip>
@@ -312,11 +325,11 @@ export default function MapExplorer() {
                   <Button 
                     variant="default" 
                     size="icon" 
-                    className="absolute top-2 right-2 h-7 w-7 rounded-full shadow-lg z-[1000]"
+                    className="absolute top-2 right-2 h-9 w-9 rounded-full shadow-lg z-[1000]"
                     onClick={handleLocateMe}
                     disabled={isLocating}
                   >
-                    {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
+                    {isLocating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crosshair className="h-5 w-5" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -332,17 +345,18 @@ export default function MapExplorer() {
           <DialogHeader>
             <DialogTitle>Add New Marker</DialogTitle>
             <DialogDescription>
-              Enter a label for the point you've selected on the map.
+              Enter a label for the point at the center of the map.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleAddMarker}>
+          <form onSubmit={handleAddMarkerSubmit}>
             <div className="grid gap-4 py-4">
               <Input
                 ref={addMarkerInputRef}
                 id="marker-label"
-                placeholder="e.g., Favorite Coffee Shop"
+                defaultValue="marker 0"
                 required
                 autoFocus
+                onFocus={(e) => e.target.select()}
               />
             </div>
             <DialogFooter>
@@ -356,3 +370,5 @@ export default function MapExplorer() {
     </div>
   );
 }
+
+    
