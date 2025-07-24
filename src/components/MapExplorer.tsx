@@ -141,8 +141,8 @@ function SidebarContent({
 export default function MapExplorer() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
-    center: [48.8584, 2.2945],
-    zoom: 13,
+    center: [48.8584, 2.2945], // Default to Paris
+    zoom: 10,
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
@@ -165,12 +165,12 @@ export default function MapExplorer() {
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
         if (isLocating) {
-          setView({ center: newPosition, zoom: 13 });
+          setView({ center: newPosition, zoom: 12 });
           setIsLocating(false);
         }
       },
-      (error) => {
-        console.error('Geolocation watch error:', error);
+      () => {
+        // Error or permission denied
         if (isLocating) {
             setIsLocating(false);
         }
@@ -253,9 +253,9 @@ export default function MapExplorer() {
   const handleExport = () => {
     if (markers.length === 0) {
       toast({
-        variant: 'destructive',
         title: 'No markers to export',
         description: 'Add some markers to the map first.',
+        variant: 'destructive'
       });
       return;
     }
@@ -282,11 +282,11 @@ export default function MapExplorer() {
       <div className="hidden md:block md:w-80 lg:w-96 border-r">
         <SidebarContent {...sidebarProps} />
       </div>
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col relative">
          <div className="md:hidden absolute top-2 left-2 z-[1001]">
              <Sheet>
                 <SheetTrigger asChild>
-                    <Button variant="default" size="sm" className="rounded-full shadow-lg bg-white/30 backdrop-blur-sm">
+                    <Button variant="default" size="icon" className="h-8 w-8 rounded-full shadow-lg bg-white/30 backdrop-blur-sm">
                         <Menu className="h-4 w-4" />
                     </Button>
                 </SheetTrigger>
