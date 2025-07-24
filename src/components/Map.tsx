@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions } from 'leaflet';
+import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker } from 'leaflet';
 
 interface MapProps {
     center: LatLngExpression;
     zoom: number;
     markers: { id: string; position: LatLngExpression; label: string }[];
+    currentLocation: LatLngExpression | null;
     onMapClick: (latlng: LatLng) => void;
 }
 
@@ -25,10 +26,11 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
-const Map = ({ center, zoom, markers, onMapClick }: MapProps) => {
+const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) => {
     const mapRef = useRef<LeafletMap | null>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const markersRef = useRef<{ [key: string]: LeafletMarker }>({});
+    const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
 
     useEffect(() => {
         if (typeof window.L === 'undefined') return;
@@ -96,6 +98,32 @@ const Map = ({ center, zoom, markers, onMapClick }: MapProps) => {
             });
         }
     }, [markers]);
+
+    useEffect(() => {
+        if (mapRef.current && typeof window.L !== 'undefined') {
+            const map = mapRef.current;
+            if (currentLocation) {
+                if (!currentLocationMarkerRef.current) {
+                    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
+                    currentLocationMarkerRef.current = L.circleMarker(currentLocation, {
+                        radius: 8,
+                        color: `hsl(${primaryColor})`,
+                        weight: 2,
+                        fillColor: `hsl(${primaryColor})`,
+                        fillOpacity: 0.8,
+                    }).addTo(map);
+                    currentLocationMarkerRef.current.bindPopup("<b>Your Location</b>");
+                } else {
+                    currentLocationMarkerRef.current.setLatLng(currentLocation);
+                }
+            } else {
+                if (currentLocationMarkerRef.current) {
+                    currentLocationMarkerRef.current.remove();
+                    currentLocationMarkerRef.current = null;
+                }
+            }
+        }
+    }, [currentLocation]);
 
     return <div ref={mapContainerRef} className="h-full w-full z-0" />;
 };

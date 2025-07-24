@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useId } from 'react';
+import React, { useState, useRef, useId, useEffect } from 'react';
 import type { LatLng, LatLngExpression } from 'leaflet';
 import dynamic from 'next/dynamic';
 import {
@@ -150,10 +150,62 @@ export default function MapExplorer() {
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<LatLngExpression | null>(null);
   const [pendingMarker, setPendingMarker] = useState<LatLng | null>(null);
   const addMarkerInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const componentId = useId();
+  const watchIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      toast({
+        variant: 'destructive',
+        title: 'Geolocation not supported',
+        description: 'Your browser does not support geolocation.',
+      });
+      return;
+    }
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const newPosition: LatLngExpression = [latitude, longitude];
+        setCurrentLocation(newPosition);
+        if (isLocating) { // Center map on first successful location
+          setView({ center: newPosition, zoom: 17 });
+          toast({
+            title: 'Location Found',
+            description: "Your current location is being shown on the map.",
+          });
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        console.error('Geolocation watch error:', error);
+        if (isLocating) {
+            toast({
+            variant: 'destructive',
+            title: 'Could not get location',
+            description: 'Please ensure location services are enabled and permissions are granted.',
+            });
+            setIsLocating(false);
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, [isLocating, toast]);
+
 
   const handleMapClick = (latlng: LatLng) => {
     setPendingMarker(latlng);
@@ -208,51 +260,19 @@ export default function MapExplorer() {
   };
 
   const handleLocateMe = () => {
-    if (!navigator.geolocation) {
-      toast({
-        variant: 'destructive',
-        title: 'Geolocation not supported',
-        description: 'Your browser does not support geolocation.',
-      });
-      return;
+    if (currentLocation) {
+        setView({ center: currentLocation, zoom: 17 });
+        toast({
+            title: 'Map Centered',
+            description: "Map centered on your current location.",
+        });
+    } else {
+        setIsLocating(true); // Triggers the useEffect to start locating
+        toast({
+            title: 'Locating...',
+            description: "Attempting to find your current location.",
+        });
     }
-
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const newPosition: LatLngExpression = [latitude, longitude];
-        setView({ center: newPosition, zoom: 17 });
-        
-        const newMarker: MarkerData = {
-          id: `marker-${componentId}-${Date.now()}`,
-          position: newPosition,
-          label: "My Location",
-        };
-        setMarkers((prev) => [...prev, newMarker]);
-
-        toast({
-          title: 'Location Found',
-          description: "Your current location has been marked on the map.",
-        });
-        setIsLocating(false);
-      },
-      (error) => {
-        console.error('Geolocation error:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Could not get location',
-          description:
-            'Please ensure location services are enabled and permissions are granted.',
-        });
-        setIsLocating(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
   };
 
   const handlePanToMarker = (position: LatLngExpression) => {
@@ -319,6 +339,7 @@ export default function MapExplorer() {
               zoom={view.zoom}
               markers={markers}
               onMapClick={handleMapClick}
+              currentLocation={currentLocation}
             />
             <TooltipProvider>
               <Tooltip>
@@ -326,7 +347,7 @@ export default function MapExplorer() {
                   <Button 
                     variant="default" 
                     size="icon" 
-                    className="absolute bottom-4 right-4 h-12 w-12 rounded-full shadow-lg z-[1000]"
+                    className="absolute top-4 right-4 h-12 w-12 rounded-full shadow-lg z-[1000]"
                     onClick={handleLocateMe}
                     disabled={isLocating}
                   >
