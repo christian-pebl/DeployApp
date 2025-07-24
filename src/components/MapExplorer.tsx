@@ -11,13 +11,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+    PopoverAnchor,
+} from "@/components/ui/popover";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -192,7 +190,6 @@ export default function MapExplorer() {
   const [isDrawingLine, setIsDrawingLine] = useState(false);
   const [drawingLine, setDrawingLine] = useState<LineData | null>(null);
   const [pendingLine, setPendingLine] = useState<LatLngExpression[] | null>(null);
-  const [namingLine, setNamingLine] = useState<LineData | null>(null);
   const lineNameInputRef = useRef<HTMLInputElement>(null);
   
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -202,18 +199,18 @@ export default function MapExplorer() {
   const watchIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
       setIsLocating(false);
       return;
     }
-
+  
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
         if (isLocating) {
-          setView({ center: newPosition, zoom: 13 });
+          setView(prev => ({ ...prev, center: newPosition, zoom: 13 }));
           setIsLocating(false);
         }
       },
@@ -221,6 +218,11 @@ export default function MapExplorer() {
         if (isLocating) {
             setIsLocating(false);
         }
+        toast({
+            variant: "destructive",
+            title: "Location Error",
+            description: "Could not get your location.",
+        });
       },
       {
         enableHighAccuracy: true,
@@ -228,13 +230,13 @@ export default function MapExplorer() {
         maximumAge: 0,
       }
     );
-
+  
     return () => {
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
     };
-  }, [isLocating]);
+  }, [isLocating, toast]);
 
   const handleMapMove = (center: LatLng, zoom: number) => {
     const newCenter: LatLngExpression = [center.lat, center.lng];
@@ -443,9 +445,72 @@ export default function MapExplorer() {
               onMapMove={handleMapMove}
               currentLocation={currentLocation}
             />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
-              <Crosshair className="h-6 w-6 text-primary opacity-80" />
-            </div>
+             <Popover open={!!pendingMarker} onOpenChange={(isOpen) => !isOpen && setPendingMarker(null)}>
+                <PopoverAnchor asChild>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
+                      <Crosshair className="h-6 w-6 text-primary opacity-80" />
+                    </div>
+                </PopoverAnchor>
+                <PopoverContent className="w-80">
+                  <form onSubmit={handleAddMarkerSubmit}>
+                      <div className="grid gap-4">
+                        <div className="space-y-2">
+                          <h4 className="font-medium leading-none">Add New Marker</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Enter a label for the point at the center of the map.
+                          </p>
+                        </div>
+                        <div className="grid gap-2">
+                           <Input
+                            ref={addMarkerInputRef}
+                            id="marker-label"
+                            defaultValue="marker 0"
+                            required
+                            autoFocus
+                            onFocus={(e) => e.target.select()}
+                          />
+                        </div>
+                         <Button type="submit">
+                            <MapPin className="mr-2 h-4 w-4" /> Add Marker
+                          </Button>
+                      </div>
+                    </form>
+                </PopoverContent>
+            </Popover>
+
+            <Popover open={!!pendingLine} onOpenChange={(isOpen) => !isOpen && setPendingLine(null)}>
+                <PopoverAnchor asChild>
+                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
+                     {!pendingMarker && <Crosshair className="h-6 w-6 text-primary opacity-80" />}
+                   </div>
+                </PopoverAnchor>
+                <PopoverContent className="w-80">
+                   <form onSubmit={handleAddLineSubmit}>
+                        <div className="grid gap-4">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Name Your Line</h4>
+                                <p className="text-sm text-muted-foreground">
+                                    Enter a label for the newly created line.
+                                </p>
+                            </div>
+                            <div className="grid gap-2">
+                                <Input
+                                    ref={lineNameInputRef}
+                                    id="line-label"
+                                    defaultValue="My new line"
+                                    required
+                                    autoFocus
+                                    onFocus={(e) => e.target.select()}
+                                />
+                            </div>
+                            <Button type="submit">
+                                <Spline className="mr-2 h-4 w-4" /> Save Line
+                            </Button>
+                        </div>
+                    </form>
+                </PopoverContent>
+            </Popover>
+           
             {isDrawingLine && (
                 <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[1001]">
                     <Button onClick={handleConfirmLine} size="lg" className="shadow-lg">
@@ -473,62 +538,6 @@ export default function MapExplorer() {
             </TooltipProvider>
         </div>
       </main>
-
-      <Dialog open={!!pendingMarker} onOpenChange={(isOpen) => !isOpen && setPendingMarker(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Marker</DialogTitle>
-            <DialogDescription>
-              Enter a label for the point at the center of the map.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAddMarkerSubmit}>
-            <div className="grid gap-4 py-4">
-              <Input
-                ref={addMarkerInputRef}
-                id="marker-label"
-                defaultValue="marker 0"
-                required
-                autoFocus
-                onFocus={(e) => e.target.select()}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="submit">
-                <MapPin className="mr-2 h-4 w-4" /> Add Marker
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={!!pendingLine} onOpenChange={(isOpen) => !isOpen && setPendingLine(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Name Your Line</DialogTitle>
-            <DialogDescription>
-              Enter a label for the newly created line.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAddLineSubmit}>
-            <div className="grid gap-4 py-4">
-              <Input
-                ref={lineNameInputRef}
-                id="line-label"
-                defaultValue="My new line"
-                required
-                autoFocus
-                onFocus={(e) => e.target.select()}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="submit">
-                <Spline className="mr-2 h-4 w-4" /> Save Line
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
