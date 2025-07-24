@@ -76,17 +76,15 @@ function SidebarContent({
   };
 
   return (
-    <div className="flex flex-col h-full bg-card text-card-foreground">
-      <ScrollArea className="flex-1 pt-8">
+    <div className="flex flex-col h-full text-card-foreground">
         <div className="p-4 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Find Location</CardTitle>
-              <CardDescription>Enter an address to add a marker.</CardDescription>
+          <Card className="bg-transparent border-0 shadow-none">
+            <CardHeader className="p-2">
+              <CardTitle className="text-base">Find Location</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-2">
               <form onSubmit={handleGeocodeSubmit} className="space-y-2">
-                <Input ref={addressInputRef} placeholder="e.g., Eiffel Tower, Paris" disabled={isGeocoding} />
+                <Input ref={addressInputRef} placeholder="e.g., Eiffel Tower" disabled={isGeocoding} />
                 <Button type="submit" className="w-full" disabled={isGeocoding}>
                   {isGeocoding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LocateFixed className="mr-2 h-4 w-4" />}
                   Find
@@ -95,46 +93,45 @@ function SidebarContent({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Your Markers</CardTitle>
-              <CardDescription>Click a marker to pan. Click trash to delete.</CardDescription>
+          <Card className="bg-transparent border-0 shadow-none">
+            <CardHeader className="p-2">
+              <CardTitle className="text-base">Your Markers</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-2">
               {markers.length === 0 ? (
-                <div className="text-center text-muted-foreground py-4">
-                  <MapPin className="mx-auto h-8 w-8 mb-2" />
-                  <p>Click on the map to add your first marker!</p>
+                <div className="text-center text-muted-foreground py-4 text-xs">
+                  <p>Click on the map to add a marker.</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {markers.map((marker, index) => (
-                    <React.Fragment key={marker.id}>
-                      <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
-                        <button onClick={() => onPanToMarker(marker.position)} className="flex-1 text-left truncate pr-2">
-                          <span className="font-medium">{marker.label}</span>
-                        </button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => onDeleteMarker(marker.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {index < markers.length - 1 && <Separator />}
-                    </React.Fragment>
-                  ))}
-                </div>
+                <ScrollArea className="h-40">
+                  <div className="space-y-2">
+                    {markers.map((marker, index) => (
+                      <React.Fragment key={marker.id}>
+                        <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
+                          <button onClick={() => onPanToMarker(marker.position)} className="flex-1 text-left truncate pr-2">
+                            <span className="font-medium text-sm">{marker.label}</span>
+                          </button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => onDeleteMarker(marker.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {index < markers.length - 1 && <Separator />}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </ScrollArea>
               )}
             </CardContent>
           </Card>
         </div>
-      </ScrollArea>
-      <div className="p-4 border-t">
+      <div className="p-4 border-t border-border/50">
         <Button onClick={onExport} className="w-full" variant="secondary">
-          <Download className="mr-2 h-4 w-4" /> Export Markers as JSON
+          <Download className="mr-2 h-4 w-4" /> Export Markers
         </Button>
       </div>
     </div>
@@ -169,7 +166,7 @@ export default function MapExplorer() {
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
         if (isLocating) {
-          setView({ center: newPosition, zoom: 13 });
+          setView({ center: newPosition, zoom: 12 });
           setIsLocating(false);
         }
       },
@@ -289,12 +286,16 @@ export default function MapExplorer() {
          <div className="md:hidden absolute top-2 left-2 z-[1001]">
              <Popover>
                 <PopoverTrigger asChild>
-                    <Button variant="default" size="icon" className="h-7 w-7 rounded-full shadow-lg bg-white/40 backdrop-blur-sm">
+                    <Button variant="default" size="icon" className="h-8 w-8 rounded-full shadow-lg bg-white/80 backdrop-blur-sm">
                         <Menu className="h-4 w-4" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent side="bottom" align="start" className="p-0 w-80 h-[calc(100vh-100px)]">
-                    <SidebarContent {...sidebarProps} />
+                <PopoverContent side="bottom" align="start" className="p-0 w-80 bg-card/90 backdrop-blur-sm border-border/50">
+                    <div className="space-y-2">
+                        <h3 className="font-semibold text-center text-card-foreground p-4">Tools</h3>
+                        <Separator />
+                        <SidebarContent {...sidebarProps} />
+                    </div>
                 </PopoverContent>
             </Popover>
         </div>
@@ -356,5 +357,3 @@ export default function MapExplorer() {
     </div>
   );
 }
-
-    
