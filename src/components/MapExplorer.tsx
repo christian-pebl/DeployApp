@@ -160,20 +160,8 @@ export default function MapExplorer() {
 
   useEffect(() => {
     if (!navigator.geolocation) {
-      toast({
-        variant: 'destructive',
-        title: 'Geolocation not supported',
-        description: 'Your browser does not support geolocation.',
-      });
       setIsLocating(false);
       return;
-    }
-
-    if (isLocating) {
-      toast({
-        title: 'Locating...',
-        description: "Attempting to find your current location.",
-      });
     }
 
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -181,24 +169,14 @@ export default function MapExplorer() {
         const { latitude, longitude } = position.coords;
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
-
         if (isLocating) {
           setView({ center: newPosition, zoom: 12 });
-          toast({
-            title: 'Location Found',
-            description: "Your current location is being shown on the map.",
-          });
           setIsLocating(false);
         }
       },
       (error) => {
         console.error('Geolocation watch error:', error);
         if (isLocating) {
-            toast({
-            variant: 'destructive',
-            title: 'Could not get location',
-            description: 'Please ensure location services are enabled and permissions are granted.',
-            });
             setIsLocating(false);
         }
       },
@@ -272,16 +250,8 @@ export default function MapExplorer() {
   const handleLocateMe = () => {
     if (currentLocation) {
         setView(prevView => ({ ...prevView, center: currentLocation }));
-        toast({
-            title: 'Map Centered',
-            description: "Map centered on your current location.",
-        });
     } else {
         setIsLocating(true); 
-        toast({
-            title: 'Locating...',
-            description: "Attempting to find your current location.",
-        });
     }
   };
 
