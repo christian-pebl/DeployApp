@@ -215,6 +215,7 @@ export default function MapExplorer() {
         }
       },
       () => {
+        // Error case, for now we just stop trying to locate.
         if (isLocating) {
             setIsLocating(false);
         }
@@ -231,16 +232,19 @@ export default function MapExplorer() {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
     };
-  }, [isLocating, toast]);
+  }, [isLocating]);
 
   const handleMapMove = (center: LatLng, zoom: number) => {
     const newCenter: LatLngExpression = [center.lat, center.lng];
     setView({ center: newCenter, zoom });
 
     if (isDrawingLine && drawingLine) {
-        setDrawingLine({
-            ...drawingLine,
-            positions: [drawingLine.positions[0], newCenter]
+        setDrawingLine(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                positions: [prev.positions[0], newCenter]
+            }
         });
     }
   };
@@ -279,7 +283,7 @@ export default function MapExplorer() {
     setIsDrawingLine(true);
     const startPoint = view.center;
     const newLine: LineData = {
-        id: `line-${componentId}-${Date.now()}`,
+        id: `line-temp-${componentId}-${Date.now()}`,
         positions: [startPoint, startPoint],
         label: 'New Line'
     };
@@ -395,11 +399,11 @@ export default function MapExplorer() {
         <SidebarContent {...sidebarProps} />
       </div>
       <main className="flex-1 flex flex-col relative">
-        <div className="md:hidden absolute top-1/2 -translate-y-1/2 left-0 z-[1001]">
+        <div className="md:hidden absolute top-1/2 -translate-y-1/2 left-0 z-[1001] bg-background/30 backdrop-blur-sm rounded-r-full p-1">
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetTrigger asChild>
-                    <Button variant="secondary" className={cn("rounded-l-none h-14 w-8 p-1 transition-all", isSheetOpen && "translate-x-[calc(100%-8px)]")}>
-                        {isSheetOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                    <Button variant="ghost" size="icon" className={cn("rounded-full h-12 w-12 transition-all", isSheetOpen && "translate-x-[calc(100%-8px)]")}>
+                        {isSheetOpen ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
                     </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="p-0 w-auto bg-transparent backdrop-blur-none border-none shadow-none">
