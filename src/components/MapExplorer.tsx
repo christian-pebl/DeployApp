@@ -24,7 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin } from 'lucide-react';
+import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -148,7 +148,7 @@ export default function MapExplorer() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945], // Default to Paris
-    zoom: 12,
+    zoom: 13,
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
@@ -171,7 +171,7 @@ export default function MapExplorer() {
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
         if (isLocating) {
-          setView({ center: newPosition, zoom: 12 });
+          setView({ center: newPosition, zoom: 13 });
           setIsLocating(false);
         }
       },
@@ -232,7 +232,6 @@ export default function MapExplorer() {
         setMarkers((prev) => [...prev, newMarker]);
       }
     } catch (error) {
-      console.error("Geocoding failed:", error);
       toast({
         variant: "destructive",
         title: "Geocoding Error",
@@ -301,9 +300,14 @@ export default function MapExplorer() {
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent side="bottom" align="start" className="p-2 w-auto bg-card/95 backdrop-blur-sm border-border/50">
-                     <Button onClick={handleCenterMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full">
-                        <MapPin className="h-6 w-6"/>
-                     </Button>
+                     <div className="flex flex-col gap-2">
+                        <Button onClick={handleCenterMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full">
+                            <MapPin className="h-6 w-6"/>
+                        </Button>
+                        <Button onClick={() => {}} variant="outline" size="icon" className="h-12 w-12 rounded-full">
+                            <Spline className="h-6 w-6"/>
+                        </Button>
+                     </div>
                 </PopoverContent>
             </Popover>
         </div>
