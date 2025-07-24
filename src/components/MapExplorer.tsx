@@ -225,39 +225,53 @@ export default function MapExplorer() {
 
   useEffect(() => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
-      setIsLocating(false);
-      return;
+        setIsLocating(false);
+        toast({
+            variant: "destructive",
+            title: "Geolocation not supported",
+            description: "Your browser does not support geolocation.",
+        });
+        return;
     }
-  
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
+
+    const handleSuccess = (position: GeolocationPosition) => {
         const { latitude, longitude } = position.coords;
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
         if (isLocating) {
-          setView(prev => ({ ...prev, center: newPosition, zoom: 13 }));
-          setIsLocating(false);
+            setView(prev => ({ ...prev, center: newPosition, zoom: 13 }));
+            setIsLocating(false);
         }
-      },
-      () => {
-        // Error case, for now we just stop trying to locate.
+    };
+
+    const handleError = (error: GeolocationPositionError) => {
         if (isLocating) {
             setIsLocating(false);
         }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
-  
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
+        toast({
+            variant: "destructive",
+            title: "Geolocation Error",
+            description: `Could not get your location: ${error.message}.`,
+        });
     };
-  }, [isLocating]);
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+        handleSuccess,
+        handleError,
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+        }
+    );
+
+    return () => {
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+        }
+    };
+}, [isLocating, toast]);
+
 
   const handleMapMove = (center: LatLng, zoom: number) => {
     const newCenter: LatLngExpression = [center.lat, center.lng];
@@ -266,6 +280,7 @@ export default function MapExplorer() {
     if (isDrawingLine && drawingLine) {
         setDrawingLine(prev => {
             if (!prev) return null;
+            // The starting point is now fixed, only update the end point
             return {
                 ...prev,
                 positions: [prev.positions[0], newCenter]
