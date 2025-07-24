@@ -26,6 +26,13 @@ import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
 import { Download, Loader2, LocateFixed, MapPin, Trash2, Menu, Crosshair } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 
 const Map = dynamic(() => import('@/components/Map'), {
   ssr: false,
@@ -41,8 +48,6 @@ type MarkerData = {
 function SidebarContent({
   onGeocode,
   isGeocoding,
-  onLocateMe,
-  isLocating,
   markers,
   onPanToMarker,
   onDeleteMarker,
@@ -50,8 +55,6 @@ function SidebarContent({
 }: {
   onGeocode: (address: string) => void;
   isGeocoding: boolean;
-  onLocateMe: () => void;
-  isLocating: boolean;
   markers: MarkerData[];
   onPanToMarker: (position: LatLngExpression) => void;
   onDeleteMarker: (id: string) => void;
@@ -79,21 +82,15 @@ function SidebarContent({
           <Card>
             <CardHeader>
               <CardTitle>Find Location</CardTitle>
-              <CardDescription>Enter an address or use your current location.</CardDescription>
+              <CardDescription>Enter an address to add a marker.</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleGeocodeSubmit} className="space-y-2">
-                <Input ref={addressInputRef} placeholder="e.g., Eiffel Tower, Paris" disabled={isGeocoding || isLocating} />
-                <div className="flex gap-2">
-                  <Button type="submit" className="w-full" disabled={isGeocoding || isLocating}>
-                    {isGeocoding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LocateFixed className="mr-2 h-4 w-4" />}
-                    Find
-                  </Button>
-                  <Button type="button" variant="outline" className="w-full" onClick={onLocateMe} disabled={isGeocoding || isLocating}>
-                    {isLocating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Crosshair className="mr-2 h-4 w-4" />}
-                    Locate Me
-                  </Button>
-                </div>
+                <Input ref={addressInputRef} placeholder="e.g., Eiffel Tower, Paris" disabled={isGeocoding} />
+                <Button type="submit" className="w-full" disabled={isGeocoding}>
+                  {isGeocoding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LocateFixed className="mr-2 h-4 w-4" />}
+                  Find
+                </Button>
               </form>
             </CardContent>
           </Card>
@@ -291,8 +288,6 @@ export default function MapExplorer() {
   const sidebarProps = {
     onGeocode: handleGeocode,
     isGeocoding,
-    onLocateMe: handleLocateMe,
-    isLocating,
     markers,
     onPanToMarker: handlePanToMarker,
     onDeleteMarker: handleDeleteMarker,
@@ -325,6 +320,24 @@ export default function MapExplorer() {
               markers={markers}
               onMapClick={handleMapClick}
             />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="default" 
+                    size="icon" 
+                    className="absolute bottom-4 right-4 h-12 w-12 rounded-full shadow-lg z-[1000]"
+                    onClick={handleLocateMe}
+                    disabled={isLocating}
+                  >
+                    {isLocating ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Locate Me</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
         </div>
       </main>
 
