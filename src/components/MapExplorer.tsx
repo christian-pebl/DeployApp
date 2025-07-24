@@ -26,7 +26,6 @@ import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, 
 import {
   Sheet,
   SheetContent,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import {
   Tooltip,
@@ -55,8 +54,6 @@ type LineData = {
 };
 
 function SidebarContent({
-  onGeocode,
-  isGeocoding,
   markers,
   lines,
   onPanTo,
@@ -67,8 +64,6 @@ function SidebarContent({
   onStartLine,
   isDrawingLine,
 }: {
-  onGeocode: (address: string) => void;
-  isGeocoding: boolean;
   markers: MarkerData[];
   lines: LineData[];
   onPanTo: (position: LatLngExpression) => void;
@@ -79,19 +74,9 @@ function SidebarContent({
   onStartLine: () => void;
   isDrawingLine: boolean;
 }) {
-  const addressInputRef = useRef<HTMLInputElement>(null);
-
-  const handleGeocodeSubmit = (e: React.FormEvent<HTMLFormEvent>) => {
-    e.preventDefault();
-    const address = addressInputRef.current?.value;
-    if (address) {
-      onGeocode(address);
-    }
-  };
-
   return (
     <div className="flex flex-col h-full text-card-foreground">
-        <div className="p-4 space-y-2">
+        <div className="p-4 space-y-4">
             <div className="flex gap-2">
                 <TooltipProvider>
                     <Tooltip>
@@ -117,21 +102,7 @@ function SidebarContent({
                 </TooltipProvider>
             </div>
             <Separator />
-            <Card className="bg-transparent border-0 shadow-none">
-            <CardHeader className="p-2">
-              <CardTitle className="text-base">Find Location</CardTitle>
-            </CardHeader>
-            <CardContent className="p-2">
-              <form onSubmit={handleGeocodeSubmit} className="space-y-2">
-                <Input ref={addressInputRef} placeholder="e.g., Eiffel Tower" disabled={isGeocoding} />
-                <Button type="submit" className="w-full" disabled={isGeocoding}>
-                  {isGeocoding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LocateFixed className="mr-2 h-4 w-4" />}
-                  Find
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
+          
           <Card className="bg-transparent border-0 shadow-none">
             <CardHeader className="p-2">
               <CardTitle className="text-base">Your Items</CardTitle>
@@ -254,6 +225,15 @@ export default function MapExplorer() {
         }
     };
 
+    // Use a simple `getCurrentPosition` on mount for initial location
+    navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+    });
+
+
+    // Use `watchPosition` to keep the location updated
     watchIdRef.current = navigator.geolocation.watchPosition(
         handleSuccess,
         handleError,
@@ -269,7 +249,7 @@ export default function MapExplorer() {
             navigator.geolocation.clearWatch(watchIdRef.current);
         }
     };
-}, [isLocating, toast]);
+  }, [isLocating, toast]);
 
 
   const handleMapMove = (center: LatLng, zoom: number) => {
@@ -423,8 +403,6 @@ export default function MapExplorer() {
   };
   
   const sidebarProps = {
-    onGeocode: handleGeocode,
-    isGeocoding,
     markers,
     lines,
     onPanTo: handlePanTo,
@@ -450,7 +428,12 @@ export default function MapExplorer() {
 
       {/* Mobile Sheet (now also a sidebar) */}
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-          <SheetContent side="left" className="w-80 p-0" onInteractOutside={() => setIsSidebarOpen(false)}>
+          <SheetContent side="left" className="w-80 p-0" onInteractOutside={(e) => {
+              if (e.target === document.body) {
+                  e.preventDefault();
+              }
+              setIsSidebarOpen(false)
+            }}>
                 <SidebarContent {...sidebarProps} />
           </SheetContent>
       </Sheet>
@@ -578,5 +561,3 @@ export default function MapExplorer() {
     </div>
   );
 }
-
-    
