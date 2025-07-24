@@ -24,12 +24,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline } from 'lucide-react';
+import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight } from 'lucide-react';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   Tooltip,
   TooltipContent,
@@ -396,24 +396,40 @@ export default function MapExplorer() {
         <SidebarContent {...sidebarProps} />
       </div>
       <main className="flex-1 flex flex-col relative">
-         <div className="md:hidden absolute top-2 left-2 z-[1001]">
-             <Popover>
-                <PopoverTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shadow-lg bg-card/90 text-card-foreground backdrop-blur-sm hover:bg-card">
-                        <MoreVertical className="h-5 w-5" />
+        <div className="md:hidden absolute top-1/2 -translate-y-1/2 left-0 z-[1001]">
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button variant="secondary" className="rounded-l-none h-14 w-8 p-1">
+                        <ChevronRight className="h-5 w-5" />
                     </Button>
-                </PopoverTrigger>
-                <PopoverContent side="bottom" align="start" className="p-2 w-auto bg-card/95 backdrop-blur-sm border-border/50">
-                     <div className="flex flex-col gap-2">
-                        <Button onClick={handleCenterMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full">
-                            <MapPin className="h-6 w-6"/>
-                        </Button>
-                        <Button onClick={handleStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full">
-                            <Spline className="h-6 w-6"/>
-                        </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-2 w-auto bg-card/95 backdrop-blur-sm border-border/50">
+                     <div className="flex flex-col gap-2 p-4">
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button onClick={handleCenterMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full">
+                                        <MapPin className="h-6 w-6"/>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="right">
+                                    <p>Add Marker</p>
+                                </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button onClick={handleStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full">
+                                        <Spline className="h-6 w-6"/>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="right">
+                                    <p>Draw Line</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                      </div>
-                </PopoverContent>
-            </Popover>
+                </SheetContent>
+            </Sheet>
         </div>
         <div className="flex-1 relative">
             <Map
