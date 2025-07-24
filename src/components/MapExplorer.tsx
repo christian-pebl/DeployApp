@@ -64,6 +64,8 @@ function SidebarContent({
   onDeleteLine,
   onExport,
   onAddMarker,
+  onStartLine,
+  isDrawingLine,
 }: {
   onGeocode: (address: string) => void;
   isGeocoding: boolean;
@@ -74,6 +76,8 @@ function SidebarContent({
   onDeleteLine: (id: string) => void;
   onExport: () => void;
   onAddMarker: () => void;
+  onStartLine: () => void;
+  isDrawingLine: boolean;
 }) {
   const addressInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,9 +92,30 @@ function SidebarContent({
   return (
     <div className="flex flex-col h-full text-card-foreground">
         <div className="p-4 space-y-2">
-            <Button onClick={onAddMarker} className="w-full">
-                <MapPin className="mr-2 h-4 w-4" /> Add Marker at Center
-            </Button>
+            <div className="flex gap-2">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button onClick={onAddMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
+                                <MapPin className="h-6 w-6"/>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                            <p>Add Marker</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                             <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
+                                <Spline className="h-6 w-6"/>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                            <p>{isDrawingLine ? 'Cancel Drawing' : 'Draw Line'}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
             <Separator />
             <Card className="bg-transparent border-0 shadow-none">
             <CardHeader className="p-2">
@@ -163,7 +188,7 @@ function SidebarContent({
         </div>
       <div className="p-4 mt-auto border-t border-border/50">
         <Button onClick={onExport} className="w-full" variant="secondary">
-          <Download className="mr-2 h-4 w-4" /> Export Markers
+          <Download className="mr-2 h-4 w-4" /> Export Items
         </Button>
       </div>
     </div>
@@ -256,6 +281,7 @@ export default function MapExplorer() {
   // Marker Handlers
   const handleCenterMarker = () => {
     setPendingMarker(view.center);
+    setIsSheetOpen(false);
   };
   
   const handleAddMarkerSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -279,7 +305,8 @@ export default function MapExplorer() {
       setDrawingLine(null);
       return;
     }
-
+    
+    setIsSheetOpen(false);
     setIsDrawingLine(true);
     const startPoint = view.center;
     const newLine: LineData = {
@@ -391,6 +418,8 @@ export default function MapExplorer() {
     onDeleteLine: handleDeleteLine,
     onExport: handleExport,
     onAddMarker: handleCenterMarker,
+    onStartLine: handleStartLine,
+    isDrawingLine,
   };
 
   return (
@@ -399,38 +428,15 @@ export default function MapExplorer() {
         <SidebarContent {...sidebarProps} />
       </div>
       <main className="flex-1 flex flex-col relative">
-        <div className="md:hidden absolute top-1/2 -translate-y-1/2 left-0 z-[1001] bg-background/30 backdrop-blur-sm rounded-r-full p-1">
+        <div className="md:hidden absolute top-4 left-4 z-[1001]">
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className={cn("rounded-full h-12 w-12 transition-all", isSheetOpen && "translate-x-[calc(100%-8px)]")}>
-                        {isSheetOpen ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
+                    <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-lg">
+                        <Menu className="h-6 w-6" />
                     </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-auto bg-transparent backdrop-blur-none border-none shadow-none">
-                     <div className="flex flex-col gap-2 p-4 h-full justify-center">
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button onClick={handleCenterMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full">
-                                        <MapPin className="h-6 w-6"/>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="right">
-                                    <p>Add Marker</p>
-                                </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button onClick={handleStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full">
-                                        <Spline className="h-6 w-6"/>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="right">
-                                    <p>{isDrawingLine ? 'Cancel Drawing' : 'Draw Line'}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                     </div>
+                <SheetContent side="left" className="w-80">
+                     <SidebarContent {...sidebarProps} />
                 </SheetContent>
             </Sheet>
         </div>
@@ -444,10 +450,13 @@ export default function MapExplorer() {
               onMapMove={handleMapMove}
               currentLocation={currentLocation}
             />
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
+                <Crosshair className="h-8 w-8 text-primary opacity-80" />
+            </div>
              <Popover open={!!pendingMarker} onOpenChange={(isOpen) => !isOpen && setPendingMarker(null)}>
                 <PopoverAnchor asChild>
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
-                      <Crosshair className="h-6 w-6 text-primary opacity-80" />
+                       {/* Anchor for popover */}
                     </div>
                 </PopoverAnchor>
                 <PopoverContent className="w-80">
@@ -480,7 +489,7 @@ export default function MapExplorer() {
             <Popover open={!!pendingLine} onOpenChange={(isOpen) => !isOpen && setPendingLine(null)}>
                 <PopoverAnchor asChild>
                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
-                     {!pendingMarker && <Crosshair className="h-6 w-6 text-primary opacity-80" />}
+                     {/* Anchor for popover */}
                    </div>
                 </PopoverAnchor>
                 <PopoverContent className="w-80">
@@ -523,11 +532,11 @@ export default function MapExplorer() {
                   <Button 
                     variant="default" 
                     size="icon" 
-                    className="absolute top-2 right-2 h-9 w-9 rounded-full shadow-lg z-[1000]"
+                    className="absolute top-4 right-4 h-12 w-12 rounded-full shadow-lg z-[1000]"
                     onClick={handleLocateMe}
                     disabled={isLocating}
                   >
-                    {isLocating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crosshair className="h-5 w-5" />}
+                    {isLocating ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
