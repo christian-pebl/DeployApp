@@ -24,7 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, MapPin, Trash2, Menu } from 'lucide-react';
+import { Download, Loader2, LocateFixed, MapPin, Trash2, Menu, Crosshair } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
 
 const Map = dynamic(() => import('@/components/Map'), {
@@ -41,6 +41,8 @@ type MarkerData = {
 function SidebarContent({
   onGeocode,
   isGeocoding,
+  onLocateMe,
+  isLocating,
   markers,
   onPanToMarker,
   onDeleteMarker,
@@ -48,6 +50,8 @@ function SidebarContent({
 }: {
   onGeocode: (address: string) => void;
   isGeocoding: boolean;
+  onLocateMe: () => void;
+  isLocating: boolean;
   markers: MarkerData[];
   onPanToMarker: (position: LatLngExpression) => void;
   onDeleteMarker: (id: string) => void;
@@ -75,15 +79,21 @@ function SidebarContent({
           <Card>
             <CardHeader>
               <CardTitle>Find Location</CardTitle>
-              <CardDescription>Enter an address to find it on the map.</CardDescription>
+              <CardDescription>Enter an address or use your current location.</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleGeocodeSubmit} className="space-y-2">
-                <Input ref={addressInputRef} placeholder="e.g., Eiffel Tower, Paris" disabled={isGeocoding} />
-                <Button type="submit" className="w-full" disabled={isGeocoding}>
-                  {isGeocoding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LocateFixed className="mr-2 h-4 w-4" />}
-                  Find
-                </Button>
+                <Input ref={addressInputRef} placeholder="e.g., Eiffel Tower, Paris" disabled={isGeocoding || isLocating} />
+                <div className="flex gap-2">
+                  <Button type="submit" className="w-full" disabled={isGeocoding || isLocating}>
+                    {isGeocoding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LocateFixed className="mr-2 h-4 w-4" />}
+                    Find
+                  </Button>
+                  <Button type="button" variant="outline" className="w-full" onClick={onLocateMe} disabled={isGeocoding || isLocating}>
+                    {isLocating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Crosshair className="mr-2 h-4 w-4" />}
+                    Locate Me
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>
@@ -142,6 +152,7 @@ export default function MapExplorer() {
     zoom: 15,
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [pendingMarker, setPendingMarker] = useState<LatLng | null>(null);
   const addMarkerInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -199,6 +210,54 @@ export default function MapExplorer() {
     }
   };
 
+  const handleLocateMe = () => {
+    if (!navigator.geolocation) {
+      toast({
+        variant: 'destructive',
+        title: 'Geolocation not supported',
+        description: 'Your browser does not support geolocation.',
+      });
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const newPosition: LatLngExpression = [latitude, longitude];
+        setView({ center: newPosition, zoom: 17 });
+        
+        const newMarker: MarkerData = {
+          id: `marker-${componentId}-${Date.now()}`,
+          position: newPosition,
+          label: "My Location",
+        };
+        setMarkers((prev) => [...prev, newMarker]);
+
+        toast({
+          title: 'Location Found',
+          description: "Your current location has been marked on the map.",
+        });
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Could not get location',
+          description:
+            'Please ensure location services are enabled and permissions are granted.',
+        });
+        setIsLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
+
   const handlePanToMarker = (position: LatLngExpression) => {
     setView({ center: position, zoom: 17 });
   };
@@ -232,6 +291,8 @@ export default function MapExplorer() {
   const sidebarProps = {
     onGeocode: handleGeocode,
     isGeocoding,
+    onLocateMe: handleLocateMe,
+    isLocating,
     markers,
     onPanToMarker: handlePanToMarker,
     onDeleteMarker: handleDeleteMarker,
