@@ -24,7 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight } from 'lucide-react';
+import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight, ChevronLeft } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -36,6 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from '@/lib/utils';
 
 
 const Map = dynamic(() => import('@/components/Map'), {
@@ -194,6 +195,7 @@ export default function MapExplorer() {
   const [namingLine, setNamingLine] = useState<LineData | null>(null);
   const lineNameInputRef = useRef<HTMLInputElement>(null);
   
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const { toast } = useToast();
   const componentId = useId();
@@ -397,14 +399,14 @@ export default function MapExplorer() {
       </div>
       <main className="flex-1 flex flex-col relative">
         <div className="md:hidden absolute top-1/2 -translate-y-1/2 left-0 z-[1001]">
-            <Sheet>
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetTrigger asChild>
-                    <Button variant="secondary" className="rounded-l-none h-14 w-8 p-1">
-                        <ChevronRight className="h-5 w-5" />
+                    <Button variant="secondary" className={cn("rounded-l-none h-14 w-8 p-1 transition-all", isSheetOpen && "translate-x-[calc(100%-8px)]")}>
+                        {isSheetOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                     </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="p-2 w-auto bg-card/95 backdrop-blur-sm border-border/50">
-                     <div className="flex flex-col gap-2 p-4">
+                <SheetContent side="left" className="p-0 w-auto bg-transparent backdrop-blur-none border-none shadow-none">
+                     <div className="flex flex-col gap-2 p-4 h-full justify-center">
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
