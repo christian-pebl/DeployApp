@@ -48,9 +48,8 @@ const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) =
                 maxZoom: 20
             }).addTo(mapRef.current);
             
-            mapRef.current.createPane('currentLocationPane');
-            const pane = mapRef.current.getPane('currentLocationPane');
-            if(pane) pane.style.zIndex = '601';
+            const pane = mapRef.current.createPane('currentLocationPane');
+            pane.style.zIndex = '650';
 
             L.control.zoom({ position: 'bottomright' }).addTo(mapRef.current);
 

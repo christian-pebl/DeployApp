@@ -73,12 +73,7 @@ function SidebarContent({
 
   return (
     <div className="flex flex-col h-full bg-card text-card-foreground">
-      <div className="p-4 border-b">
-        <h2 className="text-2xl font-bold font-headline text-primary">Map Explorer</h2>
-        <p className="text-sm text-muted-foreground">Your personal cartography tool.</p>
-      </div>
-
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 pt-8">
         <div className="p-4 space-y-6">
           <Card>
             <CardHeader>
@@ -291,8 +286,8 @@ export default function MapExplorer() {
          <div className="md:hidden absolute top-2 left-2 z-[1001]">
              <Sheet>
                 <SheetTrigger asChild>
-                    <Button variant="default" size="icon" className="rounded-full shadow-lg">
-                        <Menu />
+                    <Button variant="default" size="sm" className="rounded-full shadow-lg bg-white/30 backdrop-blur-sm">
+                        <Menu className="h-4 w-4" />
                     </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="p-0 w-80">
