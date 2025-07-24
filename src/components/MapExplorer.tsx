@@ -22,7 +22,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight, ChevronLeft, Minus } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -92,7 +92,9 @@ function SidebarContent({
                     <Tooltip>
                         <TooltipTrigger asChild>
                              <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
-                                <Spline className="h-6 w-6"/>
+                                <div className="relative h-6 w-6 flex items-center justify-center">
+                                    <Minus className="h-1 w-6 absolute rotate-45" />
+                                </div>
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
@@ -560,4 +562,5 @@ export default function MapExplorer() {
       </main>
     </div>
   );
-}
+
+    
