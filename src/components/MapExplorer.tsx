@@ -189,7 +189,7 @@ export default function MapExplorer() {
   // Line states
   const [isDrawingLine, setIsDrawingLine] = useState(false);
   const [drawingLine, setDrawingLine] = useState<LineData | null>(null);
-  const [pendingLine, setPendingLine] = useState<LatLngExpression[] | null>(null);
+  const [pendingLine, setPendingLine] = useState<LineData | null>(null);
   const lineNameInputRef = useRef<HTMLInputElement>(null);
   
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -218,11 +218,6 @@ export default function MapExplorer() {
         if (isLocating) {
             setIsLocating(false);
         }
-        toast({
-            variant: "destructive",
-            title: "Location Error",
-            description: "Could not get your location.",
-        });
       },
       {
         enableHighAccuracy: true,
@@ -293,7 +288,7 @@ export default function MapExplorer() {
   
   const handleConfirmLine = () => {
     if (drawingLine) {
-        setPendingLine(drawingLine.positions);
+        setPendingLine(drawingLine);
         setIsDrawingLine(false);
         setDrawingLine(null);
     }
@@ -304,8 +299,8 @@ export default function MapExplorer() {
     const label = lineNameInputRef.current?.value;
     if (label && pendingLine) {
         const newLine = {
+            ...pendingLine,
             id: `line-${componentId}-${Date.now()}`,
-            positions: pendingLine,
             label: label,
         };
         setLines(prev => [...prev, newLine]);
@@ -427,7 +422,7 @@ export default function MapExplorer() {
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">
-                                    <p>Draw Line</p>
+                                    <p>{isDrawingLine ? 'Cancel Drawing' : 'Draw Line'}</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
