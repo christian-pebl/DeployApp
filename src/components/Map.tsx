@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useRef } from 'react';
@@ -14,7 +15,6 @@ interface MapProps {
 const createCustomIcon = (color: string) => {
     const iconHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" width="36" height="36" class="drop-shadow-lg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
     
-    // The type for DivIconOptions is not perfectly matched in some @types/leaflet versions, so we cast to any as a workaround.
     const iconOptions: DivIconOptions = {
       html: iconHtml,
       className: 'border-0 bg-transparent',
@@ -39,7 +39,7 @@ const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) =
             mapRef.current = L.map(mapContainerRef.current, {
                 center: center,
                 zoom: zoom,
-                zoomControl: false // We can add custom controls if needed
+                zoomControl: false 
             });
 
             L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -106,7 +106,7 @@ const Map = ({ center, zoom, markers, currentLocation, onMapClick }: MapProps) =
                 if (!currentLocationMarkerRef.current) {
                     const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
                     currentLocationMarkerRef.current = L.circleMarker(currentLocation, {
-                        radius: 6,
+                        radius: 2.6,
                         color: `hsl(${primaryColor})`,
                         weight: 2,
                         fillColor: `hsl(${primaryColor})`,

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useId, useEffect } from 'react';
@@ -146,7 +147,7 @@ export default function MapExplorer() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945],
-    zoom: 13,
+    zoom: 5,
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
@@ -164,10 +165,10 @@ export default function MapExplorer() {
         title: 'Geolocation not supported',
         description: 'Your browser does not support geolocation.',
       });
+      setIsLocating(false);
       return;
     }
 
-    // This toast is shown on initial load
     if (isLocating) {
       toast({
         title: 'Locating...',
@@ -182,7 +183,7 @@ export default function MapExplorer() {
         setCurrentLocation(newPosition);
 
         if (isLocating) {
-          setView({ center: newPosition, zoom: 13 });
+          setView({ center: newPosition, zoom: 5 });
           toast({
             title: 'Location Found',
             description: "Your current location is being shown on the map.",
@@ -270,13 +271,13 @@ export default function MapExplorer() {
 
   const handleLocateMe = () => {
     if (currentLocation) {
-        setView({ center: currentLocation, zoom: 17 });
+        setView(prevView => ({ ...prevView, center: currentLocation }));
         toast({
             title: 'Map Centered',
             description: "Map centered on your current location.",
         });
     } else {
-        setIsLocating(true); // Triggers the useEffect to start locating
+        setIsLocating(true); 
         toast({
             title: 'Locating...',
             description: "Attempting to find your current location.",
@@ -285,7 +286,7 @@ export default function MapExplorer() {
   };
 
   const handlePanToMarker = (position: LatLngExpression) => {
-    setView({ center: position, zoom: 17 });
+    setView(prevView => ({ ...prevView, center: position }));
   };
   
   const handleDeleteMarker = (id: string) => {
@@ -356,11 +357,11 @@ export default function MapExplorer() {
                   <Button 
                     variant="default" 
                     size="icon" 
-                    className="absolute top-4 right-4 h-12 w-12 rounded-full shadow-lg z-[1000]"
+                    className="absolute top-4 right-4 h-8 w-8 rounded-full shadow-lg z-[1000]"
                     onClick={handleLocateMe}
                     disabled={isLocating}
                   >
-                    {isLocating ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
+                    {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
