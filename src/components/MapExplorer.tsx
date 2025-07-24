@@ -7,7 +7,6 @@ import dynamic from 'next/dynamic';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -25,7 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil } from 'lucide-react';
+import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -81,7 +80,7 @@ function SidebarContent({
     <div className="flex flex-col h-full text-card-foreground">
         <div className="p-4 space-y-2">
             <Button onClick={onAddMarker} className="w-full">
-                <Pencil className="mr-2 h-4 w-4" /> Add Marker at Center
+                <MapPin className="mr-2 h-4 w-4" /> Add Marker at Center
             </Button>
             <Separator />
             <Card className="bg-transparent border-0 shadow-none">
@@ -149,7 +148,7 @@ export default function MapExplorer() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945], // Default to Paris
-    zoom: 12, // Zoom level for approx 5km
+    zoom: 12,
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
@@ -297,13 +296,13 @@ export default function MapExplorer() {
          <div className="md:hidden absolute top-2 left-2 z-[1001]">
              <Popover>
                 <PopoverTrigger asChild>
-                    <Button variant="default" size="icon" className="h-9 w-9 rounded-full shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white/90">
+                    <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shadow-lg bg-card/90 text-card-foreground backdrop-blur-sm hover:bg-card">
                         <MoreVertical className="h-5 w-5" />
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent side="bottom" align="start" className="p-2 w-auto bg-card/95 backdrop-blur-sm border-border/50">
                      <Button onClick={handleCenterMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full">
-                        <Pencil className="h-6 w-6"/>
+                        <MapPin className="h-6 w-6"/>
                      </Button>
                 </PopoverContent>
             </Popover>
@@ -361,7 +360,7 @@ export default function MapExplorer() {
             </div>
             <DialogFooter>
               <Button type="submit">
-                <Pencil className="mr-2 h-4 w-4" /> Add Marker
+                <MapPin className="mr-2 h-4 w-4" /> Add Marker
               </Button>
             </DialogFooter>
           </form>
