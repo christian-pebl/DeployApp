@@ -251,7 +251,12 @@ export default function MapExplorer() {
                                 variant={interactionMode === 'draw_line' ? 'default' : 'ghost'} 
                                 size="icon" 
                                 className="h-10 w-10 rounded-full"
-                                onClick={() => setInteractionMode(p => p === 'draw_line' ? 'none' : 'draw_line')}
+                                onClick={() => {
+                                    setInteractionMode(p => p === 'draw_line' ? 'none' : 'draw_line');
+                                    if (interactionMode !== 'draw_line') {
+                                      toast({ title: 'Draw a Line', description: 'Click a start and end point on the map.' });
+                                    }
+                                }}
                             >
                                 <Milestone className="h-5 w-5" />
                             </Button>
