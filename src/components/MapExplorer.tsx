@@ -294,7 +294,7 @@ export default function MapExplorer() {
               </Tooltip>
             </TooltipProvider>
             
-            <div className="absolute bottom-16 right-4 z-30">
+            <div className="absolute bottom-[calc(3rem+1rem+0.5rem)] right-4 z-[1000] flex flex-col gap-2">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -342,3 +342,5 @@ export default function MapExplorer() {
     </div>
   );
 }
+
+    
