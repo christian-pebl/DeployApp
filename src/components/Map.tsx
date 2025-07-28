@@ -147,29 +147,25 @@ const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick, onMapM
     }, [lines]);
 
     useEffect(() => {
-        if (mapRef.current && typeof window.L !== 'undefined') {
+        if (mapRef.current && typeof window.L !== 'undefined' && currentLocation) {
             const map = mapRef.current;
-            if (currentLocation) {
-                if (!currentLocationMarkerRef.current) {
-                    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
-                    currentLocationMarkerRef.current = L.circleMarker(currentLocation, {
-                        radius: 8,
-                        color: `hsl(${primaryColor})`,
-                        weight: 3,
-                        fillColor: `hsl(${primaryColor})`,
-                        fillOpacity: 0.2,
-                        pane: 'currentLocationPane'
-                    }).addTo(map);
-                } else {
-                    currentLocationMarkerRef.current.setLatLng(currentLocation);
-                }
-                 currentLocationMarkerRef.current?.bringToFront();
+            if (!currentLocationMarkerRef.current) {
+                const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
+                currentLocationMarkerRef.current = L.circleMarker(currentLocation, {
+                    radius: 8,
+                    color: `hsl(${primaryColor})`,
+                    weight: 3,
+                    fillColor: `hsl(${primaryColor})`,
+                    fillOpacity: 0.2,
+                    pane: 'currentLocationPane'
+                }).addTo(map);
+                currentLocationMarkerRef.current.bringToFront();
             } else {
-                if (currentLocationMarkerRef.current) {
-                    currentLocationMarkerRef.current.remove();
-                    currentLocationMarkerRef.current = null;
-                }
+                currentLocationMarkerRef.current.setLatLng(currentLocation);
             }
+        } else if (currentLocationMarkerRef.current) {
+            currentLocationMarkerRef.current.remove();
+            currentLocationMarkerRef.current = null;
         }
     }, [currentLocation]);
 

@@ -251,7 +251,7 @@ export default function MapExplorer() {
             navigator.geolocation.clearWatch(watchIdRef.current);
         }
     };
-  }, []);
+  }, [isLocating, toast]);
 
 
   const handleMapMove = (center: LatLng, zoom: number) => {
