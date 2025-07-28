@@ -82,7 +82,7 @@ function SidebarContent({
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button onClick={() => onAddMarker()} variant="outline" size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
+                            <Button onClick={onAddMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
                                 <MapPin className="h-6 w-6"/>
                             </Button>
                         </TooltipTrigger>
@@ -92,7 +92,7 @@ function SidebarContent({
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                             <Button onClick={() => onStartLine()} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
+                             <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
                                 <Spline className="h-6 w-6" />
                             </Button>
                         </TooltipTrigger>
@@ -184,7 +184,7 @@ export default function MapExplorer() {
   
   // Line states
   const [isDrawingLine, setIsDrawingLine] = useState(false);
-  const [drawingLine, setDrawingLine] = useState<LineData | null>(null);
+  const [linePoints, setLinePoints] = useState<LatLng[]>([]);
   const [pendingLine, setPendingLine] = useState<LineData | null>(null);
   const lineNameInputRef = useRef<HTMLInputElement>(null);
   
@@ -260,6 +260,26 @@ export default function MapExplorer() {
 
   const handleMapClick = (latlng: LatLng) => {
     addLog(`Map clicked at: ${latlng.lat}, ${latlng.lng}`);
+
+    if (isDrawingLine) {
+        const newPoints = [...linePoints, latlng];
+        setLinePoints(newPoints);
+        addLog(`Line point ${newPoints.length} added.`);
+
+        if (newPoints.length === 2) {
+            addLog('Line complete. Opening naming dialog.');
+            const newLine: LineData = {
+                id: `line-pending-${componentId}-${Date.now()}`,
+                positions: newPoints,
+                label: `Line ${lines.length + 1}`
+            };
+            setPendingLine(newLine);
+            setIsDrawingLine(false);
+            setLinePoints([]);
+        }
+        return;
+    }
+
     if (isSidebarOpen) {
       addLog('Closing sidebar due to map click.');
       setIsSidebarOpen(false);
@@ -291,29 +311,17 @@ export default function MapExplorer() {
     if(isDrawingLine) {
       addLog('Cancelling line draw.');
       setIsDrawingLine(false);
-      setDrawingLine(null);
+      setLinePoints([]);
       return;
     }
-    
-    addLog('Starting line draw.');
+    addLog('Starting line draw. Click map to set start point.');
     setIsSidebarOpen(false);
     setIsDrawingLine(true);
-    const startPoint = view.center;
-    const newLine: LineData = {
-        id: `line-temp-${componentId}-${Date.now()}`,
-        positions: [startPoint, startPoint],
-        label: 'New Line'
-    };
-    setDrawingLine(newLine);
-  };
-  
-  const handleConfirmLine = () => {
-    if (drawingLine) {
-        addLog('Confirming line position.');
-        setPendingLine(drawingLine);
-        setIsDrawingLine(false);
-        setDrawingLine(null);
-    }
+    setLinePoints([]);
+    toast({
+        title: 'Draw a Line',
+        description: 'Click on the map to set the starting point.',
+    });
   };
 
   const handleAddLineSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -330,7 +338,6 @@ export default function MapExplorer() {
         setPendingLine(null);
     }
   };
-
 
   const handleGeocode = async (address: string) => {
     addLog(`Geocoding address: "${address}"`);
@@ -505,7 +512,7 @@ export default function MapExplorer() {
               center={view.center}
               zoom={view.zoom}
               markers={markers}
-              lines={drawingLine ? [...lines, drawingLine] : lines}
+              lines={lines}
               onMapClick={handleMapClick}
               currentLocation={currentLocation}
             />
@@ -588,13 +595,6 @@ export default function MapExplorer() {
                 </PopoverContent>
             </Popover>
            
-            {isDrawingLine && (
-                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[1001]">
-                    <Button onClick={handleConfirmLine} size="lg" className="shadow-lg">
-                        Confirm Line Endpoint
-                    </Button>
-                </div>
-            )}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -618,3 +618,5 @@ export default function MapExplorer() {
     </div>
   );
 }
+
+    
