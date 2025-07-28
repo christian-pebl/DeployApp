@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, Notebook } from 'lucide-react';
+import { Loader2, Crosshair } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -171,7 +171,13 @@ export default function MapExplorer() {
                             onClick={handleShowLog}
                             className="h-12 w-12 rounded-full shadow-lg"
                         >
-                            <Notebook className="h-6 w-6" />
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
+                                <path d="M6.6,8.4l-3.3,3.3c-0.4,0.4-0.4,1,0,1.4l3.3,3.3c0.4,0.4,1,0.4,1.4,0s0.4-1,0-1.4L5.4,12l2.5-2.5c0.4-0.4,0.4-1,0-1.4S7,8,6.6,8.4z"/>
+                                <path d="M17.4,8.4c-0.4-0.4-1-0.4-1.4,0s-0.4,1,0,1.4L18.6,12l-2.5,2.5c-0.4,0.4-0.4,1,0,1.4c0.2,0.2,0.5,0.3,0.7,0.3s0.5-0.1,0.7-0.3l3.3-3.3c0.4-0.4,0.4-1,0-1.4L17.4,8.4z"/>
+                                <rect x="2" y="10" width="20" height="2" />
+                                <rect x="2" y="15" width="20" height="2" />
+                                <rect x="2" y="20" width="16" height="2" />
+                            </svg>
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent side="right">
