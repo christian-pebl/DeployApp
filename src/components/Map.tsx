@@ -2,13 +2,13 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline } from 'leaflet';
+import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup } from 'leaflet';
 
 interface MapProps {
     center: LatLngExpression;
     zoom: number;
-    markers: { id: string; position: LatLngExpression; label: string }[];
-    lines: { id: string; positions: LatLngExpression[]; label: string }[];
+    pins: { id: string; lat: number; lng: number; label: string }[];
+    lines: { id: string; path: { lat: number; lng: number }[]; label: string }[];
     currentLocation: LatLngExpression | null;
     onMapClick: (latlng: LatLng) => void;
 }
@@ -27,11 +27,11 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
-const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick }: MapProps) => {
+const Map = ({ center, zoom, pins, lines, currentLocation, onMapClick }: MapProps) => {
     const mapRef = useRef<LeafletMap | null>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
-    const markersRef = useRef<{ [key: string]: LeafletMarker }>({});
-    const linesRef = useRef<{ [key: string]: Polyline }>({});
+    const pinLayerRef = useRef<LayerGroup | null>(null);
+    const lineLayerRef = useRef<LayerGroup | null>(null);
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
 
     useEffect(() => {
@@ -54,6 +54,9 @@ const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick }: MapP
             pane.style.zIndex = '650';
 
             L.control.zoom({ position: 'bottomright' }).addTo(mapRef.current);
+            
+            pinLayerRef.current = L.layerGroup().addTo(mapRef.current);
+            lineLayerRef.current = L.layerGroup().addTo(mapRef.current);
 
             mapRef.current.on('click', (e) => {
                 onMapClick(e.latlng);
@@ -76,65 +79,45 @@ const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick }: MapP
 
 
     useEffect(() => {
-        if (mapRef.current && typeof window.L !== 'undefined') {
-            const map = mapRef.current;
+        if (pinLayerRef.current && typeof window.L !== 'undefined') {
+            const layer = pinLayerRef.current;
+            layer.clearLayers();
             const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent');
             const markerIcon = createCustomIcon(`hsl(${accentColor})`);
 
-            const existingMarkerIds = Object.keys(markersRef.current);
-            const newMarkerIds = markers.map(m => m.id);
-
-            existingMarkerIds.forEach(markerId => {
-                if (!newMarkerIds.includes(markerId)) {
-                    markersRef.current[markerId].remove();
-                    delete markersRef.current[markerId];
-                }
-            });
-
-            markers.forEach(markerData => {
-                if (!markersRef.current[markerData.id]) {
-                    const newMarker = L.marker(markerData.position, { icon: markerIcon }).addTo(map);
-                    newMarker.bindPopup(`<b class="font-sans">${markerData.label}</b>`);
-                    markersRef.current[markerData.id] = newMarker;
-                } else {
-                    const existingMarker = markersRef.current[markerData.id];
-                    existingMarker.setLatLng(markerData.position);
-                    existingMarker.getPopup()?.setContent(`<b class="font-sans">${markerData.label}</b>`);
-                }
+            pins.forEach(pin => {
+                const marker = L.marker([pin.lat, pin.lng], { icon: markerIcon })
+                  .bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' })
+                  .addTo(layer);
             });
         }
-    }, [markers]);
+    }, [pins]);
 
     useEffect(() => {
-        if (mapRef.current && typeof window.L !== 'undefined') {
-            const map = mapRef.current;
+        if (lineLayerRef.current && typeof window.L !== 'undefined') {
+            const layer = lineLayerRef.current;
+            layer.clearLayers();
             const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
 
-            const existingLineIds = Object.keys(linesRef.current);
-            const newLineIds = lines.map(l => l.id);
+            lines.forEach(line => {
+                const latlngs = line.path.map(p => [p.lat, p.lng] as LatLngExpression);
+                if (latlngs.length < 2) return;
 
-            existingLineIds.forEach(lineId => {
-                if (!newLineIds.includes(lineId)) {
-                    linesRef.current[lineId].remove();
-                    delete linesRef.current[lineId];
-                }
-            });
-
-            lines.forEach(lineData => {
-                const lineOptions = {
+                const poly = L.polyline(latlngs, {
                     color: `hsl(${primaryColor})`,
-                    weight: 3,
+                    weight: 4,
                     opacity: 0.8
-                };
-                if (!linesRef.current[lineData.id]) {
-                    const newLine = L.polyline(lineData.positions, lineOptions).addTo(map);
-                    newLine.bindPopup(`<b class="font-sans">${lineData.label}</b>`);
-                    linesRef.current[lineData.id] = newLine;
-                } else {
-                    const existingLine = linesRef.current[lineData.id];
-                    existingLine.setLatLngs(lineData.positions);
-                    existingLine.getPopup()?.setContent(`<b class="font-sans">${lineData.label}</b>`);
-                }
+                }).addTo(layer);
+
+                const midIndex = Math.floor(latlngs.length / 2);
+                L.tooltip({
+                    permanent: true,
+                    direction: 'center',
+                    className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
+                })
+                .setLatLng(latlngs[midIndex] as LatLng)
+                .setContent(line.label)
+                .addTo(layer);
             });
         }
     }, [lines]);
@@ -142,17 +125,18 @@ const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick }: MapP
     useEffect(() => {
         if (mapRef.current && typeof window.L !== 'undefined' && currentLocation) {
             const map = mapRef.current;
+            const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
+            const circleOptions = {
+                radius: 8,
+                color: `hsl(${primaryColor})`,
+                weight: 3,
+                fillColor: `hsl(${primaryColor})`,
+                fillOpacity: 0.2,
+                pane: 'currentLocationPane'
+            };
+
             if (!currentLocationMarkerRef.current) {
-                const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
-                currentLocationMarkerRef.current = L.circleMarker(currentLocation, {
-                    radius: 8,
-                    color: `hsl(${primaryColor})`,
-                    weight: 3,
-                    fillColor: `hsl(${primaryColor})`,
-                    fillOpacity: 0.2,
-                    pane: 'currentLocationPane'
-                }).addTo(map);
-                currentLocationMarkerRef.current.bringToFront();
+                currentLocationMarkerRef.current = L.circleMarker(currentLocation, circleOptions).addTo(map);
             } else {
                 currentLocationMarkerRef.current.setLatLng(currentLocation);
             }

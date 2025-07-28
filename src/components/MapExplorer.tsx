@@ -7,13 +7,23 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Milestone, Minus } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter
+} from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 
 const Map = dynamic(() => import('@/components/Map'), {
@@ -21,22 +31,27 @@ const Map = dynamic(() => import('@/components/Map'), {
   loading: () => <div className="w-full h-full bg-muted flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>,
 });
 
-type MarkerData = {
-  id: string;
-  position: LatLngExpression;
-  label: string;
-};
+type Pin = { id: string; lat: number; lng: number; label: string };
+type Line = { id: string; path: { lat: number; lng: number }[]; label: string };
+type InteractionMode = 'none' | 'add_pin' | 'draw_line';
 
 export default function MapExplorer() {
   const [log, setLog] = useState<string[]>(['App Initialized']);
-  const [markers, setMarkers] = useState<MarkerData[]>([]);
+  const [pins, setPins] = useState<Pin[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945], // Default to Paris
     zoom: 13,
   });
-  const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<LatLng | null>(null);
+  
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('none');
+  const [linePoints, setLinePoints] = useState<LatLng[]>([]);
+  
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [newItem, setNewItem] = useState<{ type: 'pin' | 'line'; data: any } | null>(null);
+  const [newItemLabel, setNewItemLabel] = useState('');
   
   const { toast } = useToast();
   const componentId = useId();
@@ -52,16 +67,11 @@ export default function MapExplorer() {
         setIsLocating(false);
         const errorMsg = "Geolocation not supported by your browser.";
         addLog(`Error: ${errorMsg}`);
-        toast({
-            variant: "destructive",
-            title: "Geolocation Error",
-            description: errorMsg,
-        });
+        toast({ variant: "destructive", title: "Geolocation Error", description: errorMsg });
         return;
     }
 
     let initialLocationFound = false;
-
     const handleSuccess = (position: GeolocationPosition) => {
         const { latitude, longitude } = position.coords;
         const newPosition: LatLng = L.latLng(latitude, longitude);
@@ -74,28 +84,17 @@ export default function MapExplorer() {
             initialLocationFound = true;
         }
     };
-
     const handleError = (error: GeolocationPositionError) => {
-        const errorMsg = error.code === error.PERMISSION_DENIED
-            ? "Location access denied."
-            : `Geolocation error (code ${error.code}): ${error.message}`;
+        const errorMsg = error.code === error.PERMISSION_DENIED ? "Location access denied." : `Geolocation error (code ${error.code}): ${error.message}`;
         addLog(`Error: ${errorMsg}`);
         if (isLocating) setIsLocating(false);
         if (error.code === error.PERMISSION_DENIED) {
-            toast({
-                variant: "destructive",
-                title: "Geolocation Error",
-                description: "Location access denied. Please enable it in your browser settings.",
-            });
+            toast({ variant: "destructive", title: "Geolocation Error", description: "Location access denied. Please enable it in your browser settings." });
         }
     };
     
     addLog('Setting up geolocation watcher.');
-    watchIdRef.current = navigator.geolocation.watchPosition(
-        handleSuccess,
-        handleError,
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    watchIdRef.current = navigator.geolocation.watchPosition(handleSuccess, handleError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
 
     return () => {
         if (watchIdRef.current !== null) {
@@ -108,35 +107,27 @@ export default function MapExplorer() {
 
   const handleMapClick = (latlng: LatLng) => {
     addLog(`Map clicked at: ${latlng.lat}, ${latlng.lng}`);
-  };
-  
-  const handleGeocode = async (address: string) => {
-    addLog(`Geocoding address: "${address}"`);
-    setIsGeocoding(true);
-    try {
-      const result = await geocodeAddress({ address });
-      if (result.latitude && result.longitude) {
-        const position: LatLngExpression = [result.latitude, result.longitude];
-        addLog(`Geocode success: ${result.latitude}, ${result.longitude}`);
-        setView({ center: position, zoom: 17 });
-        const newMarker: MarkerData = {
-          id: `marker-${componentId}-${Date.now()}`,
-          position,
-          label: address,
-        };
-        setMarkers((prev) => [...prev, newMarker]);
-      } else {
-         addLog(`Geocode failed for: "${address}"`);
-      }
-    } catch (error) {
-      addLog(`Geocode error: ${error}`);
-      toast({
-        variant: "destructive",
-        title: "Geocoding Error",
-        description: "Could not find the specified location. Please try a different address.",
-      });
-    } finally {
-      setIsGeocoding(false);
+
+    if (interactionMode === 'add_pin') {
+        addLog('Creating new pin.');
+        setNewItem({ type: 'pin', data: latlng });
+        setIsSheetOpen(true);
+        setInteractionMode('none');
+    }
+
+    if (interactionMode === 'draw_line') {
+        if (linePoints.length === 0) {
+            addLog('Starting a new line.');
+            setLinePoints([latlng]);
+            toast({ title: "Line Started", description: "Click another point on the map to finish the line." });
+        } else {
+            addLog('Finishing line.');
+            const finalPoints = [...linePoints, latlng];
+            setNewItem({ type: 'line', data: finalPoints });
+            setIsSheetOpen(true);
+            setInteractionMode('none');
+            setLinePoints([]);
+        }
     }
   };
 
@@ -150,6 +141,38 @@ export default function MapExplorer() {
         setIsLocating(true); 
     }
   };
+  
+  const handleSaveNewItem = () => {
+    if (!newItem || !newItemLabel.trim()) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Please provide a label." });
+      return;
+    }
+    
+    if (newItem.type === 'pin') {
+      const newPin: Pin = {
+        id: `pin-${componentId}-${Date.now()}`,
+        lat: newItem.data.lat,
+        lng: newItem.data.lng,
+        label: newItemLabel
+      };
+      setPins(prev => [...prev, newPin]);
+      addLog(`Saved pin: "${newItemLabel}"`);
+    }
+
+    if (newItem.type === 'line') {
+      const newLine: Line = {
+        id: `line-${componentId}-${Date.now()}`,
+        path: newItem.data.map((p: LatLng) => ({ lat: p.lat, lng: p.lng })),
+        label: newItemLabel,
+      };
+      setLines(prev => [...prev, newLine]);
+      addLog(`Saved line: "${newItemLabel}"`);
+    }
+    
+    setIsSheetOpen(false);
+    setNewItem(null);
+    setNewItemLabel('');
+  };
 
   const handleShowLog = () => {
     const lastEntry = log[log.length - 1] || 'Log is empty.';
@@ -158,6 +181,21 @@ export default function MapExplorer() {
         description: <pre className="text-xs whitespace-pre-wrap">{lastEntry}</pre>
     });
   }
+
+  const getInteractionCursor = () => {
+    switch (interactionMode) {
+      case 'add_pin':
+      case 'draw_line':
+        return 'crosshair';
+      default:
+        return 'grab';
+    }
+  };
+  
+  const sheetTitle = newItem?.type === 'pin' ? 'Add a new Pin' : 'Add a new Line';
+  const sheetDescription = newItem?.type === 'pin' 
+      ? "You've added a pin to the map. Give it a label to save it."
+      : "You've drawn a line on the map. Give it a label to save it.";
 
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
@@ -184,23 +222,54 @@ export default function MapExplorer() {
                         <p>Show Last Log</p>
                     </TooltipContent>
                 </Tooltip>
+
+                <div className="flex flex-col gap-2 p-2 bg-card rounded-full shadow-lg border">
+                   <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button 
+                                variant={interactionMode === 'add_pin' ? 'default' : 'ghost'} 
+                                size="icon" 
+                                className="h-10 w-10 rounded-full"
+                                onClick={() => setInteractionMode(p => p === 'add_pin' ? 'none' : 'add_pin')}
+                            >
+                                <MapPin className="h-5 w-5" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right"><p>Add a Pin</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                             <Button 
+                                variant={interactionMode === 'draw_line' ? 'default' : 'ghost'} 
+                                size="icon" 
+                                className="h-10 w-10 rounded-full"
+                                onClick={() => setInteractionMode(p => p === 'draw_line' ? 'none' : 'draw_line')}
+                            >
+                                <Milestone className="h-5 w-5" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right"><p>Draw a Line</p></TooltipContent>
+                    </Tooltip>
+                </div>
             </TooltipProvider>
         </div>
 
 
       <main className="flex-1 flex flex-col relative h-full">
-        <div className="flex-1 relative">
+        <div className="flex-1 relative" style={{ cursor: getInteractionCursor() }}>
             <Map
               center={view.center}
               zoom={view.zoom}
-              markers={markers}
-              lines={[]}
+              pins={pins}
+              lines={lines}
               onMapClick={handleMapClick}
               currentLocation={currentLocation}
             />
-             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
-                <Crosshair className="h-8 w-8 text-primary opacity-80" />
-            </div>
+             {interactionMode === 'none' && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
+                    <Crosshair className="h-8 w-8 text-primary opacity-80" />
+                </div>
+             )}
            
             <TooltipProvider>
               <Tooltip>
@@ -222,6 +291,30 @@ export default function MapExplorer() {
             </TooltipProvider>
         </div>
       </main>
+
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent>
+            <SheetHeader>
+                <SheetTitle>{sheetTitle}</SheetTitle>
+                <SheetDescription>{sheetDescription}</SheetDescription>
+            </SheetHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="item-label" className="text-right">Label</Label>
+                    <Input 
+                        id="item-label"
+                        value={newItemLabel}
+                        onChange={(e) => setNewItemLabel(e.target.value)}
+                        className="col-span-3"
+                        placeholder="e.g. Eiffel Tower"
+                    />
+                </div>
+            </div>
+            <SheetFooter>
+                <Button type="submit" onClick={handleSaveNewItem}>Save</Button>
+            </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
