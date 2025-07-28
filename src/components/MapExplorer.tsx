@@ -56,6 +56,8 @@ export default function MapExplorer() {
   const { toast } = useToast();
   const componentId = useId();
   const watchIdRef = useRef<number | null>(null);
+  
+  const [pendingPin, setPendingPin] = useState<LatLng | null>(null);
 
   const addLog = (entry: string) => {
     setLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${entry}`]);
@@ -76,8 +78,9 @@ export default function MapExplorer() {
         const { latitude, longitude } = position.coords;
         const newPosition: LatLng = L.latLng(latitude, longitude);
         setCurrentLocation(newPosition);
-        addLog(`Location updated: ${latitude}, ${longitude}`);
+        // Do not log every location update to prevent clutter
         if (!initialLocationFound) {
+            addLog(`Initial location found: ${latitude}, ${longitude}`);
             addLog('Centering map on initial location.');
             setView({ center: newPosition, zoom: 15 });
             setIsLocating(false);
@@ -110,9 +113,8 @@ export default function MapExplorer() {
 
     if (interactionMode === 'add_pin') {
         addLog('Creating new pin.');
-        setNewItem({ type: 'pin', data: latlng });
-        setIsSheetOpen(true);
-        setInteractionMode('none');
+        setPendingPin(latlng);
+        setInteractionMode('none'); // Exit add_pin mode after first click
     }
 
     if (interactionMode === 'draw_line') {
@@ -141,6 +143,24 @@ export default function MapExplorer() {
         setIsLocating(true); 
     }
   };
+
+  const handlePinSave = (label: string) => {
+    if (!pendingPin) return;
+    const newPin: Pin = {
+      id: `pin-${componentId}-${Date.now()}`,
+      lat: pendingPin.lat,
+      lng: pendingPin.lng,
+      label: label
+    };
+    setPins(prev => [...prev, newPin]);
+    addLog(`Saved pin: "${label}"`);
+    setPendingPin(null);
+  };
+
+  const handlePinCancel = () => {
+    setPendingPin(null);
+    addLog('Pin creation cancelled.');
+  };
   
   const handleSaveNewItem = () => {
     if (!newItem || !newItemLabel.trim()) {
@@ -148,17 +168,7 @@ export default function MapExplorer() {
       return;
     }
     
-    if (newItem.type === 'pin') {
-      const newPin: Pin = {
-        id: `pin-${componentId}-${Date.now()}`,
-        lat: newItem.data.lat,
-        lng: newItem.data.lng,
-        label: newItemLabel
-      };
-      setPins(prev => [...prev, newPin]);
-      addLog(`Saved pin: "${newItemLabel}"`);
-    }
-
+    // This part is now only for lines, as pins are handled via popup
     if (newItem.type === 'line') {
       const newLine: Line = {
         id: `line-${componentId}-${Date.now()}`,
@@ -175,10 +185,11 @@ export default function MapExplorer() {
   };
 
   const handleShowLog = () => {
-    const lastEntry = log[log.length - 1] || 'Log is empty.';
+    const logContent = log.join('\n');
     toast({
-        title: "Latest Log Entry",
-        description: <pre className="text-xs whitespace-pre-wrap">{lastEntry}</pre>
+        title: "Event Log",
+        description: <pre className="text-xs whitespace-pre-wrap max-h-60 overflow-y-auto">{logContent}</pre>,
+        duration: 10000,
     });
   }
 
@@ -192,10 +203,8 @@ export default function MapExplorer() {
     }
   };
   
-  const sheetTitle = newItem?.type === 'pin' ? 'Add a new Pin' : 'Add a new Line';
-  const sheetDescription = newItem?.type === 'pin' 
-      ? "You've added a pin to the map. Give it a label to save it."
-      : "You've drawn a line on the map. Give it a label to save it.";
+  const sheetTitle = 'Add a new Line';
+  const sheetDescription = "You've drawn a line on the map. Give it a label to save it.";
 
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
@@ -213,7 +222,7 @@ export default function MapExplorer() {
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                        <p>Show Last Log</p>
+                        <p>Show Event Log</p>
                     </TooltipContent>
                 </Tooltip>
 
@@ -224,7 +233,12 @@ export default function MapExplorer() {
                                 variant={interactionMode === 'add_pin' ? 'default' : 'ghost'} 
                                 size="icon" 
                                 className="h-10 w-10 rounded-full"
-                                onClick={() => setInteractionMode(p => p === 'add_pin' ? 'none' : 'add_pin')}
+                                onClick={() => {
+                                  setInteractionMode(p => p === 'add_pin' ? 'none' : 'add_pin');
+                                  if (interactionMode !== 'add_pin') {
+                                    toast({ title: 'Add a Pin', description: 'Click anywhere on the map to place a pin.' });
+                                  }
+                                }}
                             >
                                 <MapPin className="h-5 w-5" />
                             </Button>
@@ -258,6 +272,9 @@ export default function MapExplorer() {
               lines={lines}
               onMapClick={handleMapClick}
               currentLocation={currentLocation}
+              pendingPin={pendingPin}
+              onPinSave={handlePinSave}
+              onPinCancel={handlePinCancel}
             />
              {interactionMode === 'none' && (
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
@@ -300,7 +317,7 @@ export default function MapExplorer() {
                         value={newItemLabel}
                         onChange={(e) => setNewItemLabel(e.target.value)}
                         className="col-span-3"
-                        placeholder="e.g. Eiffel Tower"
+                        placeholder="e.g. Start of trail"
                     />
                 </div>
             </div>

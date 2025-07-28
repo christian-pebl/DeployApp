@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup } from 'leaflet';
+import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup } from 'leaflet';
 
 interface MapProps {
     center: LatLngExpression;
@@ -10,7 +10,10 @@ interface MapProps {
     pins: { id: string; lat: number; lng: number; label: string }[];
     lines: { id: string; path: { lat: number; lng: number }[]; label: string }[];
     currentLocation: LatLngExpression | null;
+    pendingPin: LatLng | null;
     onMapClick: (latlng: LatLng) => void;
+    onPinSave: (label: string) => void;
+    onPinCancel: () => void;
 }
 
 const createCustomIcon = (color: string) => {
@@ -27,12 +30,14 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
-const Map = ({ center, zoom, pins, lines, currentLocation, onMapClick }: MapProps) => {
+const Map = ({ center, zoom, pins, lines, currentLocation, pendingPin, onMapClick, onPinSave, onPinCancel }: MapProps) => {
     const mapRef = useRef<LeafletMap | null>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
     const lineLayerRef = useRef<LayerGroup | null>(null);
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
+    const pendingPinMarkerRef = useRef<LeafletMarker | null>(null);
+    const popupRef = useRef<Popup | null>(null);
 
     useEffect(() => {
         if (typeof window.L === 'undefined') return;
@@ -59,7 +64,9 @@ const Map = ({ center, zoom, pins, lines, currentLocation, onMapClick }: MapProp
             lineLayerRef.current = L.layerGroup().addTo(mapRef.current);
 
             mapRef.current.on('click', (e) => {
-                onMapClick(e.latlng);
+                if (!popupRef.current || !popupRef.current.isOpen()) {
+                   onMapClick(e.latlng);
+                }
             });
         }
 
@@ -109,15 +116,17 @@ const Map = ({ center, zoom, pins, lines, currentLocation, onMapClick }: MapProp
                     opacity: 0.8
                 }).addTo(layer);
 
-                const midIndex = Math.floor(latlngs.length / 2);
-                L.tooltip({
-                    permanent: true,
-                    direction: 'center',
-                    className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
-                })
-                .setLatLng(latlngs[midIndex] as LatLng)
-                .setContent(line.label)
-                .addTo(layer);
+                if(line.label) {
+                    const midIndex = Math.floor(latlngs.length / 2);
+                    L.tooltip({
+                        permanent: true,
+                        direction: 'center',
+                        className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
+                    })
+                    .setLatLng(latlngs[midIndex] as LatLng)
+                    .setContent(line.label)
+                    .addTo(layer);
+                }
             });
         }
     }, [lines]);
@@ -145,6 +154,64 @@ const Map = ({ center, zoom, pins, lines, currentLocation, onMapClick }: MapProp
             currentLocationMarkerRef.current = null;
         }
     }, [currentLocation]);
+
+    useEffect(() => {
+        if (mapRef.current && typeof window.L !== 'undefined') {
+            const map = mapRef.current;
+            
+            // Cleanup previous pending pin
+            if (pendingPinMarkerRef.current) {
+                pendingPinMarkerRef.current.remove();
+                pendingPinMarkerRef.current = null;
+            }
+            if(popupRef.current) {
+                popupRef.current.remove();
+                popupRef.current = null;
+            }
+
+            if (pendingPin) {
+                const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent');
+                const markerIcon = createCustomIcon(`hsl(${accentColor})`);
+                
+                pendingPinMarkerRef.current = L.marker(pendingPin, { icon: markerIcon }).addTo(map);
+
+                const formId = `pin-form-${Date.now()}`;
+                const content = `
+                    <form id="${formId}" class="flex flex-col gap-2">
+                        <input type="text" name="label" placeholder="Enter pin label" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
+                        <div class="flex justify-end gap-2">
+                            <button type="button" id="cancel-pin" class="px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Cancel</button>
+                            <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
+                        </div>
+                    </form>
+                `;
+
+                popupRef.current = L.popup({ closeButton: false, closeOnClick: false, className: 'p-0' })
+                    .setLatLng(pendingPin)
+                    .setContent(content)
+                    .openOn(map);
+                
+                popupRef.current.on('remove', onPinCancel);
+
+                // Need to use a timeout to ensure the DOM is ready for event listeners
+                setTimeout(() => {
+                    const form = document.getElementById(formId);
+                    const cancelButton = document.getElementById('cancel-pin');
+
+                    form?.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        const input = (e.target as HTMLFormElement).elements.namedItem('label') as HTMLInputElement;
+                        onPinSave(input.value);
+                    });
+
+                    cancelButton?.addEventListener('click', () => {
+                        onPinCancel();
+                    });
+                }, 0);
+            }
+        }
+    }, [pendingPin, onPinSave, onPinCancel]);
+
 
     return <div ref={mapContainerRef} className="h-full w-full z-0" />;
 };
