@@ -11,7 +11,6 @@ interface MapProps {
     lines: { id: string; positions: LatLngExpression[]; label: string }[];
     currentLocation: LatLngExpression | null;
     onMapClick: (latlng: LatLng) => void;
-    onMapMove: (center: LatLng, zoom: number) => void;
 }
 
 const createCustomIcon = (color: string) => {
@@ -28,7 +27,7 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
-const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick, onMapMove }: MapProps) => {
+const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick }: MapProps) => {
     const mapRef = useRef<LeafletMap | null>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const markersRef = useRef<{ [key: string]: LeafletMarker }>({});
@@ -58,12 +57,6 @@ const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick, onMapM
 
             mapRef.current.on('click', (e) => {
                 onMapClick(e.latlng);
-            });
-
-            mapRef.current.on('moveend', () => {
-                if (mapRef.current) {
-                    onMapMove(mapRef.current.getCenter(), mapRef.current.getZoom());
-                }
             });
         }
 
@@ -173,5 +166,3 @@ const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick, onMapM
 };
 
 export default Map;
-
-    

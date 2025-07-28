@@ -258,23 +258,6 @@ export default function MapExplorer() {
   }, [toast]);
 
 
-  const handleMapMove = (center: LatLng, zoom: number) => {
-    const newCenter: LatLngExpression = [center.lat, center.lng];
-    
-    if (isDrawingLine && drawingLine) {
-        setDrawingLine(prev => {
-            if (!prev) return null;
-            return {
-                ...prev,
-                positions: [prev.positions[0], newCenter]
-            }
-        });
-    } else {
-      // Only update view state if not drawing a line
-      setView({ center: newCenter, zoom });
-    }
-  };
-
   const handleMapClick = (latlng: LatLng) => {
     addLog(`Map clicked at: ${latlng.lat}, ${latlng.lng}`);
     if (isSidebarOpen) {
@@ -524,7 +507,6 @@ export default function MapExplorer() {
               markers={markers}
               lines={drawingLine ? [...lines, drawingLine] : lines}
               onMapClick={handleMapClick}
-              onMapMove={handleMapMove}
               currentLocation={currentLocation}
             />
              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
