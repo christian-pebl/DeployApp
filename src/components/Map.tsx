@@ -5,6 +5,7 @@ import React, { useEffect, useRef } from 'react';
 import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup, LocationEvent } from 'leaflet';
 
 interface MapProps {
+    mapRef: React.MutableRefObject<LeafletMap | null>;
     center: LatLngExpression;
     zoom: number;
     pins: { id: string; lat: number; lng: number; label: string }[];
@@ -32,8 +33,7 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
-const Map = ({ center, zoom, pins, lines, currentLocation, pendingPin, onMapClick, onPinSave, onPinCancel, onLocationFound, onLocationError }: MapProps) => {
-    const mapRef = useRef<LeafletMap | null>(null);
+const Map = ({ mapRef, center, zoom, pins, lines, currentLocation, pendingPin, onMapClick, onPinSave, onPinCancel, onLocationFound, onLocationError }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
     const lineLayerRef = useRef<LayerGroup | null>(null);

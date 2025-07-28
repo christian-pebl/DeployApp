@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useRef, useId, useEffect } from 'react';
-import type { LatLng, LatLngExpression } from 'leaflet';
+import type { LatLng, LatLngExpression, Map as LeafletMap } from 'leaflet';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +57,7 @@ export default function MapExplorer() {
   
   const [pendingPin, setPendingPin] = useState<LatLng | null>(null);
   const initialLocationFound = useRef(false);
+  const mapRef = useRef<LeafletMap | null>(null);
 
   const addLog = (entry: string) => {
     setLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${entry}`]);
@@ -104,11 +105,22 @@ export default function MapExplorer() {
         if (updatedLinePoints.length === 1) {
             addLog('Line started. Click another point to finish.');
             toast({ title: "Line Started", description: "Click another point on the map to finish the line." });
-        } else if (updatedLinePoints.length === 2) {
+        } else if (updatedLinePoints.length >= 2) {
             addLog('Line endpoint selected. Opening details pane.');
             setIsSheetOpen(true);
             setInteractionMode('none');
         }
+    }
+  };
+  
+  const handleAddPin = () => {
+    if (mapRef.current) {
+        const center = mapRef.current.getCenter();
+        addLog(`Adding pin at map center: ${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`);
+        setPendingPin(center);
+    } else {
+        addLog('Error: Map not initialized.');
+        toast({ variant: "destructive", title: "Error", description: "Map is not ready yet." });
     }
   };
 
@@ -205,18 +217,7 @@ export default function MapExplorer() {
                                 variant={interactionMode === 'add_pin' ? 'default' : 'ghost'} 
                                 size="icon" 
                                 className="h-10 w-10 rounded-full"
-                                onClick={() => {
-                                  setInteractionMode(prev => {
-                                      const newMode = prev === 'add_pin' ? 'none' : 'add_pin';
-                                      if (newMode === 'add_pin') {
-                                          toast({ title: 'Add a Pin', description: 'Click anywhere on the map to place a pin.' });
-                                          addLog('Entered "Add Pin" mode.');
-                                      } else {
-                                          addLog('Exited "Add Pin" mode.');
-                                      }
-                                      return newMode;
-                                  });
-                                }}
+                                onClick={handleAddPin}
                             >
                                 <MapPin className="h-5 w-5" />
                             </Button>
@@ -260,6 +261,7 @@ export default function MapExplorer() {
       <main className="flex-1 flex flex-col relative h-full">
         <div className="flex-1 relative" style={{ cursor: getInteractionCursor() }}>
             <Map
+              mapRef={mapRef}
               center={view.center}
               zoom={view.zoom}
               pins={pins}
