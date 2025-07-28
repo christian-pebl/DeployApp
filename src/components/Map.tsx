@@ -10,6 +10,7 @@ interface MapProps {
     zoom: number;
     pins: { id: string; lat: number; lng: number; label: string }[];
     lines: { id: string; path: { lat: number; lng: number }[]; label: string }[];
+    liveLine: LatLng[] | null;
     currentLocation: LatLng | null;
     pendingPin: LatLng | null;
     onMapClick: (latlng: LatLng) => void;
@@ -33,10 +34,11 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
-const Map = ({ mapRef, center, zoom, pins, lines, currentLocation, pendingPin, onMapClick, onPinSave, onPinCancel, onLocationFound, onLocationError }: MapProps) => {
+const Map = ({ mapRef, center, zoom, pins, lines, liveLine, currentLocation, pendingPin, onMapClick, onPinSave, onPinCancel, onLocationFound, onLocationError }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
     const lineLayerRef = useRef<LayerGroup | null>(null);
+    const liveLineRef = useRef<Polyline | null>(null);
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
     const pendingPinMarkerRef = useRef<LeafletMarker | null>(null);
     const popupRef = useRef<Popup | null>(null);
@@ -71,7 +73,6 @@ const Map = ({ mapRef, center, zoom, pins, lines, currentLocation, pendingPin, o
                 }
             });
 
-            // Use Leaflet's built-in geolocation
             mapRef.current.locate({ watch: true, setView: false });
 
             mapRef.current.on('locationfound', (e: LocationEvent) => {
@@ -144,6 +145,29 @@ const Map = ({ mapRef, center, zoom, pins, lines, currentLocation, pendingPin, o
     }, [lines]);
 
     useEffect(() => {
+        if (mapRef.current && typeof window.L !== 'undefined') {
+            const map = mapRef.current;
+            const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
+
+            if (liveLine && liveLine.length >= 2) {
+                if (!liveLineRef.current) {
+                    liveLineRef.current = L.polyline(liveLine, {
+                        color: `hsl(${primaryColor})`,
+                        weight: 4,
+                        opacity: 0.8,
+                        dashArray: '5, 10'
+                    }).addTo(map);
+                } else {
+                    liveLineRef.current.setLatLngs(liveLine);
+                }
+            } else if (liveLineRef.current) {
+                liveLineRef.current.remove();
+                liveLineRef.current = null;
+            }
+        }
+    }, [liveLine]);
+
+    useEffect(() => {
         if (mapRef.current && typeof window.L !== 'undefined' && currentLocation) {
             const map = mapRef.current;
             const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
@@ -205,7 +229,6 @@ const Map = ({ mapRef, center, zoom, pins, lines, currentLocation, pendingPin, o
                 
                 popupRef.current.on('remove', onPinCancel);
 
-                // Need to use a timeout to ensure the DOM is ready for event listeners
                 setTimeout(() => {
                     const form = document.getElementById(formId);
                     const cancelButton = document.getElementById('cancel-pin');
@@ -229,3 +252,5 @@ const Map = ({ mapRef, center, zoom, pins, lines, currentLocation, pendingPin, o
 };
 
 export default Map;
+
+    

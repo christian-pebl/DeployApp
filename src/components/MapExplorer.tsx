@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Code } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -33,7 +33,7 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 type Pin = { id: string; lat: number; lng: number; label: string };
 type Line = { id: string; path: { lat: number; lng: number }[]; label: string };
-type InteractionMode = 'none' | 'add_pin' | 'draw_line';
+type InteractionMode = 'none' | 'add_pin' | 'draw_line_start' | 'draw_line_end';
 
 export default function MapExplorer() {
   const [log, setLog] = useState<string[]>(['App Initialized']);
@@ -48,6 +48,7 @@ export default function MapExplorer() {
   
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('none');
   const [linePoints, setLinePoints] = useState<LatLng[]>([]);
+  const [liveLine, setLiveLine] = useState<LatLng[] | null>(null);
   
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [newItemLabel, setNewItemLabel] = useState('');
@@ -67,6 +68,27 @@ export default function MapExplorer() {
       addLog('Attempting to get user location.');
       setIsLocating(true);
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || interactionMode !== 'draw_line_start') {
+        setLiveLine(null);
+        return;
+    }
+
+    const handleMove = () => {
+        if (linePoints.length > 0) {
+            setLiveLine([linePoints[0], map.getCenter()]);
+        }
+    };
+    
+    map.on('move', handleMove);
+
+    return () => {
+        map.off('move', handleMove);
+    };
+}, [interactionMode, linePoints]);
+
 
   const handleLocationFound = (latlng: LatLng) => {
     setCurrentLocation(latlng);
@@ -91,25 +113,6 @@ export default function MapExplorer() {
 
   const handleMapClick = (latlng: LatLng) => {
     addLog(`Map clicked at: ${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`);
-
-    if (interactionMode === 'add_pin') {
-        setPendingPin(latlng);
-        setInteractionMode('none');
-    }
-
-    if (interactionMode === 'draw_line') {
-        const updatedLinePoints = [...linePoints, latlng];
-        setLinePoints(updatedLinePoints);
-
-        if (updatedLinePoints.length === 1) {
-            addLog('Line started. Click another point to finish.');
-            toast({ title: "Line Started", description: "Click another point on the map to finish the line." });
-        } else if (updatedLinePoints.length >= 2) {
-            addLog('Line endpoint selected. Opening details pane.');
-            setIsSheetOpen(true);
-            setInteractionMode('none');
-        }
-    }
   };
   
   const handleAddPin = () => {
@@ -121,6 +124,27 @@ export default function MapExplorer() {
     } else {
         addLog('Error: Map not initialized.');
         toast({ variant: "destructive", title: "Error", description: "Map is not ready yet." });
+    }
+  };
+  
+  const handleStartLine = () => {
+    if (mapRef.current) {
+      const center = mapRef.current.getCenter();
+      setLinePoints([center]);
+      setInteractionMode('draw_line_start');
+      addLog('Line started. Drag map to draw.');
+      toast({ title: 'Line Started', description: 'Pan the map to draw the line. Click Confirm to set the end point.' });
+    }
+  };
+
+  const handleConfirmLine = () => {
+    if (mapRef.current && linePoints.length === 1) {
+        const endPoint = mapRef.current.getCenter();
+        setLinePoints(prev => [...prev, endPoint]);
+        setInteractionMode('none');
+        setIsSheetOpen(true);
+        setLiveLine(null);
+        addLog('Line endpoint confirmed. Opening details pane.');
     }
   };
 
@@ -192,16 +216,6 @@ export default function MapExplorer() {
         duration: 10000,
     });
   }
-
-  const getInteractionCursor = () => {
-    switch (interactionMode) {
-      case 'add_pin':
-      case 'draw_line':
-        return 'crosshair';
-      default:
-        return 'grab';
-    }
-  };
   
   const sheetTitle = 'Add a new Line';
   const sheetDescription = "You've drawn a line on the map. Give it a label to save it.";
@@ -210,63 +224,50 @@ export default function MapExplorer() {
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
        
       <main className="flex-1 flex flex-col relative h-full">
-         <div className="absolute top-4 left-4 z-30 flex flex-col gap-2 bg-background/80 p-2 rounded-lg shadow-lg backdrop-blur-sm border">
+         <div className="absolute top-4 left-4 z-30 flex items-center gap-2 bg-background/80 p-2 rounded-lg shadow-lg backdrop-blur-sm border">
            <TooltipProvider>
                <Tooltip>
                     <TooltipTrigger asChild>
                         <Button 
-                            variant={interactionMode === 'add_pin' ? 'secondary' : 'ghost'} 
-                            onClick={() => {
-                                setInteractionMode('add_pin');
-                                handleAddPin();
-                            }}
-                            className="w-full justify-start"
+                            variant={'ghost'} 
+                            size="icon"
+                            onClick={handleAddPin}
+                            className="rounded-full h-10 w-10"
                         >
-                            <MapPin className="mr-2 h-5 w-5" />
-                            Add a Pin
+                            <MapPin className="h-5 w-5" />
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="right"><p>Drop a pin at the map center</p></TooltipContent>
+                    <TooltipContent side="right"><p>Add a Pin</p></TooltipContent>
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger asChild>
                          <Button 
-                            variant={interactionMode === 'draw_line' ? 'secondary' : 'ghost'}
-                            onClick={() => {
-                                setInteractionMode(prev => {
-                                    const newMode = prev === 'draw_line' ? 'none' : 'draw_line';
-                                    if (newMode === 'draw_line') {
-                                        toast({ title: 'Draw a Line', description: 'Click a start and end point on the map.' });
-                                        addLog('Entered "Draw Line" mode.');
-                                    } else {
-                                        addLog('Exited "Draw Line" mode.');
-                                        setLinePoints([]); // Clear points if exiting mode
-                                    }
-                                    return newMode;
-                                });
-                            }}
-                            className="w-full justify-start"
+                            variant={interactionMode.startsWith('draw_line') ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={handleStartLine}
+                            disabled={interactionMode.startsWith('draw_line')}
+                            className="rounded-full h-10 w-10"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
                                 <path d="M4 12h16"/>
                                 <circle cx="4" cy="12" r="2" fill="currentColor"/>
                                 <circle cx="20" cy="12" r="2" fill="currentColor"/>
                             </svg>
-                            Draw a Line
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="right"><p>Draw a line between two points</p></TooltipContent>
+                    <TooltipContent side="right"><p>Draw a Line</p></TooltipContent>
                 </Tooltip>
             </TooltipProvider>
         </div>
 
-        <div className="flex-1 relative" style={{ cursor: getInteractionCursor() }}>
+        <div className="flex-1 relative" style={{ cursor: interactionMode === 'none' ? 'grab' : 'crosshair' }}>
             <Map
               mapRef={mapRef}
               center={view.center}
               zoom={view.zoom}
               pins={pins}
               lines={lines}
+              liveLine={liveLine}
               onMapClick={handleMapClick}
               currentLocation={currentLocation}
               pendingPin={pendingPin}
@@ -279,6 +280,24 @@ export default function MapExplorer() {
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
                     <Crosshair className="h-8 w-8 text-primary opacity-80" />
                 </div>
+             )}
+             
+             {interactionMode === 'draw_line_start' && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-[1000] pointer-events-none text-center">
+                    <div className="bg-background/80 backdrop-blur-sm rounded-md px-3 py-1 text-sm font-semibold shadow-lg border">
+                        Pan map to draw line
+                    </div>
+                </div>
+            )}
+            
+            {interactionMode === 'draw_line_start' && (
+                 <Button 
+                    className="absolute bottom-24 right-4 z-[1000] shadow-lg"
+                    onClick={handleConfirmLine}
+                 >
+                     <Check className="mr-2 h-4 w-4" />
+                     Confirm Line
+                 </Button>
              )}
            
             <TooltipProvider>
@@ -310,7 +329,7 @@ export default function MapExplorer() {
                           onClick={handleShowLog}
                           className="h-12 w-12 rounded-full shadow-lg bg-card"
                       >
-                          <Code className="h-6 w-6" />
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
                       </Button>
                   </TooltipTrigger>
                   <TooltipContent side="left">
@@ -349,3 +368,5 @@ export default function MapExplorer() {
     </div>
   );
 }
+
+    
