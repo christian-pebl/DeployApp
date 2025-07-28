@@ -82,7 +82,7 @@ function SidebarContent({
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button onClick={onAddMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
+                            <Button onClick={() => onAddMarker()} variant="outline" size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
                                 <MapPin className="h-6 w-6"/>
                             </Button>
                         </TooltipTrigger>
@@ -92,7 +92,7 @@ function SidebarContent({
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                             <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
+                             <Button onClick={() => onStartLine()} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
                                 <Spline className="h-6 w-6" />
                             </Button>
                         </TooltipTrigger>
