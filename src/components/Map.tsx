@@ -2,18 +2,20 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup } from 'leaflet';
+import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup, LocationEvent } from 'leaflet';
 
 interface MapProps {
     center: LatLngExpression;
     zoom: number;
     pins: { id: string; lat: number; lng: number; label: string }[];
     lines: { id: string; path: { lat: number; lng: number }[]; label: string }[];
-    currentLocation: LatLngExpression | null;
+    currentLocation: LatLng | null;
     pendingPin: LatLng | null;
     onMapClick: (latlng: LatLng) => void;
     onPinSave: (label: string) => void;
     onPinCancel: () => void;
+    onLocationFound: (latlng: LatLng) => void;
+    onLocationError: (error: any) => void;
 }
 
 const createCustomIcon = (color: string) => {
@@ -30,7 +32,7 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
-const Map = ({ center, zoom, pins, lines, currentLocation, pendingPin, onMapClick, onPinSave, onPinCancel }: MapProps) => {
+const Map = ({ center, zoom, pins, lines, currentLocation, pendingPin, onMapClick, onPinSave, onPinCancel, onLocationFound, onLocationError }: MapProps) => {
     const mapRef = useRef<LeafletMap | null>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
@@ -67,6 +69,16 @@ const Map = ({ center, zoom, pins, lines, currentLocation, pendingPin, onMapClic
                 if (!popupRef.current || !popupRef.current.isOpen()) {
                    onMapClick(e.latlng);
                 }
+            });
+
+            // Use Leaflet's built-in geolocation
+            mapRef.current.locate({ watch: true, setView: false });
+
+            mapRef.current.on('locationfound', (e: LocationEvent) => {
+                onLocationFound(e.latlng);
+            });
+            mapRef.current.on('locationerror', (e: any) => {
+                onLocationError(e);
             });
         }
 

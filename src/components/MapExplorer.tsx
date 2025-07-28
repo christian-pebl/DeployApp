@@ -55,57 +55,39 @@ export default function MapExplorer() {
   
   const { toast } = useToast();
   const componentId = useId();
-  const watchIdRef = useRef<number | null>(null);
   
   const [pendingPin, setPendingPin] = useState<LatLng | null>(null);
+  const initialLocationFound = useRef(false);
 
   const addLog = (entry: string) => {
     setLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${entry}`]);
   };
-
+  
   useEffect(() => {
-    addLog('Attempting to get user location.');
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-        setIsLocating(false);
-        const errorMsg = "Geolocation not supported by your browser.";
-        addLog(`Error: ${errorMsg}`);
-        toast({ variant: "destructive", title: "Geolocation Error", description: errorMsg });
-        return;
+      addLog('Attempting to get user location.');
+      setIsLocating(true);
+  }, []);
+
+  const handleLocationFound = (latlng: LatLng) => {
+    setCurrentLocation(latlng);
+    if (!initialLocationFound.current) {
+      addLog(`Initial location found: ${latlng.lat}, ${latlng.lng}`);
+      addLog('Centering map on initial location.');
+      setView({ center: latlng, zoom: 15 });
+      setIsLocating(false);
+      initialLocationFound.current = true;
     }
+  };
 
-    let initialLocationFound = false;
-    const handleSuccess = (position: GeolocationPosition) => {
-        const { latitude, longitude } = position.coords;
-        const newPosition: LatLng = L.latLng(latitude, longitude);
-        setCurrentLocation(newPosition);
-        // Do not log every location update to prevent clutter
-        if (!initialLocationFound) {
-            addLog(`Initial location found: ${latitude}, ${longitude}`);
-            addLog('Centering map on initial location.');
-            setView({ center: newPosition, zoom: 15 });
-            setIsLocating(false);
-            initialLocationFound = true;
-        }
-    };
-    const handleError = (error: GeolocationPositionError) => {
-        const errorMsg = error.code === error.PERMISSION_DENIED ? "Location access denied." : `Geolocation error (code ${error.code}): ${error.message}`;
-        addLog(`Error: ${errorMsg}`);
-        if (isLocating) setIsLocating(false);
-        if (error.code === error.PERMISSION_DENIED) {
-            toast({ variant: "destructive", title: "Geolocation Error", description: "Location access denied. Please enable it in your browser settings." });
-        }
-    };
-    
-    addLog('Setting up geolocation watcher.');
-    watchIdRef.current = navigator.geolocation.watchPosition(handleSuccess, handleError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-
-    return () => {
-        if (watchIdRef.current !== null) {
-            addLog('Cleaning up geolocation watcher.');
-            navigator.geolocation.clearWatch(watchIdRef.current);
-        }
-    };
-  }, [toast]);
+  const handleLocationError = (error: any) => {
+    let errorMsg = `Geolocation error (code ${error.code}): ${error.message}`;
+    if (error.code === 1) { // PERMISSION_DENIED
+      errorMsg = "Location access denied. Please enable it in your browser settings.";
+    }
+    addLog(`Error: ${errorMsg}`);
+    if (isLocating) setIsLocating(false);
+    toast({ variant: "destructive", title: "Geolocation Error", description: errorMsg });
+  };
 
 
   const handleMapClick = (latlng: LatLng) => {
@@ -268,6 +250,8 @@ export default function MapExplorer() {
               pendingPin={pendingPin}
               onPinSave={handlePinSave}
               onPinCancel={handlePinCancel}
+              onLocationFound={handleLocationFound}
+              onLocationError={handleLocationError}
             />
              {interactionMode === 'none' && (
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
@@ -342,5 +326,3 @@ export default function MapExplorer() {
     </div>
   );
 }
-
-    
