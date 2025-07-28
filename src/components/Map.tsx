@@ -60,7 +60,7 @@ const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick, onMapM
                 onMapClick(e.latlng);
             });
 
-            mapRef.current.on('move', () => {
+            mapRef.current.on('moveend', () => {
                 if (mapRef.current) {
                     onMapMove(mapRef.current.getCenter(), mapRef.current.getZoom());
                 }
@@ -163,7 +163,7 @@ const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick, onMapM
             } else {
                 currentLocationMarkerRef.current.setLatLng(currentLocation);
             }
-        } else if (currentLocationMarkerRef.current) {
+        } else if (mapRef.current && !currentLocation && currentLocationMarkerRef.current) {
             currentLocationMarkerRef.current.remove();
             currentLocationMarkerRef.current = null;
         }
@@ -173,3 +173,5 @@ const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick, onMapM
 };
 
 export default Map;
+
+    

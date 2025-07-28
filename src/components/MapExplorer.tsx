@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useRef, useId, useEffect } from 'react';
@@ -23,7 +22,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight, ChevronLeft, Minus, icons, Notebook, Route } from 'lucide-react';
+import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight, ChevronLeft, Minus, icons, Notebook, Route, Orbit } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -94,7 +93,7 @@ function SidebarContent({
                     <Tooltip>
                         <TooltipTrigger asChild>
                              <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
-                                <Route className="h-6 w-6" />
+                                <Orbit className="h-6 w-6" />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
@@ -138,7 +137,7 @@ function SidebarContent({
                       <React.Fragment key={line.id}>
                         <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
                           <button onClick={() => onPanTo(line.positions[0])} className="flex-1 text-left truncate pr-2">
-                            <span className="font-medium text-sm"><Route className="inline-block mr-2 h-4 w-4"/>{line.label}</span>
+                            <span className="font-medium text-sm"><Orbit className="inline-block mr-2 h-4 w-4"/>{line.label}</span>
                           </button>
                           <Button
                             variant="ghost"
@@ -213,15 +212,18 @@ export default function MapExplorer() {
         return;
     }
 
+    let initialLocationFound = false;
+
     const handleSuccess = (position: GeolocationPosition) => {
         const { latitude, longitude } = position.coords;
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
         addLog(`Location updated: ${latitude}, ${longitude}`);
-        if (isLocating) {
+        if (!initialLocationFound) {
             addLog('Centering map on initial location.');
             setView({ center: newPosition, zoom: 15 });
             setIsLocating(false);
+            initialLocationFound = true;
         }
     };
 
@@ -253,13 +255,10 @@ export default function MapExplorer() {
             navigator.geolocation.clearWatch(watchIdRef.current);
         }
     };
-  }, [isLocating, toast]);
+  }, [toast]);
 
 
   const handleMapMove = (center: LatLng, zoom: number) => {
-    // This is a controlled component, but we want to avoid re-rendering on every move.
-    // We can use a ref to store the latest view state and only update the react state on 'moveend'
-    // For now, simple state update is fine.
     const newCenter: LatLngExpression = [center.lat, center.lng];
     
     if (isDrawingLine && drawingLine) {
@@ -271,7 +270,8 @@ export default function MapExplorer() {
             }
         });
     } else {
-        setView({ center: newCenter, zoom });
+      // Only update view state if not drawing a line
+      setView({ center: newCenter, zoom });
     }
   };
 
@@ -457,7 +457,7 @@ export default function MapExplorer() {
       {/* Sidebar for Desktop */}
       <div className={cn(
         "absolute top-0 left-0 h-full z-20 transition-transform duration-300 ease-in-out",
-        "w-72 bg-card/80 backdrop-blur-sm border-r",
+        "w-64 bg-card/80 backdrop-blur-sm border-r",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}>
         <SidebarContent {...sidebarProps} />
@@ -599,7 +599,7 @@ export default function MapExplorer() {
                                 />
                             </div>
                             <Button type="submit">
-                                <Spline className="mr-2 h-4 w-4" /> Save Line
+                                <Orbit className="mr-2 h-4 w-4" /> Save Line
                             </Button>
                         </div>
                     </form>
@@ -621,9 +621,9 @@ export default function MapExplorer() {
                     size="icon" 
                     className="absolute top-4 right-4 h-12 w-12 rounded-full shadow-lg z-[1000]"
                     onClick={handleLocateMe}
-                    disabled={isLocating}
+                    disabled={isLocating && !currentLocation}
                   >
-                    {isLocating ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
+                    {isLocating && !currentLocation ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -636,3 +636,5 @@ export default function MapExplorer() {
     </div>
   );
 }
+
+    
