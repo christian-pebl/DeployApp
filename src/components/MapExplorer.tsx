@@ -22,7 +22,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight, ChevronLeft, Minus } from 'lucide-react';
+import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight, ChevronLeft, Minus, icons } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -92,7 +92,7 @@ function SidebarContent({
                     <Tooltip>
                         <TooltipTrigger asChild>
                              <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
-                               <Spline className="h-6 w-6" />
+                                <Minus className="h-6 w-6" />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
@@ -136,7 +136,7 @@ function SidebarContent({
                       <React.Fragment key={line.id}>
                         <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
                           <button onClick={() => onPanTo(line.positions[0])} className="flex-1 text-left truncate pr-2">
-                            <span className="font-medium text-sm"><Spline className="inline-block mr-2 h-4 w-4"/>{line.label}</span>
+                            <span className="font-medium text-sm"><Minus className="inline-block mr-2 h-4 w-4"/>{line.label}</span>
                           </button>
                           <Button
                             variant="ghost"
@@ -421,7 +421,7 @@ export default function MapExplorer() {
       <div className={cn(
         "absolute top-0 left-0 h-full z-20 transition-transform duration-300 ease-in-out",
         "w-72 bg-card/80 backdrop-blur-sm border-r",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        isSidebarOpen ? "translate-x-0" : "-translate-x-72"
       )}>
         <SidebarContent {...sidebarProps} />
       </div>
@@ -524,7 +524,7 @@ export default function MapExplorer() {
                                 />
                             </div>
                             <Button type="submit">
-                                <Spline className="mr-2 h-4 w-4" /> Save Line
+                                <Minus className="mr-2 h-4 w-4" /> Save Line
                             </Button>
                         </div>
                     </form>
@@ -561,5 +561,3 @@ export default function MapExplorer() {
     </div>
   );
 }
-
-    
