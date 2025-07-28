@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -152,10 +152,11 @@ export default function MapExplorer() {
     addLog('Locate me button clicked.');
     if (currentLocation) {
         addLog('Centering view on current location.');
-        setView({ center: currentLocation, zoom: 15 });
-    } else {
+        mapRef.current?.setView(currentLocation, 15, { animate: true });
+    } else if (mapRef.current) {
         addLog('Current location not available, re-attempting location.');
-        setIsLocating(true); 
+        setIsLocating(true);
+        mapRef.current.locate({ setView: true, maxZoom: 15 });
     }
   };
 
@@ -368,5 +369,3 @@ export default function MapExplorer() {
     </div>
   );
 }
-
-    
