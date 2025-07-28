@@ -1,21 +1,21 @@
 
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup, LocationEvent } from 'leaflet';
+import React, { useEffect, useRef, useState } from 'react';
+import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup, LocationEvent, LeafletMouseEvent } from 'leaflet';
+
+type Pin = { id: string; lat: number; lng: number; label: string };
+type Line = { id: string; path: { lat: number; lng: number }[]; label: string };
 
 interface MapProps {
     mapRef: React.MutableRefObject<LeafletMap | null>;
     center: LatLngExpression;
     zoom: number;
-    pins: { id: string; lat: number; lng: number; label: string }[];
-    lines: { id: string; path: { lat: number; lng: number }[]; label: string }[];
-    liveLine: LatLng[] | null;
+    pins: Pin[];
+    setPins: React.Dispatch<React.SetStateAction<Pin[]>>;
+    lines: Line[];
+    setLines: React.Dispatch<React.SetStateAction<Line[]>>;
     currentLocation: LatLng | null;
-    pendingPin: LatLng | null;
-    onMapClick: (latlng: LatLng) => void;
-    onPinSave: (label: string) => void;
-    onPinCancel: () => void;
     onLocationFound: (latlng: LatLng) => void;
     onLocationError: (error: any) => void;
 }
@@ -34,53 +34,145 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
-const Map = ({ mapRef, center, zoom, pins, lines, liveLine, currentLocation, pendingPin, onMapClick, onPinSave, onPinCancel, onLocationFound, onLocationError }: MapProps) => {
+const Map = ({ mapRef, center, zoom, pins, setPins, lines, setLines, currentLocation, onLocationFound, onLocationError }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
     const lineLayerRef = useRef<LayerGroup | null>(null);
-    const liveLineRef = useRef<Polyline | null>(null);
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
-    const pendingPinMarkerRef = useRef<LeafletMarker | null>(null);
     const popupRef = useRef<Popup | null>(null);
+    
+    const [linePoints, setLinePoints] = useState<LatLng[]>([]);
 
     useEffect(() => {
         if (typeof window.L === 'undefined') return;
 
         if (mapContainerRef.current && !mapRef.current) {
-            mapRef.current = L.map(mapContainerRef.current, {
+            const map = L.map(mapContainerRef.current, {
                 center: center,
                 zoom: zoom,
                 zoomControl: false 
             });
+            mapRef.current = map;
 
             L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
                 subdomains: 'abcd',
                 maxZoom: 20
-            }).addTo(mapRef.current);
+            }).addTo(map);
             
-            const pane = mapRef.current.createPane('currentLocationPane');
+            const pane = map.createPane('currentLocationPane');
             pane.style.zIndex = '650';
-
-            L.control.zoom({ position: 'bottomright' }).addTo(mapRef.current);
             
-            pinLayerRef.current = L.layerGroup().addTo(mapRef.current);
-            lineLayerRef.current = L.layerGroup().addTo(mapRef.current);
+            pinLayerRef.current = L.layerGroup().addTo(map);
+            lineLayerRef.current = L.layerGroup().addTo(map);
 
-            mapRef.current.on('click', (e) => {
-                if (!popupRef.current || !popupRef.current.isOpen()) {
-                   onMapClick(e.latlng);
+            map.on('click', (e: LeafletMouseEvent) => {
+                if (popupRef.current && popupRef.current.isOpen()) return;
+
+                const formId = `pin-form-${Date.now()}`;
+                const content = `
+                    <form id="${formId}" class="flex flex-col gap-2">
+                        <input type="text" name="label" placeholder="Enter pin label" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
+                        <div class="flex justify-end gap-2">
+                            <button type="button" class="cancel-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Cancel</button>
+                            <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
+                        </div>
+                    </form>
+                `;
+                
+                popupRef.current = L.popup({ closeButton: false, closeOnClick: false, className: 'p-0' })
+                    .setLatLng(e.latlng)
+                    .setContent(content)
+                    .openOn(map);
+
+                const handleCancel = () => {
+                    map.closePopup();
+                };
+                
+                popupRef.current.on('remove', handleCancel);
+
+                setTimeout(() => {
+                    const form = document.getElementById(formId);
+                    const cancelButton = form?.querySelector('.cancel-btn');
+
+                    form?.addEventListener('submit', (ev) => {
+                        ev.preventDefault();
+                        const input = (ev.target as HTMLFormElement).elements.namedItem('label') as HTMLInputElement;
+                        const newPin: Pin = {
+                            id: `pin-${Date.now()}`,
+                            lat: e.latlng.lat,
+                            lng: e.latlng.lng,
+                            label: input.value
+                        };
+                        setPins(prev => [...prev, newPin]);
+                        map.closePopup();
+                    });
+
+                    cancelButton?.addEventListener('click', handleCancel);
+                }, 0);
+            });
+            
+            map.on('dblclick', (e: LeafletMouseEvent) => {
+                const newPoints = [...linePoints, e.latlng];
+                setLinePoints(newPoints);
+                
+                if (newPoints.length === 2) {
+                    const lineId = `line-${Date.now()}`;
+                    const midPoint = L.latLng(
+                        (newPoints[0].lat + newPoints[1].lat) / 2,
+                        (newPoints[0].lng + newPoints[1].lng) / 2
+                    );
+
+                    const formId = `line-form-${Date.now()}`;
+                    const content = `
+                        <form id="${formId}" class="flex flex-col gap-2">
+                            <input type="text" name="label" placeholder="Enter line label" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
+                            <div class="flex justify-end gap-2">
+                                <button type="button" class="cancel-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Cancel</button>
+                                <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
+                            </div>
+                        </form>
+                    `;
+
+                    popupRef.current = L.popup({ closeButton: false, closeOnClick: false, className: 'p-0' })
+                        .setLatLng(midPoint)
+                        .setContent(content)
+                        .openOn(map);
+                    
+                    const handleCancel = () => {
+                       map.closePopup();
+                       setLinePoints([]);
+                    };
+
+                    popupRef.current.on('remove', handleCancel);
+
+                    setTimeout(() => {
+                        const form = document.getElementById(formId);
+                        const cancelButton = form?.querySelector('.cancel-btn');
+
+                        form?.addEventListener('submit', (ev) => {
+                            ev.preventDefault();
+                            const input = (ev.target as HTMLFormElement).elements.namedItem('label') as HTMLInputElement;
+                            const newLine: Line = {
+                                id: lineId,
+                                path: newPoints.map(p => ({ lat: p.lat, lng: p.lng })),
+                                label: input.value,
+                            };
+                            setLines(prev => [...prev, newLine]);
+                            map.closePopup();
+                            setLinePoints([]);
+                        });
+
+                        cancelButton?.addEventListener('click', handleCancel);
+                    }, 0);
                 }
             });
 
-            mapRef.current.locate({ watch: true, setView: false });
 
-            mapRef.current.on('locationfound', (e: LocationEvent) => {
-                onLocationFound(e.latlng);
-            });
-            mapRef.current.on('locationerror', (e: any) => {
-                onLocationError(e);
-            });
+            map.locate({ watch: true, setView: false });
+
+            map.on('locationfound', (e: LocationEvent) => { onLocationFound(e.latlng); });
+            map.on('locationerror', (e: any) => { onLocationError(e); });
         }
 
         return () => {
@@ -106,7 +198,7 @@ const Map = ({ mapRef, center, zoom, pins, lines, liveLine, currentLocation, pen
             const markerIcon = createCustomIcon(`hsl(${accentColor})`);
 
             pins.forEach(pin => {
-                const marker = L.marker([pin.lat, pin.lng], { icon: markerIcon })
+                L.marker([pin.lat, pin.lng], { icon: markerIcon })
                   .bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' })
                   .addTo(layer);
             });
@@ -144,28 +236,6 @@ const Map = ({ mapRef, center, zoom, pins, lines, liveLine, currentLocation, pen
         }
     }, [lines]);
 
-    useEffect(() => {
-        if (mapRef.current && typeof window.L !== 'undefined') {
-            const map = mapRef.current;
-            const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
-
-            if (liveLine && liveLine.length >= 2) {
-                if (!liveLineRef.current) {
-                    liveLineRef.current = L.polyline(liveLine, {
-                        color: `hsl(${primaryColor})`,
-                        weight: 4,
-                        opacity: 0.8,
-                        dashArray: '5, 10'
-                    }).addTo(map);
-                } else {
-                    liveLineRef.current.setLatLngs(liveLine);
-                }
-            } else if (liveLineRef.current) {
-                liveLineRef.current.remove();
-                liveLineRef.current = null;
-            }
-        }
-    }, [liveLine]);
 
     useEffect(() => {
         if (mapRef.current && typeof window.L !== 'undefined' && currentLocation) {
@@ -190,62 +260,6 @@ const Map = ({ mapRef, center, zoom, pins, lines, liveLine, currentLocation, pen
             currentLocationMarkerRef.current = null;
         }
     }, [currentLocation]);
-
-    useEffect(() => {
-        if (mapRef.current && typeof window.L !== 'undefined') {
-            const map = mapRef.current;
-            
-            // Cleanup previous pending pin
-            if (pendingPinMarkerRef.current) {
-                pendingPinMarkerRef.current.remove();
-                pendingPinMarkerRef.current = null;
-            }
-            if(popupRef.current) {
-                popupRef.current.remove();
-                popupRef.current = null;
-            }
-
-            if (pendingPin) {
-                const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent');
-                const markerIcon = createCustomIcon(`hsl(${accentColor})`);
-                
-                pendingPinMarkerRef.current = L.marker(pendingPin, { icon: markerIcon }).addTo(map);
-
-                const formId = `pin-form-${Date.now()}`;
-                const content = `
-                    <form id="${formId}" class="flex flex-col gap-2">
-                        <input type="text" name="label" placeholder="Enter pin label" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
-                        <div class="flex justify-end gap-2">
-                            <button type="button" id="cancel-pin" class="px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Cancel</button>
-                            <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
-                        </div>
-                    </form>
-                `;
-
-                popupRef.current = L.popup({ closeButton: false, closeOnClick: false, className: 'p-0' })
-                    .setLatLng(pendingPin)
-                    .setContent(content)
-                    .openOn(map);
-                
-                popupRef.current.on('remove', onPinCancel);
-
-                setTimeout(() => {
-                    const form = document.getElementById(formId);
-                    const cancelButton = document.getElementById('cancel-pin');
-
-                    form?.addEventListener('submit', (e) => {
-                        e.preventDefault();
-                        const input = (e.target as HTMLFormElement).elements.namedItem('label') as HTMLInputElement;
-                        onPinSave(input.value);
-                    });
-
-                    cancelButton?.addEventListener('click', () => {
-                        onPinCancel();
-                    });
-                }, 0);
-            }
-        }
-    }, [pendingPin, onPinSave, onPinCancel]);
 
 
     return <div ref={mapContainerRef} className="h-full w-full z-0" />;
