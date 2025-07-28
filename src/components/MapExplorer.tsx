@@ -1,13 +1,13 @@
 
 'use client';
 
-import React, { useState, useRef, useId, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { LatLng, LatLngExpression, Map as LeafletMap } from 'leaflet';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Minus, Plus, Edit, Trash2, Save } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -29,12 +29,18 @@ export default function MapExplorer() {
   const [pins, setPins] = useState<Pin[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
-    center: [48.8584, 2.2945], // Default to Paris
+    center: [48.8584, 2.2945],
     zoom: 13,
   });
   const [isLocating, setIsLocating] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<LatLng | null>(null);
-  
+
+  const [pendingPin, setPendingPin] = useState<LatLng | null>(null);
+  const [pendingLine, setPendingLine] = useState<{ path: LatLng[] } | null>(null);
+  const [isDrawingLine, setIsDrawingLine] = useState(false);
+  const [lineStartPoint, setLineStartPoint] = useState<LatLng | null>(null);
+  const [currentMapCenter, setCurrentMapCenter] = useState<LatLng | null>(null);
+
   const { toast } = useToast();
   
   const initialLocationFound = useRef(false);
@@ -98,6 +104,45 @@ export default function MapExplorer() {
     mapRef.current?.zoomOut();
   };
 
+  const handleAddPin = () => {
+    if (mapRef.current) {
+        const center = mapRef.current.getCenter();
+        setPendingPin(center);
+    }
+  };
+
+  const handleDrawLine = () => {
+    if (mapRef.current) {
+        const center = mapRef.current.getCenter();
+        setLineStartPoint(center);
+        setIsDrawingLine(true);
+    }
+  };
+  
+  const handleConfirmLine = () => {
+    if (lineStartPoint && currentMapCenter) {
+      setPendingLine({ path: [lineStartPoint, currentMapCenter] });
+      setIsDrawingLine(false);
+      setLineStartPoint(null);
+    }
+  };
+
+  const handlePinSave = (id: string, label: string, lat: number, lng: number) => {
+    const newPin: Pin = { id, lat, lng, label };
+    setPins(prev => [...prev, newPin]);
+    setPendingPin(null);
+  };
+
+  const handleLineSave = (id: string, label: string, path: LatLng[]) => {
+      const newLine: Line = {
+          id,
+          path: path.map(p => ({ lat: p.lat, lng: p.lng })),
+          label,
+      };
+      setLines(prev => [...prev, newLine]);
+      setPendingLine(null);
+  };
+
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
        
@@ -108,14 +153,60 @@ export default function MapExplorer() {
               center={view.center}
               zoom={view.zoom}
               pins={pins}
-              setPins={setPins}
               lines={lines}
-              setLines={setLines}
               currentLocation={currentLocation}
               onLocationFound={handleLocationFound}
               onLocationError={handleLocationError}
+              onMove={(center) => setCurrentMapCenter(center)}
+              isDrawingLine={isDrawingLine}
+              lineStartPoint={lineStartPoint}
+              pendingPin={pendingPin}
+              onPinSave={handlePinSave}
+              onPinCancel={() => setPendingPin(null)}
+              pendingLine={pendingLine}
+              onLineSave={handleLineSave}
+              onLineCancel={() => setPendingLine(null)}
             />
             
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
+                <Plus className="h-8 w-8 text-blue-500" />
+            </div>
+
+            <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleAddPin}>
+                                <MapPin className="h-6 w-6" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Add a Pin</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawLine}>
+                                <Minus className="h-6 w-6" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Draw a Line</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
+            
+            {isDrawingLine && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-background/80 p-2 rounded-md shadow-md">
+                    <p className="text-sm font-semibold">Pan map to draw line</p>
+                </div>
+            )}
+             {isDrawingLine && (
+                <Button 
+                    className="absolute bottom-24 right-4 z-[1000] h-12 rounded-full shadow-lg"
+                    onClick={handleConfirmLine}
+                >
+                    <Check className="mr-2 h-5 w-5" /> Confirm Line
+                </Button>
+            )}
+
             <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
               <TooltipProvider>
                 <Tooltip>
@@ -181,5 +272,3 @@ export default function MapExplorer() {
     </div>
   );
 }
-
-    
