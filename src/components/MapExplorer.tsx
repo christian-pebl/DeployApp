@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Code } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Code, Menu } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -234,11 +234,10 @@ export default function MapExplorer() {
             <SidebarHeader>
                  <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold">Map Objects</h2>
-                    <SidebarTrigger />
                  </div>
             </SidebarHeader>
             <SidebarContent className="flex flex-col gap-4 p-4">
-                 <div className="flex flex-col gap-2 p-2 bg-card rounded-lg shadow-inner border">
+                 <div className="flex flex-col items-center gap-2 p-2 bg-card rounded-lg shadow-inner border">
                    <TooltipProvider>
                        <Tooltip>
                             <TooltipTrigger asChild>
@@ -283,6 +282,10 @@ export default function MapExplorer() {
                             <TooltipContent side="right"><p>Draw a line between two points</p></TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
+
+                    <SidebarTrigger className="mt-2 rounded-full h-8 w-8" variant="ghost" size="icon">
+                        <Menu className="h-5 w-5" />
+                    </SidebarTrigger>
                 </div>
 
                 <Accordion type="multiple" collapsible className="w-full" defaultValue={['pins', 'lines']}>
