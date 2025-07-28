@@ -22,7 +22,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight, ChevronLeft, Minus, icons } from 'lucide-react';
+import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight, ChevronLeft, Minus, icons, Notebook } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -92,7 +92,7 @@ function SidebarContent({
                     <Tooltip>
                         <TooltipTrigger asChild>
                              <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
-                                <Minus className="h-6 w-6" />
+                                <Spline className="h-6 w-6" />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
@@ -136,7 +136,7 @@ function SidebarContent({
                       <React.Fragment key={line.id}>
                         <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
                           <button onClick={() => onPanTo(line.positions[0])} className="flex-1 text-left truncate pr-2">
-                            <span className="font-medium text-sm"><Minus className="inline-block mr-2 h-4 w-4"/>{line.label}</span>
+                            <span className="font-medium text-sm"><Spline className="inline-block mr-2 h-4 w-4"/>{line.label}</span>
                           </button>
                           <Button
                             variant="ghost"
@@ -166,6 +166,7 @@ function SidebarContent({
 
 
 export default function MapExplorer() {
+  const [log, setLog] = useState<string[]>(['App Initialized']);
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [lines, setLines] = useState<LineData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
@@ -192,13 +193,20 @@ export default function MapExplorer() {
   const componentId = useId();
   const watchIdRef = useRef<number | null>(null);
 
+  const addLog = (entry: string) => {
+    setLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${entry}`]);
+  };
+
   useEffect(() => {
+    addLog('Attempting to get user location.');
     if (typeof window === 'undefined' || !navigator.geolocation) {
         setIsLocating(false);
+        const errorMsg = "Geolocation not supported by your browser.";
+        addLog(`Error: ${errorMsg}`);
         toast({
             variant: "destructive",
-            title: "Geolocation not supported",
-            description: "Your browser does not support geolocation.",
+            title: "Geolocation Error",
+            description: errorMsg,
         });
         return;
     }
@@ -207,15 +215,20 @@ export default function MapExplorer() {
         const { latitude, longitude } = position.coords;
         const newPosition: LatLngExpression = [latitude, longitude];
         setCurrentLocation(newPosition);
+        addLog(`Location updated: ${latitude}, ${longitude}`);
         if (isLocating) {
+            addLog('Centering map on initial location.');
             setView(prev => ({ ...prev, center: newPosition, zoom: 15 }));
             setIsLocating(false);
         }
     };
 
     const handleError = (error: GeolocationPositionError) => {
+        const errorMsg = error.code === error.PERMISSION_DENIED
+            ? "Location access denied."
+            : `Geolocation error (code ${error.code}): ${error.message}`;
+        addLog(`Error: ${errorMsg}`);
         if (isLocating) setIsLocating(false);
-        // Only show toast if permission is denied, otherwise fail silently
         if (error.code === error.PERMISSION_DENIED) {
             toast({
                 variant: "destructive",
@@ -224,32 +237,21 @@ export default function MapExplorer() {
             });
         }
     };
-
-    // Use a simple `getCurrentPosition` on mount for initial location
-    navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-    });
-
-
-    // Use `watchPosition` to keep the location updated
+    
+    addLog('Setting up geolocation watcher.');
     watchIdRef.current = navigator.geolocation.watchPosition(
         handleSuccess,
         handleError,
-        {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0,
-        }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
     return () => {
         if (watchIdRef.current !== null) {
+            addLog('Cleaning up geolocation watcher.');
             navigator.geolocation.clearWatch(watchIdRef.current);
         }
     };
-  }, [isLocating, toast]);
+  }, []);
 
 
   const handleMapMove = (center: LatLng, zoom: number) => {
@@ -268,12 +270,15 @@ export default function MapExplorer() {
   };
 
   const handleMapClick = (latlng: LatLng) => {
+    addLog(`Map clicked at: ${latlng.lat}, ${latlng.lng}`);
     if (isSidebarOpen) {
+      addLog('Closing sidebar due to map click.');
       setIsSidebarOpen(false);
     }
   };
   
   const handleCenterMarker = () => {
+    addLog('Initiating add marker at center.');
     setPendingMarker(view.center);
     setIsSidebarOpen(false);
   };
@@ -282,6 +287,7 @@ export default function MapExplorer() {
     e.preventDefault();
     const label = addMarkerInputRef.current?.value;
     if (label && pendingMarker) {
+      addLog(`Adding marker "${label}".`);
       const newMarker: MarkerData = {
         id: `marker-${componentId}-${Date.now()}`,
         position: pendingMarker,
@@ -293,12 +299,14 @@ export default function MapExplorer() {
   };
 
   const handleStartLine = () => {
-    if(isDrawingLine) { // Cancel drawing
+    if(isDrawingLine) {
+      addLog('Cancelling line draw.');
       setIsDrawingLine(false);
       setDrawingLine(null);
       return;
     }
     
+    addLog('Starting line draw.');
     setIsSidebarOpen(false);
     setIsDrawingLine(true);
     const startPoint = view.center;
@@ -312,6 +320,7 @@ export default function MapExplorer() {
   
   const handleConfirmLine = () => {
     if (drawingLine) {
+        addLog('Confirming line position.');
         setPendingLine(drawingLine);
         setIsDrawingLine(false);
         setDrawingLine(null);
@@ -322,6 +331,7 @@ export default function MapExplorer() {
     e.preventDefault();
     const label = lineNameInputRef.current?.value;
     if (label && pendingLine) {
+        addLog(`Adding line "${label}".`);
         const newLine = {
             ...pendingLine,
             id: `line-${componentId}-${Date.now()}`,
@@ -334,11 +344,13 @@ export default function MapExplorer() {
 
 
   const handleGeocode = async (address: string) => {
+    addLog(`Geocoding address: "${address}"`);
     setIsGeocoding(true);
     try {
       const result = await geocodeAddress({ address });
       if (result.latitude && result.longitude) {
         const position: LatLngExpression = [result.latitude, result.longitude];
+        addLog(`Geocode success: ${result.latitude}, ${result.longitude}`);
         setView({ center: position, zoom: 17 });
         const newMarker: MarkerData = {
           id: `marker-${componentId}-${Date.now()}`,
@@ -346,8 +358,11 @@ export default function MapExplorer() {
           label: address,
         };
         setMarkers((prev) => [...prev, newMarker]);
+      } else {
+         addLog(`Geocode failed for: "${address}"`);
       }
     } catch (error) {
+      addLog(`Geocode error: ${error}`);
       toast({
         variant: "destructive",
         title: "Geocoding Error",
@@ -359,33 +374,41 @@ export default function MapExplorer() {
   };
 
   const handleLocateMe = () => {
+    addLog('Locate me button clicked.');
     if (currentLocation) {
+        addLog('Centering view on current location.');
         setView(prevView => ({ ...prevView, center: currentLocation, zoom: 15 }));
     } else {
+        addLog('Current location not available, attempting to locate.');
         setIsLocating(true); 
     }
   };
 
   const handlePanTo = (position: LatLngExpression) => {
+    addLog(`Panning to: ${JSON.stringify(position)}`);
     setView(prevView => ({ ...prevView, center: position, zoom: 15 }));
     setIsSidebarOpen(false);
   };
   
   const handleDeleteMarker = (id: string) => {
+    addLog(`Deleting marker: ${id}`);
     setMarkers((prev) => prev.filter((m) => m.id !== id));
   };
 
   const handleDeleteLine = (id: string) => {
+    addLog(`Deleting line: ${id}`);
     setLines((prev) => prev.filter((l) => l.id !== id));
   };
 
 
   const handleExport = () => {
+    addLog('Exporting items.');
     const exportData = {
       markers,
       lines
     }
     if (exportData.markers.length === 0 && exportData.lines.length === 0) {
+      addLog('Export failed: no items.');
       toast({
         title: 'No items to export',
         description: 'Add some markers or lines to the map first.',
@@ -401,6 +424,14 @@ export default function MapExplorer() {
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
   };
+
+  const handleShowLog = () => {
+    const lastEntry = log[log.length - 1] || 'Log is empty.';
+    toast({
+        title: "Latest Log Entry",
+        description: <pre className="text-xs whitespace-pre-wrap">{lastEntry}</pre>
+    });
+  }
   
   const sidebarProps = {
     markers,
@@ -421,7 +452,7 @@ export default function MapExplorer() {
       <div className={cn(
         "absolute top-0 left-0 h-full z-20 transition-transform duration-300 ease-in-out",
         "w-72 bg-card/80 backdrop-blur-sm border-r",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-72"
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <SidebarContent {...sidebarProps} />
       </div>
@@ -439,17 +470,44 @@ export default function MapExplorer() {
       </Sheet>
 
       {/* Sidebar Toggle */}
-      <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className={cn(
-              "absolute top-1/2 -translate-y-1/2 z-30 h-16 w-8 rounded-l-none transition-all duration-300 ease-in-out",
-              isSidebarOpen ? "left-72" : "left-0"
-          )}
-      >
-          {isSidebarOpen ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
-      </Button>
+       <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                                addLog(`Sidebar toggled ${isSidebarOpen ? 'closed' : 'open'}.`);
+                                setIsSidebarOpen(!isSidebarOpen);
+                            }}
+                            className="h-12 w-12 rounded-full shadow-lg"
+                        >
+                            <Menu className="h-6 w-6" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                        <p>Toggle Tools</p>
+                    </TooltipContent>
+                </Tooltip>
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={handleShowLog}
+                            className="h-12 w-12 rounded-full shadow-lg"
+                        >
+                            <Notebook className="h-6 w-6" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                        <p>Show Last Log</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        </div>
+
 
       <main className="flex-1 flex flex-col relative h-full">
         <div className="flex-1 relative">
@@ -465,7 +523,12 @@ export default function MapExplorer() {
              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
                 <Crosshair className="h-8 w-8 text-primary opacity-80" />
             </div>
-             <Popover open={!!pendingMarker} onOpenChange={(isOpen) => !isOpen && setPendingMarker(null)}>
+             <Popover open={!!pendingMarker} onOpenChange={(isOpen) => {
+                if (!isOpen) {
+                  addLog('Closing add marker popover.');
+                  setPendingMarker(null)
+                }
+              }}>
                 <PopoverAnchor asChild>
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
                        {/* Anchor for popover */}
@@ -484,7 +547,7 @@ export default function MapExplorer() {
                            <Input
                             ref={addMarkerInputRef}
                             id="marker-label"
-                            defaultValue="marker 0"
+                            defaultValue={`Marker ${markers.length + 1}`}
                             required
                             autoFocus
                             onFocus={(e) => e.target.select()}
@@ -498,7 +561,12 @@ export default function MapExplorer() {
                 </PopoverContent>
             </Popover>
 
-            <Popover open={!!pendingLine} onOpenChange={(isOpen) => !isOpen && setPendingLine(null)}>
+            <Popover open={!!pendingLine} onOpenChange={(isOpen) => {
+                if (!isOpen) {
+                    addLog('Closing add line popover.');
+                    setPendingLine(null);
+                }
+            }}>
                 <PopoverAnchor asChild>
                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
                      {/* Anchor for popover */}
@@ -517,14 +585,14 @@ export default function MapExplorer() {
                                 <Input
                                     ref={lineNameInputRef}
                                     id="line-label"
-                                    defaultValue="My new line"
+                                    defaultValue={`Line ${lines.length + 1}`}
                                     required
                                     autoFocus
                                     onFocus={(e) => e.target.select()}
                                 />
                             </div>
                             <Button type="submit">
-                                <Minus className="mr-2 h-4 w-4" /> Save Line
+                                <Spline className="mr-2 h-4 w-4" /> Save Line
                             </Button>
                         </div>
                     </form>
@@ -534,7 +602,7 @@ export default function MapExplorer() {
             {isDrawingLine && (
                 <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[1001]">
                     <Button onClick={handleConfirmLine} size="lg" className="shadow-lg">
-                        Confirm Line
+                        Confirm Line Endpoint
                     </Button>
                 </div>
             )}
@@ -552,7 +620,7 @@ export default function MapExplorer() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Locate Me</p>
+                  <p>Center on Me</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
