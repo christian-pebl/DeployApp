@@ -4,37 +4,16 @@
 import React, { useState, useRef, useId, useEffect } from 'react';
 import type { LatLng, LatLngExpression } from 'leaflet';
 import dynamic from 'next/dynamic';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-    PopoverAnchor,
-} from "@/components/ui/popover";
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Download, Loader2, LocateFixed, Trash2, Menu, Crosshair, MoreVertical, Pencil, MapPin, Spline, ChevronRight, ChevronLeft, Minus, icons, Notebook, Route, Orbit } from 'lucide-react';
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Loader2, Crosshair, Notebook } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from '@/lib/utils';
 
 
 const Map = dynamic(() => import('@/components/Map'), {
@@ -48,128 +27,9 @@ type MarkerData = {
   label: string;
 };
 
-type LineData = {
-  id: string;
-  positions: LatLngExpression[];
-  label: string;
-};
-
-function SidebarContent({
-  markers,
-  lines,
-  onPanTo,
-  onDeleteMarker,
-  onDeleteLine,
-  onExport,
-  onAddMarker,
-  onStartLine,
-  isDrawingLine,
-}: {
-  markers: MarkerData[];
-  lines: LineData[];
-  onPanTo: (position: LatLngExpression) => void;
-  onDeleteMarker: (id: string) => void;
-  onDeleteLine: (id: string) => void;
-  onExport: () => void;
-  onAddMarker: () => void;
-  onStartLine: () => void;
-  isDrawingLine: boolean;
-}) {
-  return (
-    <div className="flex flex-col h-full text-card-foreground">
-        <div className="p-4 space-y-4">
-            <div className="flex gap-2">
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button onClick={onAddMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
-                                <MapPin className="h-6 w-6"/>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                            <p>Add Marker</p>
-                        </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                             <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
-                                <Spline className="h-6 w-6" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                            <p>{isDrawingLine ? 'Cancel Drawing' : 'Draw Line'}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            </div>
-            <Separator />
-          
-          <Card className="bg-transparent border-0 shadow-none">
-            <CardHeader className="p-2">
-              <CardTitle className="text-base">Your Items</CardTitle>
-            </CardHeader>
-            <CardContent className="p-2">
-              {markers.length === 0 && lines.length === 0 ? (
-                <div className="text-center text-muted-foreground py-4 text-xs">
-                  <p>Add an item to see it here.</p>
-                </div>
-              ) : (
-                <ScrollArea className="h-40">
-                  <div className="space-y-2">
-                    {markers.map((marker) => (
-                      <React.Fragment key={marker.id}>
-                        <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
-                          <button onClick={() => onPanTo(marker.position)} className="flex-1 text-left truncate pr-2">
-                            <span className="font-medium text-sm"><MapPin className="inline-block mr-2 h-4 w-4"/>{marker.label}</span>
-                          </button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => onDeleteMarker(marker.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </React.Fragment>
-                    ))}
-                     {lines.map((line) => (
-                      <React.Fragment key={line.id}>
-                        <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
-                          <button onClick={() => onPanTo(line.positions[0])} className="flex-1 text-left truncate pr-2">
-                            <span className="font-medium text-sm"><Orbit className="inline-block mr-2 h-4 w-4"/>{line.label}</span>
-                          </button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => onDeleteLine(line.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      <div className="p-4 mt-auto border-t border-border/50">
-        <Button onClick={onExport} className="w-full" variant="secondary">
-          <Download className="mr-2 h-4 w-4" /> Export Items
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-
 export default function MapExplorer() {
   const [log, setLog] = useState<string[]>(['App Initialized']);
   const [markers, setMarkers] = useState<MarkerData[]>([]);
-  const [lines, setLines] = useState<LineData[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945], // Default to Paris
     zoom: 13,
@@ -178,18 +38,6 @@ export default function MapExplorer() {
   const [isLocating, setIsLocating] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<LatLng | null>(null);
   
-  // Marker states
-  const [pendingMarker, setPendingMarker] = useState<LatLngExpression | null>(null);
-  const addMarkerInputRef = useRef<HTMLInputElement>(null);
-  
-  // Line states
-  const [isDrawingLine, setIsDrawingLine] = useState(false);
-  const [linePoints, setLinePoints] = useState<LatLng[]>([]);
-  const [pendingLine, setPendingLine] = useState<LineData | null>(null);
-  const lineNameInputRef = useRef<HTMLInputElement>(null);
-  
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
   const { toast } = useToast();
   const componentId = useId();
   const watchIdRef = useRef<number | null>(null);
@@ -260,85 +108,8 @@ export default function MapExplorer() {
 
   const handleMapClick = (latlng: LatLng) => {
     addLog(`Map clicked at: ${latlng.lat}, ${latlng.lng}`);
-
-    if (isDrawingLine) {
-        const newPoints = [...linePoints, latlng];
-        setLinePoints(newPoints);
-        addLog(`Line point ${newPoints.length} added.`);
-
-        if (newPoints.length === 2) {
-            addLog('Line complete. Opening naming dialog.');
-            const newLine: LineData = {
-                id: `line-pending-${componentId}-${Date.now()}`,
-                positions: newPoints,
-                label: `Line ${lines.length + 1}`
-            };
-            setPendingLine(newLine);
-            setIsDrawingLine(false);
-            setLinePoints([]);
-        }
-        return;
-    }
-
-    if (isSidebarOpen) {
-      addLog('Closing sidebar due to map click.');
-      setIsSidebarOpen(false);
-    }
   };
   
-  const handleCenterMarker = () => {
-    addLog('Initiating add marker at center.');
-    setPendingMarker(view.center);
-    setIsSidebarOpen(false);
-  };
-  
-  const handleAddMarkerSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const label = addMarkerInputRef.current?.value;
-    if (label && pendingMarker) {
-      addLog(`Adding marker "${label}".`);
-      const newMarker: MarkerData = {
-        id: `marker-${componentId}-${Date.now()}`,
-        position: pendingMarker,
-        label,
-      };
-      setMarkers((prev) => [...prev, newMarker]);
-      setPendingMarker(null);
-    }
-  };
-
-  const handleStartLine = () => {
-    if(isDrawingLine) {
-      addLog('Cancelling line draw.');
-      setIsDrawingLine(false);
-      setLinePoints([]);
-      return;
-    }
-    addLog('Starting line draw. Click map to set start point.');
-    setIsSidebarOpen(false);
-    setIsDrawingLine(true);
-    setLinePoints([]);
-    toast({
-        title: 'Draw a Line',
-        description: 'Click on the map to set the starting point.',
-    });
-  };
-
-  const handleAddLineSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const label = lineNameInputRef.current?.value;
-    if (label && pendingLine) {
-        addLog(`Adding line "${label}".`);
-        const newLine = {
-            ...pendingLine,
-            id: `line-${componentId}-${Date.now()}`,
-            label: label,
-        };
-        setLines(prev => [...prev, newLine]);
-        setPendingLine(null);
-    }
-  };
-
   const handleGeocode = async (address: string) => {
     addLog(`Geocoding address: "${address}"`);
     setIsGeocoding(true);
@@ -380,47 +151,6 @@ export default function MapExplorer() {
     }
   };
 
-  const handlePanTo = (position: LatLngExpression) => {
-    addLog(`Panning to: ${JSON.stringify(position)}`);
-    setView({ center: position, zoom: 15 });
-    setIsSidebarOpen(false);
-  };
-  
-  const handleDeleteMarker = (id: string) => {
-    addLog(`Deleting marker: ${id}`);
-    setMarkers((prev) => prev.filter((m) => m.id !== id));
-  };
-
-  const handleDeleteLine = (id: string) => {
-    addLog(`Deleting line: ${id}`);
-    setLines((prev) => prev.filter((l) => l.id !== id));
-  };
-
-
-  const handleExport = () => {
-    addLog('Exporting items.');
-    const exportData = {
-      markers,
-      lines
-    }
-    if (exportData.markers.length === 0 && exportData.lines.length === 0) {
-      addLog('Export failed: no items.');
-      toast({
-        title: 'No items to export',
-        description: 'Add some markers or lines to the map first.',
-        variant: 'destructive'
-      });
-      return;
-    }
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = 'map_items.json';
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-  };
-
   const handleShowLog = () => {
     const lastEntry = log[log.length - 1] || 'Log is empty.';
     toast({
@@ -428,65 +158,11 @@ export default function MapExplorer() {
         description: <pre className="text-xs whitespace-pre-wrap">{lastEntry}</pre>
     });
   }
-  
-  const sidebarProps = {
-    markers,
-    lines,
-    onPanTo: handlePanTo,
-    onDeleteMarker: handleDeleteMarker,
-    onDeleteLine: handleDeleteLine,
-    onExport: handleExport,
-    onAddMarker: handleCenterMarker,
-    onStartLine: handleStartLine,
-    isDrawingLine,
-  };
 
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
-      
-      {/* Sidebar for Desktop */}
-      <div className={cn(
-        "absolute top-0 left-0 h-full z-20 transition-transform duration-300 ease-in-out",
-        "w-80 bg-card/90 backdrop-blur-sm border-r",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      )}>
-        <SidebarContent {...sidebarProps} />
-      </div>
-
-      {/* Mobile Sheet (now also a sidebar) */}
-      <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-          <SheetContent side="left" className="w-80 p-0 bg-card/90 backdrop-blur-sm" onInteractOutside={(e) => {
-              if (e.target === document.body) {
-                  e.preventDefault();
-              }
-              setIsSidebarOpen(false)
-            }}>
-                <SheetTitle className="sr-only">Tools and Items</SheetTitle>
-                <SidebarContent {...sidebarProps} />
-          </SheetContent>
-      </Sheet>
-
-      {/* Sidebar Toggle */}
        <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
             <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => {
-                                addLog(`Sidebar toggled ${isSidebarOpen ? 'closed' : 'open'}.`);
-                                setIsSidebarOpen(!isSidebarOpen);
-                            }}
-                            className="h-12 w-12 rounded-full shadow-lg"
-                        >
-                            <Menu className="h-6 w-6" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                        <p>Toggle Tools</p>
-                    </TooltipContent>
-                </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
                         <Button
@@ -512,88 +188,13 @@ export default function MapExplorer() {
               center={view.center}
               zoom={view.zoom}
               markers={markers}
-              lines={lines}
+              lines={[]}
               onMapClick={handleMapClick}
               currentLocation={currentLocation}
             />
              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
                 <Crosshair className="h-8 w-8 text-primary opacity-80" />
             </div>
-             <Popover open={!!pendingMarker} onOpenChange={(isOpen) => {
-                if (!isOpen) {
-                  addLog('Closing add marker popover.');
-                  setPendingMarker(null)
-                }
-              }}>
-                <PopoverAnchor asChild>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
-                       {/* Anchor for popover */}
-                    </div>
-                </PopoverAnchor>
-                <PopoverContent className="w-80">
-                  <form onSubmit={handleAddMarkerSubmit}>
-                      <div className="grid gap-4">
-                        <div className="space-y-2">
-                          <h4 className="font-medium leading-none">Add New Marker</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Enter a label for the point at the center of the map.
-                          </p>
-                        </div>
-                        <div className="grid gap-2">
-                           <Input
-                            ref={addMarkerInputRef}
-                            id="marker-label"
-                            defaultValue={`Marker ${markers.length + 1}`}
-                            required
-                            autoFocus
-                            onFocus={(e) => e.target.select()}
-                          />
-                        </div>
-                         <Button type="submit">
-                            <MapPin className="mr-2 h-4 w-4" /> Add Marker
-                          </Button>
-                      </div>
-                    </form>
-                </PopoverContent>
-            </Popover>
-
-            <Popover open={!!pendingLine} onOpenChange={(isOpen) => {
-                if (!isOpen) {
-                    addLog('Closing add line popover.');
-                    setPendingLine(null);
-                }
-            }}>
-                <PopoverAnchor asChild>
-                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
-                     {/* Anchor for popover */}
-                   </div>
-                </PopoverAnchor>
-                <PopoverContent className="w-80">
-                   <form onSubmit={handleAddLineSubmit}>
-                        <div className="grid gap-4">
-                            <div className="space-y-2">
-                                <h4 className="font-medium leading-none">Name Your Line</h4>
-                                <p className="text-sm text-muted-foreground">
-                                    Enter a label for the newly created line.
-                                </p>
-                            </div>
-                            <div className="grid gap-2">
-                                <Input
-                                    ref={lineNameInputRef}
-                                    id="line-label"
-                                    defaultValue={`Line ${lines.length + 1}`}
-                                    required
-                                    autoFocus
-                                    onFocus={(e) => e.target.select()}
-                                />
-                            </div>
-                            <Button type="submit">
-                                <Orbit className="mr-2 h-4 w-4" /> Save Line
-                            </Button>
-                        </div>
-                    </form>
-                </PopoverContent>
-            </Popover>
            
             <TooltipProvider>
               <Tooltip>
@@ -618,5 +219,3 @@ export default function MapExplorer() {
     </div>
   );
 }
-
-    
