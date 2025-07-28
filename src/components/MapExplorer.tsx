@@ -283,21 +283,15 @@ export default function MapExplorer() {
                 </div>
              )}
              
-             {interactionMode === 'draw_line_start' && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-[1000] pointer-events-none text-center">
-                    <div className="bg-background/80 backdrop-blur-sm rounded-md px-3 py-1 text-sm font-semibold shadow-lg border">
-                        Pan map to draw line
-                    </div>
-                </div>
-            )}
             
             {interactionMode === 'draw_line_start' && (
                  <Button 
-                    className="absolute bottom-24 right-4 z-[1000] shadow-lg"
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[5rem] z-[1000] shadow-lg bg-background/80 backdrop-blur-sm border"
+                    variant="outline"
                     onClick={handleConfirmLine}
                  >
                      <Check className="mr-2 h-4 w-4" />
-                     Confirm Line
+                     Pan map to draw, then confirm
                  </Button>
              )}
            
