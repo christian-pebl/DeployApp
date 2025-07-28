@@ -93,7 +93,7 @@ function SidebarContent({
                     <Tooltip>
                         <TooltipTrigger asChild>
                              <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
-                                <Orbit className="h-6 w-6" />
+                                <Spline className="h-6 w-6" />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
