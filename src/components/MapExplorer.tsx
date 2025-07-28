@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Code, Menu } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Code } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -22,16 +22,8 @@ import {
   SheetDescription,
   SheetFooter
 } from "@/components/ui/sheet";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sidebar, SidebarProvider, SidebarTrigger, SidebarContent, SidebarHeader } from '@/components/ui/sidebar';
 
 
 const Map = dynamic(() => import('@/components/Map'), {
@@ -101,7 +93,8 @@ export default function MapExplorer() {
     addLog(`Map clicked at: ${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`);
 
     if (interactionMode === 'add_pin') {
-        // This case is handled by handleAddPin now to drop at center
+        setPendingPin(latlng);
+        setInteractionMode('none');
     }
 
     if (interactionMode === 'draw_line') {
@@ -213,130 +206,59 @@ export default function MapExplorer() {
   const sheetTitle = 'Add a new Line';
   const sheetDescription = "You've drawn a line on the map. Give it a label to save it.";
 
-  const panToItem = (item: Pin | Line) => {
-    let target: LatLngExpression;
-    if ('lat' in item) { // It's a Pin
-        target = [item.lat, item.lng];
-    } else { // It's a Line
-        if (item.path.length > 0) {
-            target = [item.path[0].lat, item.path[0].lng];
-        } else {
-            return;
-        }
-    }
-    setView(prev => ({ ...prev, center: target, zoom: Math.max(prev.zoom, 16) }));
-  }
-
   return (
-    <SidebarProvider>
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
-       <Sidebar>
-            <SidebarHeader>
-                 <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">Map Objects</h2>
-                 </div>
-            </SidebarHeader>
-            <SidebarContent className="flex flex-col gap-4 p-4">
-                 <div className="flex flex-col items-center gap-2 p-2 bg-card rounded-lg shadow-inner border">
-                   <TooltipProvider>
-                       <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button 
-                                    variant={interactionMode === 'add_pin' ? 'secondary' : 'ghost'} 
-                                    onClick={handleAddPin}
-                                    className="w-full justify-start"
-                                >
-                                    <MapPin className="mr-2 h-5 w-5" />
-                                    Add a Pin
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right"><p>Drop a pin at the map center</p></TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                 <Button 
-                                    variant={interactionMode === 'draw_line' ? 'secondary' : 'ghost'}
-                                    onClick={() => {
-                                        setInteractionMode(prev => {
-                                            const newMode = prev === 'draw_line' ? 'none' : 'draw_line';
-                                            if (newMode === 'draw_line') {
-                                                toast({ title: 'Draw a Line', description: 'Click a start and end point on the map.' });
-                                                addLog('Entered "Draw Line" mode.');
-                                            } else {
-                                                addLog('Exited "Draw Line" mode.');
-                                                setLinePoints([]); // Clear points if exiting mode
-                                            }
-                                            return newMode;
-                                        });
-                                    }}
-                                    className="w-full justify-start"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5">
-                                        <path d="M4 12h16"/>
-                                        <circle cx="4" cy="12" r="2" fill="currentColor"/>
-                                        <circle cx="20" cy="12" r="2" fill="currentColor"/>
-                                    </svg>
-                                    Draw a Line
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right"><p>Draw a line between two points</p></TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-
-                    <SidebarTrigger className="mt-2 rounded-full h-8 w-8" variant="ghost" size="icon">
-                        <Menu className="h-5 w-5" />
-                    </SidebarTrigger>
-                </div>
-
-                <Accordion type="multiple" collapsible className="w-full" defaultValue={['pins', 'lines']}>
-                    <AccordionItem value="pins">
-                        <AccordionTrigger className="text-base font-medium">Pins ({pins.length})</AccordionTrigger>
-                        <AccordionContent>
-                            {pins.length > 0 ? (
-                                <ul className="space-y-2 pt-2">
-                                    {pins.map(pin => (
-                                        <li key={pin.id}>
-                                            <Button variant="ghost" className="w-full justify-start h-auto py-2" onClick={() => panToItem(pin)}>
-                                                <MapPin className="mr-2 h-4 w-4 text-accent" />
-                                                <span className="truncate">{pin.label}</span>
-                                            </Button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-sm text-muted-foreground p-2">No pins added yet.</p>
-                            )}
-                        </AccordionContent>
-                    </AccordionItem>
-                    <AccordionItem value="lines">
-                        <AccordionTrigger className="text-base font-medium">Lines ({lines.length})</AccordionTrigger>
-                        <AccordionContent>
-                             {lines.length > 0 ? (
-                                <ul className="space-y-2 pt-2">
-                                    {lines.map(line => (
-                                        <li key={line.id}>
-                                            <Button variant="ghost" className="w-full justify-start h-auto py-2" onClick={() => panToItem(line)}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-primary">
-                                                    <path d="M4 12h16"/><circle cx="4" cy="12" r="2" fill="currentColor"/><circle cx="20" cy="12" r="2" fill="currentColor"/>
-                                                </svg>
-                                                <span className="truncate">{line.label}</span>
-                                            </Button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-sm text-muted-foreground p-2">No lines added yet.</p>
-                            )}
-                        </AccordionContent>
-                    </AccordionItem>
-                </Accordion>
-            </SidebarContent>
-       </Sidebar>
-
+       
       <main className="flex-1 flex flex-col relative h-full">
-         <div className="absolute top-4 left-4 z-30 md:hidden">
-            <SidebarTrigger />
-         </div>
+         <div className="absolute top-4 left-4 z-30 flex flex-col gap-2 bg-background/80 p-2 rounded-lg shadow-lg backdrop-blur-sm border">
+           <TooltipProvider>
+               <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button 
+                            variant={interactionMode === 'add_pin' ? 'secondary' : 'ghost'} 
+                            onClick={() => {
+                                setInteractionMode('add_pin');
+                                handleAddPin();
+                            }}
+                            className="w-full justify-start"
+                        >
+                            <MapPin className="mr-2 h-5 w-5" />
+                            Add a Pin
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right"><p>Drop a pin at the map center</p></TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                         <Button 
+                            variant={interactionMode === 'draw_line' ? 'secondary' : 'ghost'}
+                            onClick={() => {
+                                setInteractionMode(prev => {
+                                    const newMode = prev === 'draw_line' ? 'none' : 'draw_line';
+                                    if (newMode === 'draw_line') {
+                                        toast({ title: 'Draw a Line', description: 'Click a start and end point on the map.' });
+                                        addLog('Entered "Draw Line" mode.');
+                                    } else {
+                                        addLog('Exited "Draw Line" mode.');
+                                        setLinePoints([]); // Clear points if exiting mode
+                                    }
+                                    return newMode;
+                                });
+                            }}
+                            className="w-full justify-start"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5">
+                                <path d="M4 12h16"/>
+                                <circle cx="4" cy="12" r="2" fill="currentColor"/>
+                                <circle cx="20" cy="12" r="2" fill="currentColor"/>
+                            </svg>
+                            Draw a Line
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right"><p>Draw a line between two points</p></TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        </div>
 
         <div className="flex-1 relative" style={{ cursor: getInteractionCursor() }}>
             <Map
@@ -425,8 +347,5 @@ export default function MapExplorer() {
         </SheetContent>
       </Sheet>
     </div>
-    </SidebarProvider>
   );
 }
-
-    
