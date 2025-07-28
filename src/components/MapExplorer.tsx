@@ -82,7 +82,7 @@ function SidebarContent({
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button onClick={onAddMarker} variant="outline" size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
+                            <Button onClick={() => onAddMarker()} variant="outline" size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
                                 <MapPin className="h-6 w-6"/>
                             </Button>
                         </TooltipTrigger>
@@ -92,7 +92,7 @@ function SidebarContent({
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                             <Button onClick={onStartLine} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
+                             <Button onClick={() => onStartLine()} variant={isDrawingLine ? "destructive" : "outline"} size="icon" className="h-12 w-12 rounded-full flex-shrink-0">
                                 <Spline className="h-6 w-6" />
                             </Button>
                         </TooltipTrigger>
@@ -457,7 +457,7 @@ export default function MapExplorer() {
       {/* Sidebar for Desktop */}
       <div className={cn(
         "absolute top-0 left-0 h-full z-20 transition-transform duration-300 ease-in-out",
-        "w-64 bg-card/80 backdrop-blur-sm border-r",
+        "w-80 bg-card/90 backdrop-blur-sm border-r",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}>
         <SidebarContent {...sidebarProps} />
@@ -465,7 +465,7 @@ export default function MapExplorer() {
 
       {/* Mobile Sheet (now also a sidebar) */}
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-          <SheetContent side="left" className="w-80 p-0 bg-card/80 backdrop-blur-sm" onInteractOutside={(e) => {
+          <SheetContent side="left" className="w-80 p-0 bg-card/90 backdrop-blur-sm" onInteractOutside={(e) => {
               if (e.target === document.body) {
                   e.preventDefault();
               }
@@ -636,5 +636,3 @@ export default function MapExplorer() {
     </div>
   );
 }
-
-    
