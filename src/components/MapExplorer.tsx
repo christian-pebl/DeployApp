@@ -176,7 +176,7 @@ export default function MapExplorer() {
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
-  const [currentLocation, setCurrentLocation] = useState<LatLngExpression | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<LatLng | null>(null);
   
   // Marker states
   const [pendingMarker, setPendingMarker] = useState<LatLngExpression | null>(null);
@@ -216,7 +216,7 @@ export default function MapExplorer() {
 
     const handleSuccess = (position: GeolocationPosition) => {
         const { latitude, longitude } = position.coords;
-        const newPosition: LatLngExpression = [latitude, longitude];
+        const newPosition: LatLng = L.latLng(latitude, longitude);
         setCurrentLocation(newPosition);
         addLog(`Location updated: ${latitude}, ${longitude}`);
         if (!initialLocationFound) {
@@ -636,5 +636,3 @@ export default function MapExplorer() {
     </div>
   );
 }
-
-    
