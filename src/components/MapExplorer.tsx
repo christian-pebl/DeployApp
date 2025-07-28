@@ -290,7 +290,7 @@ export default function MapExplorer() {
               </Tooltip>
             </TooltipProvider>
             
-            <div className="absolute bottom-16 right-4 z-30">
+            <div className="absolute bottom-24 right-4 z-30">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
