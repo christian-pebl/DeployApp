@@ -50,7 +50,6 @@ export default function MapExplorer() {
   const [linePoints, setLinePoints] = useState<LatLng[]>([]);
   
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [newItem, setNewItem] = useState<{ type: 'pin' | 'line'; data: any } | null>(null);
   const [newItemLabel, setNewItemLabel] = useState('');
   
   const { toast } = useToast();
@@ -72,7 +71,6 @@ export default function MapExplorer() {
     setCurrentLocation(latlng);
     if (!initialLocationFound.current) {
       addLog(`Initial location found: ${latlng.lat}, ${latlng.lng}`);
-      addLog('Centering map on initial location.');
       setView({ center: latlng, zoom: 15 });
       setIsLocating(false);
       initialLocationFound.current = true;
@@ -80,7 +78,7 @@ export default function MapExplorer() {
   };
 
   const handleLocationError = (error: any) => {
-    let errorMsg = `Geolocation error (code ${error.code}): ${error.message}`;
+    let errorMsg = `Geolocation error: ${error.message}`;
     if (error.code === 1) { // PERMISSION_DENIED
       errorMsg = "Location access denied. Please enable it in your browser settings.";
     }
@@ -91,26 +89,25 @@ export default function MapExplorer() {
 
 
   const handleMapClick = (latlng: LatLng) => {
-    addLog(`Map clicked at: ${latlng.lat}, ${latlng.lng}`);
+    addLog(`Map clicked at: ${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`);
 
     if (interactionMode === 'add_pin') {
-        addLog('Creating new pin.');
+        addLog('Pending pin location selected.');
         setPendingPin(latlng);
         setInteractionMode('none'); // Exit add_pin mode after first click
     }
 
     if (interactionMode === 'draw_line') {
-        if (linePoints.length === 0) {
-            addLog('Starting a new line.');
-            setLinePoints([latlng]);
+        const updatedLinePoints = [...linePoints, latlng];
+        setLinePoints(updatedLinePoints);
+
+        if (updatedLinePoints.length === 1) {
+            addLog('Line started. Click another point to finish.');
             toast({ title: "Line Started", description: "Click another point on the map to finish the line." });
-        } else {
-            addLog('Finishing line.');
-            const finalPoints = [...linePoints, latlng];
-            setNewItem({ type: 'line', data: finalPoints });
+        } else if (updatedLinePoints.length === 2) {
+            addLog('Line endpoint selected. Opening details pane.');
             setIsSheetOpen(true);
             setInteractionMode('none');
-            setLinePoints([]);
         }
     }
   };
@@ -121,13 +118,17 @@ export default function MapExplorer() {
         addLog('Centering view on current location.');
         setView({ center: currentLocation, zoom: 15 });
     } else {
-        addLog('Current location not available, attempting to locate.');
+        addLog('Current location not available, re-attempting location.');
         setIsLocating(true); 
     }
   };
 
   const handlePinSave = (label: string) => {
     if (!pendingPin) return;
+    if (!label.trim()) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Pin label cannot be empty." });
+        return;
+    }
     const newPin: Pin = {
       id: `pin-${componentId}-${Date.now()}`,
       lat: pendingPin.lat,
@@ -144,27 +145,32 @@ export default function MapExplorer() {
     addLog('Pin creation cancelled.');
   };
   
-  const handleSaveNewItem = () => {
-    if (!newItem || !newItemLabel.trim()) {
-      toast({ variant: "destructive", title: "Validation Error", description: "Please provide a label." });
+  const handleSaveLine = () => {
+    if (!newItemLabel.trim()) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Please provide a label for the line." });
       return;
     }
     
-    // This part is now only for lines, as pins are handled via popup
-    if (newItem.type === 'line') {
-      const newLine: Line = {
+    const newLine: Line = {
         id: `line-${componentId}-${Date.now()}`,
-        path: newItem.data.map((p: LatLng) => ({ lat: p.lat, lng: p.lng })),
+        path: linePoints.map(p => ({ lat: p.lat, lng: p.lng })),
         label: newItemLabel,
-      };
-      setLines(prev => [...prev, newLine]);
-      addLog(`Saved line: "${newItemLabel}"`);
-    }
+    };
+    setLines(prev => [...prev, newLine]);
+    addLog(`Saved line: "${newItemLabel}"`);
     
+    // Reset for next line
     setIsSheetOpen(false);
-    setNewItem(null);
+    setLinePoints([]);
     setNewItemLabel('');
   };
+
+  const handleCloseSheet = () => {
+      setIsSheetOpen(false);
+      setLinePoints([]);
+      setNewItemLabel('');
+      addLog('Line creation cancelled.');
+  }
 
   const handleShowLog = () => {
     const logContent = log.join('\n');
@@ -200,10 +206,16 @@ export default function MapExplorer() {
                                 size="icon" 
                                 className="h-10 w-10 rounded-full"
                                 onClick={() => {
-                                  setInteractionMode(p => p === 'add_pin' ? 'none' : 'add_pin');
-                                  if (interactionMode !== 'add_pin') {
-                                    toast({ title: 'Add a Pin', description: 'Click anywhere on the map to place a pin.' });
-                                  }
+                                  setInteractionMode(prev => {
+                                      const newMode = prev === 'add_pin' ? 'none' : 'add_pin';
+                                      if (newMode === 'add_pin') {
+                                          toast({ title: 'Add a Pin', description: 'Click anywhere on the map to place a pin.' });
+                                          addLog('Entered "Add Pin" mode.');
+                                      } else {
+                                          addLog('Exited "Add Pin" mode.');
+                                      }
+                                      return newMode;
+                                  });
                                 }}
                             >
                                 <MapPin className="h-5 w-5" />
@@ -218,10 +230,17 @@ export default function MapExplorer() {
                                 size="icon" 
                                 className="h-10 w-10 rounded-full"
                                 onClick={() => {
-                                    setInteractionMode(p => p === 'draw_line' ? 'none' : 'draw_line');
-                                    if (interactionMode !== 'draw_line') {
-                                      toast({ title: 'Draw a Line', description: 'Click a start and end point on the map.' });
-                                    }
+                                    setInteractionMode(prev => {
+                                        const newMode = prev === 'draw_line' ? 'none' : 'draw_line';
+                                        if (newMode === 'draw_line') {
+                                            toast({ title: 'Draw a Line', description: 'Click a start and end point on the map.' });
+                                            addLog('Entered "Draw Line" mode.');
+                                        } else {
+                                            addLog('Exited "Draw Line" mode.');
+                                            setLinePoints([]); // Clear points if exiting mode
+                                        }
+                                        return newMode;
+                                    });
                                 }}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -300,7 +319,7 @@ export default function MapExplorer() {
         </div>
       </main>
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+      <Sheet open={isSheetOpen} onOpenChange={handleCloseSheet}>
         <SheetContent>
             <SheetHeader>
                 <SheetTitle>{sheetTitle}</SheetTitle>
@@ -314,12 +333,13 @@ export default function MapExplorer() {
                         value={newItemLabel}
                         onChange={(e) => setNewItemLabel(e.target.value)}
                         className="col-span-3"
-                        placeholder="e.g. Start of trail"
+                        placeholder="e.g. Trail Route"
                     />
                 </div>
             </div>
             <SheetFooter>
-                <Button type="submit" onClick={handleSaveNewItem}>Save</Button>
+                <Button variant="outline" onClick={handleCloseSheet}>Cancel</Button>
+                <Button type="submit" onClick={handleSaveLine}>Save Line</Button>
             </SheetFooter>
         </SheetContent>
       </Sheet>
