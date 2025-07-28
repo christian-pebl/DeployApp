@@ -77,16 +77,9 @@ const Map = ({ center, zoom, markers, lines, currentLocation, onMapClick, onMapM
 
     useEffect(() => {
         if (mapRef.current) {
-            // Only pan, don't re-zoom programmatically when center changes unless explicitly told
-            mapRef.current.panTo(center, { animate: true, duration: 0.5 });
+            mapRef.current.setView(center, zoom, { animate: true, pan: { duration: 1 } });
         }
-    }, [center]);
-
-    useEffect(() => {
-        if (mapRef.current) {
-            mapRef.current.setZoom(zoom, { animate: true });
-        }
-    }, [zoom]);
+    }, [center, zoom]);
 
 
     useEffect(() => {

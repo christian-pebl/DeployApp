@@ -218,7 +218,7 @@ export default function MapExplorer() {
         addLog(`Location updated: ${latitude}, ${longitude}`);
         if (isLocating) {
             addLog('Centering map on initial location.');
-            setView(prev => ({ ...prev, center: newPosition, zoom: 15 }));
+            setView({ center: newPosition, zoom: 15 });
             setIsLocating(false);
         }
     };
@@ -255,6 +255,9 @@ export default function MapExplorer() {
 
 
   const handleMapMove = (center: LatLng, zoom: number) => {
+    // This is a controlled component, but we want to avoid re-rendering on every move.
+    // We can use a ref to store the latest view state and only update the react state on 'moveend'
+    // For now, simple state update is fine.
     const newCenter: LatLngExpression = [center.lat, center.lng];
     setView({ center: newCenter, zoom });
 
@@ -377,7 +380,7 @@ export default function MapExplorer() {
     addLog('Locate me button clicked.');
     if (currentLocation) {
         addLog('Centering view on current location.');
-        setView(prevView => ({ ...prevView, center: currentLocation, zoom: 15 }));
+        setView({ center: currentLocation, zoom: 15 });
     } else {
         addLog('Current location not available, attempting to locate.');
         setIsLocating(true); 
@@ -386,7 +389,7 @@ export default function MapExplorer() {
 
   const handlePanTo = (position: LatLngExpression) => {
     addLog(`Panning to: ${JSON.stringify(position)}`);
-    setView(prevView => ({ ...prevView, center: position, zoom: 15 }));
+    setView({ center: position, zoom: 15 });
     setIsSidebarOpen(false);
   };
   
