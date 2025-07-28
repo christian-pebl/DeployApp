@@ -210,22 +210,6 @@ export default function MapExplorer() {
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
        <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
             <TooltipProvider>
-                 <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={handleShowLog}
-                            className="h-12 w-12 rounded-full shadow-lg"
-                        >
-                            <Code className="h-6 w-6" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                        <p>Show Event Log</p>
-                    </TooltipContent>
-                </Tooltip>
-
                 <div className="flex flex-col gap-2 p-2 bg-card rounded-full shadow-lg border">
                    <Tooltip>
                         <TooltipTrigger asChild>
@@ -305,6 +289,26 @@ export default function MapExplorer() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            
+            <div className="absolute bottom-16 right-4 z-30">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                      <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={handleShowLog}
+                          className="h-12 w-12 rounded-full shadow-lg bg-card"
+                      >
+                          <Code className="h-6 w-6" />
+                      </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                      <p>Show Event Log</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
         </div>
       </main>
 
