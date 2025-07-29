@@ -290,11 +290,12 @@ const Map = ({
                 }).addTo(layer);
 
                 if(line.label && line.labelVisible !== false) {
+                     const center = polyline.getBounds().getCenter();
                     polyline.bindTooltip(line.label, {
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
-                    }).setLatLng(polyline.getCenter());
+                    }).setLatLng(center);
                 }
                 polyline.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
@@ -412,15 +413,17 @@ const Map = ({
     
         if (isDrawingArea) {
             const updatePreview = () => {
-                if (previewAreaRef.current) {
-                    previewAreaRef.current.setLatLngs(pendingAreaPath);
-                } else if (pendingAreaPath.length > 0) {
-                    previewAreaRef.current = L.polygon(pendingAreaPath, {
-                        color: 'hsl(var(--secondary-foreground))',
-                        weight: 2,
-                        fillColor: 'hsl(var(--secondary))',
-                        fillOpacity: 0.5,
-                    }).addTo(map);
+                if (pendingAreaPath.length > 1) {
+                    if (previewAreaRef.current) {
+                        previewAreaRef.current.setLatLngs(pendingAreaPath);
+                    } else {
+                        previewAreaRef.current = L.polygon(pendingAreaPath, {
+                            color: 'hsl(var(--secondary-foreground))',
+                            weight: 2,
+                            fillColor: 'hsl(var(--secondary))',
+                            fillOpacity: 0.5,
+                        }).addTo(map);
+                    }
                 }
     
                 const lastPoint = pendingAreaPath[pendingAreaPath.length - 1];
@@ -437,7 +440,6 @@ const Map = ({
                         }).addTo(map);
                     }
                 } else if (previewAreaLineRef.current) {
-                    // No points yet, so no preview line to draw
                     previewAreaLineRef.current.remove();
                     previewAreaLineRef.current = null;
                 }

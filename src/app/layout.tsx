@@ -24,6 +24,7 @@ export default function RootLayout({
         {children}
         <Toaster />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossOrigin=""></script>
+        <script src="https://unpkg.com/leaflet-geometryutil@0.10.3/src/leaflet.geometryutil.js" integrity="sha512-SxmNA0lK28yocNz1CIyY4TjG0rS7crkRzD4s49LgDrb3w3f752fTT8fGnp3Jc4OQ/9Imr0L2n0oW8yB/1/bevw==" crossOrigin=""></script>
       </body>
     </html>
   );

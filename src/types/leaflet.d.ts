@@ -12,7 +12,9 @@ import type {
     DivIconOptions,
     LeafletEvent,
     Popup,
-    GeometryUtil
+    LatLngTuple,
+    Polyline,
+    Polygon
 } from 'leaflet';
 
 declare global {
@@ -22,9 +24,16 @@ declare global {
     marker: (latlng: LatLngExpression, options?: MarkerOptions) => LeafletMarker;
     latLng: (latitude: number, longitude: number) => LatLng;
     divIcon: (options: DivIconOptions) => DivIcon;
+    polyline: (latlngs: LatLngExpression[] | LatLngExpression[][], options?: any) => Polyline;
+    polygon: (latlngs: LatLngExpression[] | LatLngExpression[][] | LatLngExpression[][][], options?: any) => Polygon;
     control: {
         zoom: (options: { position: string }) => Control.Zoom
     };
-    GeometryUtil: GeometryUtil;
+    GeometryUtil: {
+        geodesicArea(latlngs: LatLng[]): number;
+    };
+    DomEvent: {
+        stopPropagation(e: LeafletEvent): any;
+    }
   };
 }
