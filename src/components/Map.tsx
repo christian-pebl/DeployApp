@@ -87,7 +87,7 @@ const Map = ({
         }
 
         const isPin = 'lat' in item;
-        const isArea = !isPin && 'path' in item && L.Polygon.prototype.isPrototypeOf(L.polyline(item.path.map(p => [p.lat, p.lng])) as any);
+        const isArea = 'path' in item && item.path.length >= 3;
 
         let latlng: LatLng;
         if (isPin) {
@@ -95,7 +95,7 @@ const Map = ({
         } else if (isArea) {
             const polygon = L.polygon(item.path.map(p => L.latLng(p.lat, p.lng)));
             latlng = polygon.getBounds().getCenter();
-        } else {
+        } else { // isLine
             latlng = L.latLng((item.path[0].lat + item.path[item.path.length-1].lat) / 2, (item.path[0].lng + item.path[item.path.length-1].lng) / 2);
         }
         
@@ -107,12 +107,12 @@ const Map = ({
         } else if ('path' in item) {
             if (isArea) {
                 const polygon = L.polygon(item.path.map(p => L.latLng(p.lat, p.lng)));
-                const area = L.GeometryUtil.geodesicArea(polygon.getLatLngs()[0]);
+                const area = (L.GeometryUtil as any).geodesicArea(polygon.getLatLngs()[0]);
                 coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
                   <p class="font-semibold">Area: ${area.toFixed(2)} square meters</p>
                   <p>${item.path.length} vertices</p>
                 </div>`;
-            } else {
+            } else { // isLine
                 const startPoint = L.latLng(item.path[0].lat, item.path[0].lng);
                 const endPoint = L.latLng(item.path[item.path.length - 1].lat, item.path[item.path.length - 1].lng);
                 const distance = startPoint.distanceTo(endPoint);
@@ -408,7 +408,6 @@ const Map = ({
                     dashArray: '5, 5',
                 }).addTo(map);
             }
-
         } else if(previewAreaRef.current) {
             previewAreaRef.current.remove();
             previewAreaRef.current = null;

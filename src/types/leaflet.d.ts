@@ -11,7 +11,8 @@ import type {
     DivIcon,
     DivIconOptions,
     LeafletEvent,
-    Popup
+    Popup,
+    GeometryUtil
 } from 'leaflet';
 
 declare global {
@@ -24,5 +25,6 @@ declare global {
     control: {
         zoom: (options: { position: string }) => Control.Zoom
     };
+    GeometryUtil: GeometryUtil;
   };
 }
