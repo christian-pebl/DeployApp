@@ -107,18 +107,18 @@ const Map = ({
             coordsHtml = `<p class="text-xs text-muted-foreground">Lat: ${item.lat.toFixed(4)}, Lng: ${item.lng.toFixed(4)}</p>`;
         } else if ('path' in item) {
             if (isArea) {
+                let areaHtml = '';
                 if (L.GeometryUtil) {
                     const polygonForArea = L.polygon(item.path.map(p => [p.lat, p.lng] as LatLngExpression));
                     const areaMeters = L.GeometryUtil.geodesicArea(polygonForArea.getLatLngs()[0] as LatLng[]);
                     const areaHectares = areaMeters / 10000;
-                    let pointsHtml = item.path.map((p, i) => `<li>Point ${i+1}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</li>`).join('');
-                    coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
-                      <p class="font-semibold">Area: ${areaHectares.toFixed(4)} hectares</p>
-                      <ul class="list-disc pl-4">${pointsHtml}</ul>
-                    </div>`;
-                } else {
-                    coordsHtml = `<p class="text-xs text-muted-foreground">Calculating area...</p>`;
+                    areaHtml = `<p class="font-semibold">Area: ${areaHectares.toFixed(4)} hectares</p>`;
                 }
+                const pointsHtml = item.path.map((p, i) => `<li>Point ${i+1}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</li>`).join('');
+                coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
+                    ${areaHtml}
+                    <ul class="list-disc pl-4">${pointsHtml}</ul>
+                </div>`;
             } else { // isLine
                 const startPoint = L.latLng(item.path[0].lat, item.path[0].lng);
                 const endPoint = L.latLng(item.path[item.path.length - 1].lat, item.path[item.path.length - 1].lng);
