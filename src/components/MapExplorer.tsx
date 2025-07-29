@@ -151,18 +151,22 @@ export default function MapExplorer() {
 
   const handleUpdatePin = (id: string, label: string) => {
     setPins(prev => prev.map(p => p.id === id ? { ...p, label } : p));
+    setItemToEdit(null);
   };
 
   const handleDeletePin = (id: string) => {
     setPins(prev => prev.filter(p => p.id !== id));
+    setItemToEdit(null);
   };
   
   const handleUpdateLine = (id: string, label: string) => {
     setLines(prev => prev.map(l => l.id === id ? { ...l, label } : l));
+    setItemToEdit(null);
   };
   
   const handleDeleteLine = (id: string) => {
     setLines(prev => prev.filter(l => l.id !== id));
+    setItemToEdit(null);
   };
 
   const handleToggleLabel = (id: string, type: 'pin' | 'line') => {
@@ -171,6 +175,7 @@ export default function MapExplorer() {
     } else {
       setLines(lines.map(l => l.id === id ? { ...l, labelVisible: !(l.labelVisible ?? true) } : l));
     }
+    setItemToEdit(null);
   };
 
   const handleViewItem = (item: Pin | Line) => {
@@ -184,17 +189,9 @@ export default function MapExplorer() {
     setIsObjectListOpen(false);
   }
 
-  const handleEditItem = (item: Pin | Line) => {
+  const handleEditItem = (item: Pin | Line | null) => {
     setItemToEdit(item);
   }
-  
-  useEffect(() => {
-    if (itemToEdit && mapRef.current) {
-        mapRef.current.closePopup();
-        // This relies on the Map component's logic to show the popup
-        // A bit of a hack, we pass it via a prop now.
-    }
-  }, [itemToEdit]);
 
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">

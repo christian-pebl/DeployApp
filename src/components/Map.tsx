@@ -31,7 +31,7 @@ interface MapProps {
     onDeleteLine: (id: string) => void;
     onToggleLabel: (id: string, type: 'pin' | 'line') => void;
     itemToEdit: Pin | Line | null;
-    onEditItem: (item: Pin | Line) => void;
+    onEditItem: (item: Pin | Line | null) => void;
 }
 
 
@@ -112,7 +112,13 @@ const Map = ({
             .setLatLng(latlng)
             .setContent(content)
             .openOn(map);
+
+        const handleCleanup = () => {
+            onEditItem(null);
+        };
         
+        popupRef.current.on('remove', handleCleanup);
+
         setTimeout(() => {
             const form = document.getElementById(formId);
             const deleteButton = form?.querySelector('.delete-btn');
@@ -146,8 +152,10 @@ const Map = ({
     };
 
     useEffect(() => {
-        if(itemToEdit) {
+        if(itemToEdit && mapRef.current) {
             showEditPopup(itemToEdit);
+        } else if (!itemToEdit && mapRef.current && popupRef.current) {
+            mapRef.current.closePopup(popupRef.current);
         }
     }, [itemToEdit])
 
@@ -216,7 +224,7 @@ const Map = ({
                 marker.on('click', () => onEditItem(pin));
             });
         }
-    }, [pins]);
+    }, [pins, onEditItem]);
 
     useEffect(() => {
         if (lineLayerRef.current && typeof window.L !== 'undefined') {
@@ -235,9 +243,6 @@ const Map = ({
                 }).addTo(layer);
 
                 if(line.label && line.labelVisible !== false) {
-                    const midIndex = Math.floor(latlngs.length / 2);
-                    const midPoint = latlngs[midIndex] as LatLng;
-                    
                     polyline.bindTooltip(line.label, {
                         permanent: true,
                         direction: 'center',
@@ -245,12 +250,12 @@ const Map = ({
                     });
                 }
                 polyline.on('click', (e) => {
-                    L.DomEvent.stopPropagation(e); // Prevent map click event
+                    L.DomEvent.stopPropagation(e);
                     onEditItem(line)
                 });
             });
         }
-    }, [lines]);
+    }, [lines, onEditItem]);
 
 
     useEffect(() => {
