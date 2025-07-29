@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, CornerUpLeft, FolderPlus, FolderKanban, Folder, FolderSymlink, Trash, ChevronsUpDown } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, FolderKanban, ChevronsUpDown } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -19,18 +19,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
+} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -781,7 +777,7 @@ export default function MapExplorer() {
       </main>
       
       <Dialog open={isNewProjectDialogOpen} onOpenChange={setIsNewProjectDialogOpen}>
-        <DialogContent>
+        <DialogContent className="z-[1003]">
             <DialogHeader>
                 <DialogTitle>Create New Project</DialogTitle>
                 <DialogDescription>Enter a name and optional description for your new project.</DialogDescription>
@@ -798,7 +794,7 @@ export default function MapExplorer() {
       </Dialog>
       
       <Dialog open={isManageProjectsDialogOpen} onOpenChange={setIsManageProjectsDialogOpen}>
-        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col z-[1003]">
             <DialogHeader>
                 <DialogTitle>Manage Projects</DialogTitle>
                 <DialogDescription>Edit, delete, or view your projects.</DialogDescription>
@@ -815,6 +811,7 @@ export default function MapExplorer() {
                                 <Button variant="outline" size="sm" onClick={() => {
                                     setViewedProjectId(project.id);
                                     setIsManageProjectsDialogOpen(false);
+                                    setIsObjectListOpen(true);
                                 }}>View Objects</Button>
                                 <Button variant="outline" size="sm" onClick={() => {
                                     setProjectToEdit(project)
@@ -823,7 +820,7 @@ export default function MapExplorer() {
                                     <AlertDialogTrigger asChild>
                                         <Button variant="destructive" size="sm">Delete</Button>
                                     </AlertDialogTrigger>
-                                    <AlertDialogContent>
+                                    <AlertDialogContent className="z-[1004]">
                                         <AlertDialogHeader>
                                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                             <AlertDialogDescription>
@@ -851,7 +848,7 @@ export default function MapExplorer() {
       </Dialog>
       
       <Dialog open={!!projectToEdit} onOpenChange={(open) => !open && setProjectToEdit(null)}>
-        <DialogContent>
+        <DialogContent className="z-[1003]">
             <DialogHeader>
                 <DialogTitle>Edit Project</DialogTitle>
                 <DialogDescription>Update the name and description for "{projectToEdit?.name}".</DialogDescription>
