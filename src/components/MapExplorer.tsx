@@ -557,7 +557,7 @@ export default function MapExplorer() {
               </Card>
             )}
 
-            <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
+            <div className="absolute top-4 left-4 z-[1001] flex flex-col gap-2">
                  <DropdownMenu>
                     <TooltipProvider>
                         <Tooltip>
@@ -608,7 +608,8 @@ export default function MapExplorer() {
                         </DropdownMenuSub>
                     </DropdownMenuContent>
                 </DropdownMenu>
-
+            </div>
+            <div className="absolute top-20 left-4 z-[1000] flex flex-col gap-2">
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
