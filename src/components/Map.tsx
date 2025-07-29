@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions } from 'leaflet';
+import 'leaflet-geometryutil';
 
 type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
 type Line = { id:string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
@@ -221,7 +222,7 @@ const Map = ({
             
             calculateAreaButton?.addEventListener('click', () => {
                 if (!isArea || !window.L.GeometryUtil) {
-                     document.getElementById('area-result')!.innerText = 'Util not loaded.';
+                     document.getElementById('area-result')!.innerText = 'Error.';
                      return;
                 };
 
