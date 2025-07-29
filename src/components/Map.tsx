@@ -107,10 +107,10 @@ const Map = ({
             coordsHtml = `<p class="text-xs text-muted-foreground">Lat: ${item.lat.toFixed(4)}, Lng: ${item.lng.toFixed(4)}</p>`;
         } else if ('path' in item) {
             if (isArea) {
-                const polygon = L.polygon(item.path.map(p => L.latLng(p.lat, p.lng)));
-                const area = (L.GeometryUtil as any).geodesicArea(polygon.getLatLngs()[0]);
+                const polygonForArea = L.polygon(item.path.map(p => [p.lat, p.lng] as LatLngExpression));
+                const areaMeters = L.GeometryUtil.geodesicArea(polygonForArea.getLatLngs()[0] as LatLng[]);
                 coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
-                  <p class="font-semibold">Area: ${area.toFixed(2)} square meters</p>
+                  <p class="font-semibold">Area: ${areaMeters.toFixed(2)} square meters</p>
                   <p>${item.path.length} vertices</p>
                 </div>`;
             } else { // isLine
@@ -327,7 +327,7 @@ const Map = ({
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-secondary-foreground bg-secondary/80 border-0',
-                    }).setLatLng(polygon.getBounds().getCenter());
+                    });
                 }
                 polygon.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
