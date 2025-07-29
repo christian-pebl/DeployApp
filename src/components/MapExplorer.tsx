@@ -21,8 +21,8 @@ const Map = dynamic(() => import('@/components/Map'), {
   loading: () => <div className="w-full h-full bg-muted flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>,
 });
 
-type Pin = { id: string; lat: number; lng: number; label: string };
-type Line = { id: string; path: { lat: number; lng: number }[]; label: string };
+type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean };
+type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean };
 
 export default function MapExplorer() {
   const [log, setLog] = useState<string[]>(['App Initialized']);
@@ -128,7 +128,7 @@ export default function MapExplorer() {
   };
 
   const handlePinSave = (id: string, label: string, lat: number, lng: number) => {
-    const newPin: Pin = { id, lat, lng, label };
+    const newPin: Pin = { id, lat, lng, label, labelVisible: true };
     setPins(prev => [...prev, newPin]);
     setPendingPin(null);
   };
@@ -138,6 +138,7 @@ export default function MapExplorer() {
           id,
           path: path.map(p => ({ lat: p.lat, lng: p.lng })),
           label,
+          labelVisible: true,
       };
       setLines(prev => [...prev, newLine]);
       setPendingLine(null);
@@ -157,6 +158,14 @@ export default function MapExplorer() {
   
   const handleDeleteLine = (id: string) => {
     setLines(prev => prev.filter(l => l.id !== id));
+  };
+
+  const handleToggleLabel = (id: string, type: 'pin' | 'line') => {
+    if (type === 'pin') {
+      setPins(pins.map(p => p.id === id ? { ...p, labelVisible: !(p.labelVisible ?? true) } : p));
+    } else {
+      setLines(lines.map(l => l.id === id ? { ...l, labelVisible: !(l.labelVisible ?? true) } : l));
+    }
   };
 
   return (
@@ -186,6 +195,7 @@ export default function MapExplorer() {
               onDeletePin={handleDeletePin}
               onUpdateLine={handleUpdateLine}
               onDeleteLine={handleDeleteLine}
+              onToggleLabel={handleToggleLabel}
             />
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">

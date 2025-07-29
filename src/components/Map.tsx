@@ -4,8 +4,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup, LocationEvent, LeafletMouseEvent } from 'leaflet';
 
-type Pin = { id: string; lat: number; lng: number; label: string };
-type Line = { id: string; path: { lat: number; lng: number }[]; label: string };
+type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean };
+type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean };
 
 interface MapProps {
     mapRef: React.MutableRefObject<LeafletMap | null>;
@@ -29,6 +29,7 @@ interface MapProps {
     onDeletePin: (id: string) => void;
     onUpdateLine: (id: string, label: string) => void;
     onDeleteLine: (id: string) => void;
+    onToggleLabel: (id: string, type: 'pin' | 'line') => void;
 }
 
 
@@ -51,7 +52,7 @@ const Map = ({
     onLocationFound, onLocationError, onMove, isDrawingLine, lineStartPoint,
     pendingPin, onPinSave, onPinCancel,
     pendingLine, onLineSave, onLineCancel,
-    onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine
+    onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine, onToggleLabel
 }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
@@ -83,13 +84,18 @@ const Map = ({
             </div>`;
         }
 
+        const labelVisible = item.labelVisible !== false;
+
         const content = `
             <form id="${formId}" class="flex flex-col gap-2">
                 <input type="text" name="label" value="${item.label}" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
                 ${coordsHtml}
-                <div class="flex justify-end gap-2">
-                    <button type="button" class="delete-btn px-3 py-1 text-sm rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/80">Delete</button>
-                    <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
+                <div class="flex justify-between items-center gap-2">
+                    <button type="button" class="toggle-label-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${labelVisible ? 'Hide' : 'Show'} Label</button>
+                    <div class="flex gap-2">
+                        <button type="button" class="delete-btn px-3 py-1 text-sm rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/80">Delete</button>
+                        <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
+                    </div>
                 </div>
             </form>
         `;
@@ -102,6 +108,7 @@ const Map = ({
         setTimeout(() => {
             const form = document.getElementById(formId);
             const deleteButton = form?.querySelector('.delete-btn');
+            const toggleLabelButton = form?.querySelector('.toggle-label-btn');
 
             form?.addEventListener('submit', (ev) => {
                 ev.preventDefault();
@@ -120,6 +127,11 @@ const Map = ({
                 } else {
                     onDeleteLine(item.id);
                 }
+                map.closePopup();
+            });
+
+            toggleLabelButton?.addEventListener('click', () => {
+                onToggleLabel(item.id, isPin ? 'pin' : 'line');
                 map.closePopup();
             });
         }, 0);
@@ -183,9 +195,10 @@ const Map = ({
             const markerIcon = createCustomIcon(`hsl(${accentColor})`);
 
             pins.forEach(pin => {
-                const marker = L.marker([pin.lat, pin.lng], { icon: markerIcon })
-                  .bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' })
-                  .addTo(layer);
+                const marker = L.marker([pin.lat, pin.lng], { icon: markerIcon }).addTo(layer);
+                if (pin.labelVisible !== false) {
+                    marker.bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' });
+                }
                 marker.on('click', () => showEditPopup(pin));
             });
         }
@@ -207,7 +220,7 @@ const Map = ({
                     opacity: 0.8
                 }).addTo(layer);
 
-                if(line.label) {
+                if(line.label && line.labelVisible !== false) {
                     polyline.bindTooltip(line.label, {
                         permanent: true,
                         direction: 'center',
