@@ -7,13 +7,22 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Edit, Trash2, Save } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Edit, Trash2, Eye, Pencil } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
 
 const Map = dynamic(() => import('@/components/Map'), {
@@ -40,6 +49,8 @@ export default function MapExplorer() {
   const [isDrawingLine, setIsDrawingLine] = useState(false);
   const [lineStartPoint, setLineStartPoint] = useState<LatLng | null>(null);
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLng | null>(null);
+  const [isObjectListOpen, setIsObjectListOpen] = useState(false);
+  const [itemToEdit, setItemToEdit] = useState<Pin | Line | null>(null);
 
   const { toast } = useToast();
   
@@ -168,6 +179,29 @@ export default function MapExplorer() {
     }
   };
 
+  const handleViewItem = (item: Pin | Line) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if ('lat' in item) {
+      map.setView([item.lat, item.lng], 17);
+    } else {
+       map.fitBounds(item.path.map(p => [p.lat, p.lng]) as [[number, number]]);
+    }
+    setIsObjectListOpen(false);
+  }
+
+  const handleEditItem = (item: Pin | Line) => {
+    setItemToEdit(item);
+  }
+  
+  useEffect(() => {
+    if (itemToEdit && mapRef.current) {
+        mapRef.current.closePopup();
+        // This relies on the Map component's logic to show the popup
+        // A bit of a hack, we pass it via a prop now.
+    }
+  }, [itemToEdit]);
+
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
        
@@ -196,6 +230,8 @@ export default function MapExplorer() {
               onUpdateLine={handleUpdateLine}
               onDeleteLine={handleDeleteLine}
               onToggleLabel={handleToggleLabel}
+              itemToEdit={itemToEdit}
+              onEditItem={handleEditItem}
             />
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
@@ -224,6 +260,60 @@ export default function MapExplorer() {
                         </TooltipTrigger>
                         <TooltipContent><p>Draw a Line</p></TooltipContent>
                     </Tooltip>
+                     <Sheet open={isObjectListOpen} onOpenChange={setIsObjectListOpen}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <SheetTrigger asChild>
+                                    <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg">
+                                        <Menu className="h-6 w-6" />
+                                    </Button>
+                                </SheetTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent><p>List Objects</p></TooltipContent>
+                        </Tooltip>
+                        <SheetContent side="left" className="w-[350px] sm:w-[400px] p-0">
+                            <SheetHeader className="p-4 border-b">
+                                <SheetTitle>Map Objects</SheetTitle>
+                            </SheetHeader>
+                            <ScrollArea className="h-[calc(100%-4rem)]">
+                                <div className="p-4">
+                                    <h3 className="text-lg font-semibold mb-2">Pins</h3>
+                                    {pins.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {pins.map(pin => (
+                                                <li key={pin.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                                    <span className="font-medium truncate pr-2">{pin.label}</span>
+                                                    <div className="flex items-center gap-1">
+                                                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(pin)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
+                                                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(pin)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                                                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePin(pin.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : <p className="text-sm text-muted-foreground">No pins added yet.</p>}
+                                    
+                                    <Separator className="my-4" />
+
+                                    <h3 className="text-lg font-semibold mb-2">Lines</h3>
+                                    {lines.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {lines.map(line => (
+                                                <li key={line.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                                    <span className="font-medium truncate pr-2">{line.label}</span>
+                                                    <div className="flex items-center gap-1">
+                                                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(line)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
+                                                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(line)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                                                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(line.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : <p className="text-sm text-muted-foreground">No lines drawn yet.</p>}
+                                </div>
+                            </ScrollArea>
+                        </SheetContent>
+                    </Sheet>
                 </TooltipProvider>
             </div>
             

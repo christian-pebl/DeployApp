@@ -30,6 +30,8 @@ interface MapProps {
     onUpdateLine: (id: string, label: string) => void;
     onDeleteLine: (id: string) => void;
     onToggleLabel: (id: string, type: 'pin' | 'line') => void;
+    itemToEdit: Pin | Line | null;
+    onEditItem: (item: Pin | Line) => void;
 }
 
 
@@ -52,7 +54,8 @@ const Map = ({
     onLocationFound, onLocationError, onMove, isDrawingLine, lineStartPoint,
     pendingPin, onPinSave, onPinCancel,
     pendingLine, onLineSave, onLineCancel,
-    onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine, onToggleLabel
+    onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine, onToggleLabel,
+    itemToEdit, onEditItem
 }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
@@ -138,6 +141,12 @@ const Map = ({
     };
 
     useEffect(() => {
+        if(itemToEdit) {
+            showEditPopup(itemToEdit);
+        }
+    }, [itemToEdit])
+
+    useEffect(() => {
         if (typeof window.L === 'undefined') return;
 
         if (mapContainerRef.current && !mapRef.current) {
@@ -199,7 +208,7 @@ const Map = ({
                 if (pin.labelVisible !== false) {
                     marker.bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' });
                 }
-                marker.on('click', () => showEditPopup(pin));
+                marker.on('click', () => onEditItem(pin));
             });
         }
     }, [pins]);
@@ -221,13 +230,16 @@ const Map = ({
                 }).addTo(layer);
 
                 if(line.label && line.labelVisible !== false) {
+                    const midIndex = Math.floor(latlngs.length / 2);
+                    const midPoint = latlngs[midIndex] as LatLng;
+                    
                     polyline.bindTooltip(line.label, {
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
                     });
                 }
-                polyline.on('click', () => showEditPopup(line));
+                polyline.on('click', () => onEditItem(line));
             });
         }
     }, [lines]);
