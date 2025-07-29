@@ -354,19 +354,26 @@ const Map = ({
                 const latlngs = area.path.map(p => L.latLng(p.lat, p.lng));
                 if (latlngs.length < 2) return;
     
-                const areaGroup = L.layerGroup().addTo(layer);
-    
                 const fillOpacity = area.fillVisible !== false ? 0.2 : 0.0;
-
+    
                 const polygon = L.polygon(latlngs, {
                     color: `hsl(${secondaryFgColor})`,
                     weight: 2,
                     fillColor: `hsl(${secondaryFgColor})`,
                     fillOpacity: fillOpacity
-                }).addTo(areaGroup);
+                }).addTo(layer);
+    
+                polygon.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    onEditItem(area);
+                });
     
                 latlngs.forEach(latlng => {
-                    L.circleMarker(latlng, cornerMarkerOptions).addTo(areaGroup);
+                    const marker = L.circleMarker(latlng, cornerMarkerOptions).addTo(layer);
+                    marker.on('click', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        onEditItem(area);
+                    });
                 });
     
                 if (area.label && area.labelVisible !== false) {
@@ -377,11 +384,6 @@ const Map = ({
                         className: 'font-sans font-bold text-secondary-foreground bg-secondary/80 border-0',
                     }).openTooltip(center);
                 }
-    
-                areaGroup.on('click', (e) => {
-                    L.DomEvent.stopPropagation(e);
-                    onEditItem(area);
-                });
             });
         }
     }, [areas, onEditItem]);
