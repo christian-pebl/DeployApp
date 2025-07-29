@@ -27,7 +27,7 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
 type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
-type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
+type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; };
 
 
 export default function MapExplorer() {
@@ -193,6 +193,7 @@ export default function MapExplorer() {
           path: path.map(p => ({ lat: p.lat, lng: p.lng })),
           label,
           labelVisible: true,
+          fillVisible: true,
           notes,
       };
       setAreas(prev => [...prev, newArea]);
@@ -237,6 +238,11 @@ export default function MapExplorer() {
     } else {
       setAreas(areas.map(a => a.id === id ? { ...a, labelVisible: !(a.labelVisible ?? true) } : a));
     }
+    setItemToEdit(null);
+  };
+  
+  const handleToggleFill = (id: string) => {
+    setAreas(areas.map(a => a.id === id ? { ...a, fillVisible: !(a.fillVisible ?? true) } : a));
     setItemToEdit(null);
   };
 
@@ -345,6 +351,7 @@ export default function MapExplorer() {
               onUpdateArea={handleUpdateArea}
               onDeleteArea={handleDeleteArea}
               onToggleLabel={handleToggleLabel}
+              onToggleFill={handleToggleFill}
               itemToEdit={itemToEdit}
               onEditItem={handleEditItem}
             />

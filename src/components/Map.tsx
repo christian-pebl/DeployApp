@@ -5,7 +5,7 @@ import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, Circl
 
 type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
 type Line = { id:string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
-type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
+type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; };
 
 
 interface MapProps {
@@ -40,6 +40,7 @@ interface MapProps {
     onUpdateArea: (id: string, label: string, notes: string) => void;
     onDeleteArea: (id: string) => void;
     onToggleLabel: (id: string, type: 'pin' | 'line' | 'area') => void;
+    onToggleFill: (id: string) => void;
     itemToEdit: Pin | Line | Area | null;
     onEditItem: (item: Pin | Line | Area | null) => void;
 }
@@ -66,7 +67,7 @@ const Map = ({
     pendingPin, onPinSave, onPinCancel,
     pendingLine, onLineSave, onLineCancel,
     pendingArea, onAreaSave, onAreaCancel,
-    onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine, onUpdateArea, onDeleteArea, onToggleLabel,
+    onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine, onUpdateArea, onDeleteArea, onToggleLabel, onToggleFill,
     itemToEdit, onEditItem
 }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -136,14 +137,24 @@ const Map = ({
         }
 
         const labelVisible = item.labelVisible !== false;
+        const fillVisible = isArea ? (item as Area).fillVisible !== false : false;
+
+        let fillButtonHtml = '';
+        if(isArea) {
+            fillButtonHtml = `<button type="button" class="toggle-fill-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${fillVisible ? 'Hide' : 'Show'} Fill</button>`
+        }
+
 
         const content = `
             <form id="${formId}" class="flex flex-col gap-2">
                 <input type="text" name="label" value="${item.label}" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
                 <textarea name="notes" placeholder="Add notes..." class="p-2 border rounded-md text-sm bg-background text-foreground border-border min-h-[60px]">${item.notes || ''}</textarea>
                 ${coordsHtml}
-                <div class="flex justify-between items-center gap-2">
-                    <button type="button" class="toggle-label-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${labelVisible ? 'Hide' : 'Show'} Label</button>
+                <div class="flex justify-between items-center gap-2 flex-wrap">
+                    <div class="flex gap-2">
+                        <button type="button" class="toggle-label-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${labelVisible ? 'Hide' : 'Show'} Label</button>
+                        ${fillButtonHtml}
+                    </div>
                     <div class="flex gap-2">
                         <button type="button" class="delete-btn px-3 py-1 text-sm rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/80">Delete</button>
                         <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
@@ -167,6 +178,8 @@ const Map = ({
             const form = document.getElementById(formId);
             const deleteButton = form?.querySelector('.delete-btn');
             const toggleLabelButton = form?.querySelector('.toggle-label-btn');
+            const toggleFillButton = form?.querySelector('.toggle-fill-btn');
+
 
             form?.addEventListener('submit', (ev) => {
                 ev.preventDefault();
@@ -198,6 +211,13 @@ const Map = ({
                 onToggleLabel(item.id, isPin ? 'pin' : isArea ? 'area' : 'line');
                 map.closePopup();
             });
+
+            if (isArea) {
+                toggleFillButton?.addEventListener('click', () => {
+                    onToggleFill(item.id);
+                    map.closePopup();
+                });
+            }
         }, 0);
     };
 
@@ -337,10 +357,13 @@ const Map = ({
     
                 const areaGroup = L.layerGroup().addTo(layer);
     
+                const fillOpacity = area.fillVisible !== false ? 0.2 : 0.0;
+
                 const polygon = L.polygon(latlngs, {
                     color: `hsl(${secondaryFgColor})`,
                     weight: 2,
-                    fillOpacity: 0.0 // Make the area fill transparent
+                    fillColor: `hsl(${secondaryFgColor})`,
+                    fillOpacity: fillOpacity
                 }).addTo(areaGroup);
     
                 latlngs.forEach(latlng => {
@@ -464,7 +487,8 @@ const Map = ({
                      previewAreaRef.current = L.polygon(pendingAreaPath, {
                         color: `hsl(${secondaryFgColor})`,
                         weight: 2,
-                        fillOpacity: 0.0,
+                        fillColor: `hsl(${secondaryFgColor})`,
+                        fillOpacity: 0.2,
                         dashArray: '5, 5',
                     }).addTo(map);
                 }
