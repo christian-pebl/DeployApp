@@ -66,7 +66,7 @@ const Map = ({
 
     const showEditPopup = (item: Pin | Line) => {
         const map = mapRef.current;
-        if (!map) return;
+        if (!map || typeof window.L === 'undefined') return;
 
         if (popupRef.current && popupRef.current.isOpen()) {
             map.closePopup();
@@ -81,9 +81,14 @@ const Map = ({
         if (isPin) {
             coordsHtml = `<p class="text-xs text-muted-foreground">Lat: ${item.lat.toFixed(4)}, Lng: ${item.lng.toFixed(4)}</p>`;
         } else {
-            coordsHtml = `<div class="text-xs text-muted-foreground">
+            const startPoint = L.latLng(item.path[0].lat, item.path[0].lng);
+            const endPoint = L.latLng(item.path[1].lat, item.path[1].lng);
+            const distance = startPoint.distanceTo(endPoint);
+
+            coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
                 <p>Start: ${item.path[0].lat.toFixed(4)}, ${item.path[0].lng.toFixed(4)}</p>
                 <p>End: ${item.path[1].lat.toFixed(4)}, ${item.path[1].lng.toFixed(4)}</p>
+                <p class="font-semibold">Distance: ${distance.toFixed(2)} meters</p>
             </div>`;
         }
 
@@ -239,7 +244,10 @@ const Map = ({
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
                     });
                 }
-                polyline.on('click', () => onEditItem(line));
+                polyline.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e); // Prevent map click event
+                    onEditItem(line)
+                });
             });
         }
     }, [lines]);
