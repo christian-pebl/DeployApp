@@ -109,9 +109,11 @@ const Map = ({
             if (isArea) {
                 const polygonForArea = L.polygon(item.path.map(p => [p.lat, p.lng] as LatLngExpression));
                 const areaMeters = L.GeometryUtil.geodesicArea(polygonForArea.getLatLngs()[0] as LatLng[]);
+                const areaHectares = areaMeters / 10000;
+                let pointsHtml = item.path.map((p, i) => `<li>Point ${i+1}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</li>`).join('');
                 coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
-                  <p class="font-semibold">Area: ${areaMeters.toFixed(2)} square meters</p>
-                  <p>${item.path.length} vertices</p>
+                  <p class="font-semibold">Area: ${areaHectares.toFixed(4)} hectares</p>
+                  <ul class="list-disc pl-4">${pointsHtml}</ul>
                 </div>`;
             } else { // isLine
                 const startPoint = L.latLng(item.path[0].lat, item.path[0].lng);
@@ -143,7 +145,7 @@ const Map = ({
             </form>
         `;
 
-        popupRef.current = L.popup({ closeButton: true, closeOnClick: true, className: 'p-0' })
+        popupRef.current = L.popup({ closeButton: true, closeOnClick: true, className: 'p-0', maxHeight: 250 })
             .setLatLng(latlng)
             .setContent(content)
             .openOn(map);
@@ -413,40 +415,32 @@ const Map = ({
     
         if (isDrawingArea) {
             const updatePreview = () => {
-                if (pendingAreaPath.length > 1) {
-                    if (previewAreaRef.current) {
-                        previewAreaRef.current.setLatLngs(pendingAreaPath);
-                    } else {
-                        previewAreaRef.current = L.polygon(pendingAreaPath, {
-                            color: 'hsl(var(--secondary-foreground))',
-                            weight: 2,
-                            fillColor: 'hsl(var(--secondary))',
-                            fillOpacity: 0.5,
-                        }).addTo(map);
-                    }
+                cleanupLayers();
+
+                if (pendingAreaPath.length > 0) {
+                     previewAreaRef.current = L.polygon(pendingAreaPath, {
+                        color: 'hsl(var(--secondary-foreground))',
+                        weight: 2,
+                        fillColor: 'hsl(var(--secondary))',
+                        fillOpacity: 0.5,
+                        dashArray: '5, 5',
+                    }).addTo(map);
                 }
     
                 const lastPoint = pendingAreaPath[pendingAreaPath.length - 1];
                 if (lastPoint) {
                     const center = map.getCenter();
                     const linePath = [lastPoint, center];
-                    if (previewAreaLineRef.current) {
-                        previewAreaLineRef.current.setLatLngs(linePath);
-                    } else {
-                        previewAreaLineRef.current = L.polyline(linePath, {
-                            color: 'hsl(var(--secondary-foreground))',
-                            weight: 2,
-                            dashArray: '5, 5',
-                        }).addTo(map);
-                    }
-                } else if (previewAreaLineRef.current) {
-                    previewAreaLineRef.current.remove();
-                    previewAreaLineRef.current = null;
+                    previewAreaLineRef.current = L.polyline(linePath, {
+                        color: 'hsl(var(--secondary-foreground))',
+                        weight: 2,
+                        dashArray: '5, 5',
+                    }).addTo(map);
                 }
             };
     
             map.on('move', updatePreview);
-            updatePreview(); // Initial draw
+            updatePreview();
     
             return () => {
                 map.off('move', updatePreview);
