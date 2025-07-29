@@ -113,7 +113,7 @@ const Map = ({
                 const pointsHtml = item.path.map((p, i) => `<li>Point ${i+1}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</li>`).join('');
                 
                 let areaHtml = '';
-                if (L.GeometryUtil) {
+                if (window.L.GeometryUtil) {
                     const polygonForArea = L.polygon(item.path.map(p => [p.lat, p.lng] as LatLngExpression));
                     const areaMeters = L.GeometryUtil.geodesicArea(polygonForArea.getLatLngs()[0] as LatLng[]);
                     const areaHectares = areaMeters / 10000;
