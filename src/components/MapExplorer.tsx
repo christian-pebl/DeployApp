@@ -1,20 +1,52 @@
-
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { LatLng, LatLngExpression, Map as LeafletMap, LeafletMouseEvent } from 'leaflet';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, CornerUpLeft } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, CornerUpLeft, FolderPlus, FolderKanban, Folder, FolderSymlink, Trash } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
@@ -25,13 +57,16 @@ const Map = dynamic(() => import('@/components/Map'), {
   loading: () => <div className="w-full h-full bg-muted flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>,
 });
 
-type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
-type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
-type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; };
+type Project = { id: string; name: string; description?: string; createdAt: string; };
+type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; projectId?: string; };
+type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; projectId?: string; };
+type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; projectId?: string; };
 
 
 export default function MapExplorer() {
   const [log, setLog] = useState<string[]>(['App Initialized']);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [pins, setPins] = useState<Pin[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
@@ -57,11 +92,18 @@ export default function MapExplorer() {
   const [itemToEdit, setItemToEdit] = useState<Pin | Line | Area | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
+  const [isManageProjectsDialogOpen, setIsManageProjectsDialogOpen] = useState(false);
+  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
+  const [viewedProjectId, setViewedProjectId] = useState<string | null>(null);
+
 
   const { toast } = useToast();
   
   const initialLocationFound = useRef(false);
   const mapRef = useRef<LeafletMap | null>(null);
+  const newProjectFormRef = useRef<HTMLFormElement>(null);
+  const editProjectFormRef = useRef<HTMLFormElement>(null);
 
   const addLog = (entry: string) => {
     setLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${entry}`]);
@@ -166,28 +208,31 @@ export default function MapExplorer() {
   }
 
   const handleMapClick = (e: LeafletMouseEvent) => {
-    // This is now empty, but kept for potential future use where clicking on the map is desired behavior.
+    if (isDrawingArea) {
+      setPendingAreaPath(prev => [...prev, e.latlng]);
+    }
   };
 
-  const handlePinSave = (id: string, label: string, lat: number, lng: number, notes: string) => {
-    const newPin: Pin = { id, lat, lng, label, labelVisible: true, notes };
+  const handlePinSave = (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => {
+    const newPin: Pin = { id, lat, lng, label, labelVisible: true, notes, projectId: projectId ?? activeProjectId ?? undefined };
     setPins(prev => [...prev, newPin]);
     setPendingPin(null);
   };
 
-  const handleLineSave = (id: string, label: string, path: LatLng[], notes: string) => {
+  const handleLineSave = (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
       const newLine: Line = {
           id,
           path: path.map(p => ({ lat: p.lat, lng: p.lng })),
           label,
           labelVisible: true,
           notes,
+          projectId: projectId ?? activeProjectId ?? undefined
       };
       setLines(prev => [...prev, newLine]);
       setPendingLine(null);
   };
   
-  const handleAreaSave = (id: string, label: string, path: LatLng[], notes: string) => {
+  const handleAreaSave = (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
       const newArea: Area = {
           id,
           path: path.map(p => ({ lat: p.lat, lng: p.lng })),
@@ -195,13 +240,14 @@ export default function MapExplorer() {
           labelVisible: true,
           fillVisible: true,
           notes,
+          projectId: projectId ?? activeProjectId ?? undefined
       };
       setAreas(prev => [...prev, newArea]);
       setPendingArea(null);
   };
 
-  const handleUpdatePin = (id: string, label: string, notes: string) => {
-    setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes } : p));
+  const handleUpdatePin = (id: string, label: string, notes: string, projectId?: string) => {
+    setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes, projectId } : p));
     setItemToEdit(null);
   };
 
@@ -210,8 +256,8 @@ export default function MapExplorer() {
     setItemToEdit(null);
   };
   
-  const handleUpdateLine = (id: string, label: string, notes: string) => {
-    setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes } : l));
+  const handleUpdateLine = (id: string, label: string, notes: string, projectId?: string) => {
+    setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes, projectId } : l));
     setItemToEdit(null);
   };
   
@@ -220,8 +266,8 @@ export default function MapExplorer() {
     setItemToEdit(null);
   };
 
-  const handleUpdateArea = (id: string, label: string, notes: string, path: {lat: number, lng: number}[]) => {
-    setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path } : a));
+  const handleUpdateArea = (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string) => {
+    setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path, projectId } : a));
     setItemToEdit(null);
   };
 
@@ -314,6 +360,88 @@ export default function MapExplorer() {
     }
   };
 
+  const handleCreateNewProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    const form = newProjectFormRef.current;
+    if (!form) return;
+    const formData = new FormData(form);
+    const name = formData.get('name') as string;
+    const description = formData.get('description') as string;
+    
+    if (name) {
+        const newProject: Project = {
+            id: `proj-${Date.now()}`,
+            name,
+            description,
+            createdAt: new Date().toISOString(),
+        };
+        setProjects(prev => [...prev, newProject]);
+        setActiveProjectId(newProject.id);
+        setIsNewProjectDialogOpen(false);
+        toast({ title: "Project Created", description: `"${name}" has been created and set as active.` });
+    }
+  };
+  
+  const handleUpdateProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectToEdit) return;
+    const form = editProjectFormRef.current;
+    if (!form) return;
+
+    const formData = new FormData(form);
+    const name = formData.get('name') as string;
+    const description = formData.get('description') as string;
+
+    if (name) {
+        setProjects(projects.map(p => p.id === projectToEdit.id ? { ...p, name, description } : p));
+        setProjectToEdit(null);
+        toast({ title: "Project Updated", description: `"${name}" has been updated.` });
+    }
+  }
+  
+  const handleDeleteProject = (projectId: string) => {
+      const project = projects.find(p => p.id === projectId);
+      if(!project) return;
+      
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+      setPins(prev => prev.filter(p => p.projectId !== projectId));
+      setLines(prev => prev.filter(l => l.projectId !== projectId));
+      setAreas(prev => prev.filter(a => a.projectId !== projectId));
+      
+      if (activeProjectId === projectId) {
+          setActiveProjectId(null);
+      }
+      if (viewedProjectId === projectId) {
+          setViewedProjectId(null);
+      }
+      
+      toast({ title: "Project Deleted", description: `"${project.name}" and all its objects have been deleted.` });
+  }
+
+  const getObjectCountForProject = (projectId: string) => {
+      return pins.filter(p => p.projectId === projectId).length +
+             lines.filter(l => l.projectId === projectId).length +
+             areas.filter(a => a.projectId === projectId).length;
+  }
+
+  const displayedPins = useMemo(() => {
+    if (!viewedProjectId) return pins;
+    return pins.filter(p => p.projectId === viewedProjectId);
+  }, [pins, viewedProjectId]);
+
+  const displayedLines = useMemo(() => {
+    if (!viewedProjectId) return lines;
+    return lines.filter(l => l.projectId === viewedProjectId);
+  }, [lines, viewedProjectId]);
+
+  const displayedAreas = useMemo(() => {
+    if (!viewedProjectId) return areas;
+    return areas.filter(a => a.projectId === viewedProjectId);
+  }, [areas, viewedProjectId]);
+  
+  const activeProject = projects.find(p => p.id === activeProjectId);
+
+
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
        
@@ -323,9 +451,10 @@ export default function MapExplorer() {
               mapRef={mapRef}
               center={view.center}
               zoom={view.zoom}
-              pins={pins}
-              lines={lines}
-              areas={areas}
+              pins={displayedPins}
+              lines={displayedLines}
+              areas={displayedAreas}
+              projects={projects}
               currentLocation={currentLocation}
               onLocationFound={handleLocationFound}
               onLocationError={handleLocationError}
@@ -372,9 +501,9 @@ export default function MapExplorer() {
                   <ScrollArea className="flex-1">
                       <div className="p-4">
                           <h3 className="text-lg font-semibold mb-2">Pins</h3>
-                          {pins.length > 0 ? (
+                          {displayedPins.length > 0 ? (
                               <ul className="space-y-2">
-                                  {pins.map(pin => (
+                                  {displayedPins.map(pin => (
                                       <li key={pin.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
                                           <span className="font-medium truncate pr-2">{pin.label}</span>
                                           <div className="flex items-center gap-1">
@@ -390,9 +519,9 @@ export default function MapExplorer() {
                           <Separator className="my-4" />
 
                           <h3 className="text-lg font-semibold mb-2">Lines</h3>
-                          {lines.length > 0 ? (
+                          {displayedLines.length > 0 ? (
                               <ul className="space-y-2">
-                                  {lines.map(line => (
+                                  {displayedLines.map(line => (
                                       <li key={line.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
                                           <span className="font-medium truncate pr-2">{line.label}</span>
                                           <div className="flex items-center gap-1">
@@ -408,9 +537,9 @@ export default function MapExplorer() {
                           <Separator className="my-4" />
 
                           <h3 className="text-lg font-semibold mb-2">Areas</h3>
-                          {areas.length > 0 ? (
+                          {displayedAreas.length > 0 ? (
                               <ul className="space-y-2">
-                                  {areas.map(area => (
+                                  {displayedAreas.map(area => (
                                       <li key={area.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
                                           <span className="font-medium truncate pr-2">{area.label}</span>
                                           <div className="flex items-center gap-1">
@@ -429,6 +558,57 @@ export default function MapExplorer() {
             )}
 
             <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
+                 <DropdownMenu>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg">
+                                        <Folder className="h-6 w-6" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Projects</p>
+                                {activeProject && <p className="text-muted-foreground text-xs">Active: {activeProject.name}</p>}
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                    <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Projects</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setIsNewProjectDialogOpen(true)}>
+                            <FolderPlus className="mr-2 h-4 w-4" />
+                            <span>New Project...</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIsManageProjectsDialogOpen(true)}>
+                             <FolderKanban className="mr-2 h-4 w-4" />
+                            <span>Manage Projects...</span>
+                        </DropdownMenuItem>
+                         <DropdownMenuSeparator />
+                        <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                                <FolderSymlink className="mr-2 h-4 w-4" />
+                                <span>Select Active Project</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                                <DropdownMenuItem onClick={() => setActiveProjectId(null)}>
+                                    {activeProjectId === null && <Check className="mr-2 h-4 w-4"/>}
+                                    <span className={activeProjectId === null ? 'pl-0' : 'pl-6'}>None</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator/>
+                                {projects.map(project => (
+                                    <DropdownMenuItem key={project.id} onClick={() => setActiveProjectId(project.id)}>
+                                        {activeProjectId === project.id && <Check className="mr-2 h-4 w-4"/>}
+                                        <span className={activeProjectId === project.id ? 'pl-0' : 'pl-6'}>{project.name}</span>
+                                    </DropdownMenuItem>
+                                ))}
+                                {projects.length === 0 && <DropdownMenuLabel className="text-xs text-muted-foreground text-center">No projects yet.</DropdownMenuLabel>}
+                            </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -452,7 +632,7 @@ export default function MapExplorer() {
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawArea}>
+                             <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawArea}>
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6">
                                     <path d="M2.57141 6.28571L8.2857 2.57143L20.5714 8.28571L14.8571 21.4286L2.57141 15.7143L2.57141 6.28571Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
                                 </svg>
@@ -494,6 +674,15 @@ export default function MapExplorer() {
                         disabled={pendingAreaPath.length < 3}
                     >
                         <Check className="mr-2 h-5 w-5" /> Finish Area
+                    </Button>
+                </div>
+            )}
+            
+            {viewedProjectId && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-card/80 backdrop-blur-sm p-2 rounded-lg shadow-lg border flex items-center gap-2">
+                    <p className="font-semibold text-sm">Viewing: {projects.find(p => p.id === viewedProjectId)?.name}</p>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setViewedProjectId(null)}>
+                        <X className="h-4 w-4"/>
                     </Button>
                 </div>
             )}
@@ -574,7 +763,93 @@ export default function MapExplorer() {
             </div>
         </div>
       </main>
-
+      
+      <Dialog open={isNewProjectDialogOpen} onOpenChange={setIsNewProjectDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Create New Project</DialogTitle>
+                <DialogDescription>Enter a name and optional description for your new project.</DialogDescription>
+            </DialogHeader>
+            <form ref={newProjectFormRef} onSubmit={handleCreateNewProject} className="space-y-4">
+                <Input name="name" placeholder="Project Name" required />
+                <Textarea name="description" placeholder="Project Description (optional)" />
+                <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+                    <Button type="submit">Create Project</Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isManageProjectsDialogOpen} onOpenChange={setIsManageProjectsDialogOpen}>
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+            <DialogHeader>
+                <DialogTitle>Manage Projects</DialogTitle>
+                <DialogDescription>Edit, delete, or view your projects.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="flex-1 -mx-6 px-6">
+                <ul className="space-y-2">
+                    {projects.map(project => (
+                        <li key={project.id} className="flex items-center justify-between p-3 rounded-md border bg-card">
+                            <div className="truncate pr-4">
+                                <p className="font-semibold">{project.name}</p>
+                                <p className="text-sm text-muted-foreground">{getObjectCountForProject(project.id)} objects</p>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                                <Button variant="outline" size="sm" onClick={() => {
+                                    setViewedProjectId(project.id);
+                                    setIsManageProjectsDialogOpen(false);
+                                }}>View Objects</Button>
+                                <Button variant="outline" size="sm" onClick={() => {
+                                    setProjectToEdit(project)
+                                }}>Edit</Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="destructive" size="sm">Delete</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will permanently delete the project "{project.name}" and all {getObjectCountForProject(project.id)} of its associated map objects. This action cannot be undone.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteProject(project.id)}>Delete</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
+                        </li>
+                    ))}
+                    {projects.length === 0 && (
+                        <div className="text-center text-muted-foreground py-8">
+                            <p>You haven't created any projects yet.</p>
+                            <Button variant="link" onClick={() => { setIsManageProjectsDialogOpen(false); setIsNewProjectDialogOpen(true); }}>Create one now</Button>
+                        </div>
+                    )}
+                </ul>
+            </ScrollArea>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={!!projectToEdit} onOpenChange={(open) => !open && setProjectToEdit(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Project</DialogTitle>
+                <DialogDescription>Update the name and description for "{projectToEdit?.name}".</DialogDescription>
+            </DialogHeader>
+            <form ref={editProjectFormRef} onSubmit={handleUpdateProject} className="space-y-4">
+                <Input name="name" defaultValue={projectToEdit?.name} placeholder="Project Name" required />
+                <Textarea name="description" defaultValue={projectToEdit?.description} placeholder="Project Description (optional)" />
+                <DialogFooter>
+                    <Button type="button" variant="secondary" onClick={() => setProjectToEdit(null)}>Cancel</Button>
+                    <Button type="submit">Save Changes</Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

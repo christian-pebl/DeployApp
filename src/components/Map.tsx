@@ -1,12 +1,12 @@
-
 'use client';
 
 import React, { useEffect, useRef } from 'react';
 import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions } from 'leaflet';
 
-type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
-type Line = { id:string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
-type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; };
+type Project = { id: string; name: string; description?: string; createdAt: string; };
+type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; projectId?: string; };
+type Line = { id:string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; projectId?: string; };
+type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; projectId?: string; };
 
 
 interface MapProps {
@@ -16,6 +16,7 @@ interface MapProps {
     pins: Pin[];
     lines: Line[];
     areas: Area[];
+    projects: Project[];
     currentLocation: LatLng | null;
     onLocationFound: (latlng: LatLng) => void;
     onLocationError: (error: any) => void;
@@ -26,19 +27,19 @@ interface MapProps {
     onMapClick: (e: LeafletMouseEvent) => void;
     pendingAreaPath: LatLng[];
     pendingPin: LatLng | null;
-    onPinSave: (id: string, label: string, lat: number, lng: number, notes: string) => void;
+    onPinSave: (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => void;
     onPinCancel: () => void;
     pendingLine: { path: LatLng[] } | null;
-    onLineSave: (id: string, label: string, path: LatLng[], notes: string) => void;
+    onLineSave: (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => void;
     onLineCancel: () => void;
     pendingArea: { path: LatLng[] } | null;
-    onAreaSave: (id: string, label: string, path: LatLng[], notes: string) => void;
+    onAreaSave: (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => void;
     onAreaCancel: () => void;
-    onUpdatePin: (id: string, label: string, notes: string) => void;
+    onUpdatePin: (id: string, label: string, notes: string, projectId?: string) => void;
     onDeletePin: (id: string) => void;
-    onUpdateLine: (id: string, label: string, notes: string) => void;
+    onUpdateLine: (id: string, label: string, notes: string, projectId?: string) => void;
     onDeleteLine: (id: string) => void;
-    onUpdateArea: (id: string, label: string, notes: string, path: {lat: number, lng: number}[]) => void;
+    onUpdateArea: (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string) => void;
     onDeleteArea: (id: string) => void;
     onToggleLabel: (id: string, type: 'pin' | 'line' | 'area') => void;
     onToggleFill: (id: string) => void;
@@ -71,38 +72,26 @@ function calculatePolygonArea(path: { lat: number; lng: number }[]): number {
     if (points[0].lat !== points[points.length - 1].lat || points[0].lng !== points[points.length - 1].lng) {
       points.push(points[0]);
     }
-    
-    // Sort points to form a simple polygon
-    const centroid = points.reduce((acc, p) => ({ lat: acc.lat + p.lat / points.length, lng: acc.lng + p.lng / points.length }), { lat: 0, lng: 0 });
-    const sortedPoints = points.slice(0, -1).sort((a, b) => {
-      const angleA = Math.atan2(a.lat - centroid.lat, a.lng - centroid.lng);
-      const angleB = Math.atan2(b.lat - centroid.lat, b.lng - centroid.lng);
-      return angleA - angleB;
-    });
-    sortedPoints.push(sortedPoints[0]);
-
 
     let area = 0;
-    for (let i = 0; i < sortedPoints.length - 1; i++) {
-        const p1 = sortedPoints[i];
-        const p2 = sortedPoints[i+1];
+    for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i];
+        const p2 = points[i+1];
         area += (p1.lng * p2.lat - p2.lng * p1.lat);
     }
     const areaSqDegrees = Math.abs(area / 2);
 
-    // Approximate conversion from square degrees to square meters
-    // This is a rough approximation that works best for small areas not near the poles.
     const avgLatRad = (path.reduce((sum, p) => sum + p.lat, 0) / path.length) * (Math.PI / 180);
-    const metersPerDegree = 111320 * Math.cos(avgLatRad);
-    const areaSqMeters = areaSqDegrees * Math.pow(metersPerDegree, 2);
-
-    // Convert to hectares
-    return areaSqMeters / 10000;
+    const metersPerDegreeLat = 111132.954 - 559.822 * Math.cos(2 * avgLatRad) + 1.175 * Math.cos(4 * avgLatRad);
+    const metersPerDegreeLng = 111320 * Math.cos(avgLatRad);
+    const areaSqMeters = areaSqDegrees * metersPerDegreeLat * metersPerDegreeLng;
+    
+    return areaSqMeters / 10000; // Convert to hectares
 }
 
 
 const Map = ({ 
-    mapRef, center, zoom, pins, lines, areas, currentLocation, 
+    mapRef, center, zoom, pins, lines, areas, projects, currentLocation, 
     onLocationFound, onLocationError, onMove, isDrawingLine, lineStartPoint,
     isDrawingArea, onMapClick, pendingAreaPath,
     pendingPin, onPinSave, onPinCancel,
@@ -131,7 +120,9 @@ const Map = ({
         }
 
         const isPin = 'lat' in item;
-        const isArea = 'path' in item && item.path.length >= 3;
+        const isArea = 'path' in item && ('fillVisible' in item);
+        const isLine = 'path' in item && !('fillVisible' in item);
+
 
         let latlng: LatLng;
         if (isPin) {
@@ -180,6 +171,17 @@ const Map = ({
                 </div>`;
             }
         }
+        
+        const projectOptions = projects.map(p => `<option value="${p.id}" ${item.projectId === p.id ? 'selected' : ''}>${p.name}</option>`).join('');
+        const projectSelectorHtml = `
+            <div class="flex flex-col gap-1 pt-2">
+                <label for="project-selector" class="text-xs font-medium text-muted-foreground">Project</label>
+                <select name="projectId" id="project-selector" class="p-2 border rounded-md text-sm bg-background text-foreground border-border">
+                    <option value="">None</option>
+                    ${projectOptions}
+                </select>
+            </div>
+        `;
 
         const labelVisible = item.labelVisible !== false;
         const fillVisible = isArea ? (item as Area).fillVisible !== false : false;
@@ -194,6 +196,7 @@ const Map = ({
                 <input type="text" name="label" value="${item.label}" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
                 <textarea name="notes" placeholder="Add notes..." class="p-2 border rounded-md text-sm bg-background text-foreground border-border min-h-[60px]">${item.notes || ''}</textarea>
                 ${coordsHtml}
+                ${projectSelectorHtml}
                 <div class="flex justify-between items-center gap-2 flex-wrap pt-2">
                     <div class="flex gap-2">
                         <button type="button" class="toggle-label-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${labelVisible ? 'Hide' : 'Show'} Label</button>
@@ -230,16 +233,20 @@ const Map = ({
                 const formElements = (ev.target as HTMLFormElement).elements;
                 const labelInput = formElements.namedItem('label') as HTMLInputElement;
                 const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
+                const projectIdInput = formElements.namedItem('projectId') as HTMLSelectElement;
+                
+                const projectId = projectIdInput.value;
+
                 if (isPin) {
-                    onUpdatePin(item.id, labelInput.value, notesInput.value);
+                    onUpdatePin(item.id, labelInput.value, notesInput.value, projectId);
                 } else if (isArea) {
                     const newPath = (item as Area).path.map((_, i) => ({
                         lat: parseFloat((formElements.namedItem(`lat-${i}`) as HTMLInputElement).value),
                         lng: parseFloat((formElements.namedItem(`lng-${i}`) as HTMLInputElement).value),
                     }));
-                    onUpdateArea(item.id, labelInput.value, notesInput.value, newPath);
+                    onUpdateArea(item.id, labelInput.value, notesInput.value, newPath, projectId);
                 } else {
-                    onUpdateLine(item.id, labelInput.value, notesInput.value);
+                    onUpdateLine(item.id, labelInput.value, notesInput.value, projectId);
                 }
                 map.closePopup();
             });
@@ -290,7 +297,7 @@ const Map = ({
         } else if (!itemToEdit && mapRef.current && popupRef.current && popupRef.current.isOpen()) {
             mapRef.current.closePopup(popupRef.current);
         }
-    }, [itemToEdit])
+    }, [itemToEdit, projects])
 
     useEffect(() => {
         if (typeof window.L === 'undefined') return;
@@ -548,13 +555,12 @@ const Map = ({
                     });
                 }
 
-                if (pendingAreaPath.length > 0) {
+                if (pendingAreaPath.length > 1) {
                      previewAreaRef.current = L.polygon(pendingAreaPath, {
                         color: `hsl(${secondaryFgColor})`,
                         weight: 2,
                         fillColor: `hsl(${secondaryFgColor})`,
                         fillOpacity: 0.2,
-                        dashArray: '5, 5',
                     }).addTo(map);
                 }
     
