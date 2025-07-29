@@ -4,8 +4,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup, LocationEvent, LeafletMouseEvent } from 'leaflet';
 
-type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean };
-type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean };
+type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
+type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
 
 interface MapProps {
     mapRef: React.MutableRefObject<LeafletMap | null>;
@@ -20,14 +20,14 @@ interface MapProps {
     isDrawingLine: boolean;
     lineStartPoint: LatLng | null;
     pendingPin: LatLng | null;
-    onPinSave: (id: string, label: string, lat: number, lng: number) => void;
+    onPinSave: (id: string, label: string, lat: number, lng: number, notes: string) => void;
     onPinCancel: () => void;
     pendingLine: { path: LatLng[] } | null;
-    onLineSave: (id: string, label: string, path: LatLng[]) => void;
+    onLineSave: (id: string, label: string, path: LatLng[], notes: string) => void;
     onLineCancel: () => void;
-    onUpdatePin: (id: string, label: string) => void;
+    onUpdatePin: (id: string, label: string, notes: string) => void;
     onDeletePin: (id: string) => void;
-    onUpdateLine: (id: string, label: string) => void;
+    onUpdateLine: (id: string, label: string, notes: string) => void;
     onDeleteLine: (id: string) => void;
     onToggleLabel: (id: string, type: 'pin' | 'line') => void;
     itemToEdit: Pin | Line | null;
@@ -97,6 +97,7 @@ const Map = ({
         const content = `
             <form id="${formId}" class="flex flex-col gap-2">
                 <input type="text" name="label" value="${item.label}" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
+                <textarea name="notes" placeholder="Add notes..." class="p-2 border rounded-md text-sm bg-background text-foreground border-border min-h-[60px]">${item.notes || ''}</textarea>
                 ${coordsHtml}
                 <div class="flex justify-between items-center gap-2">
                     <button type="button" class="toggle-label-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${labelVisible ? 'Hide' : 'Show'} Label</button>
@@ -126,11 +127,13 @@ const Map = ({
 
             form?.addEventListener('submit', (ev) => {
                 ev.preventDefault();
-                const input = (ev.target as HTMLFormElement).elements.namedItem('label') as HTMLInputElement;
+                const formElements = (ev.target as HTMLFormElement).elements;
+                const labelInput = formElements.namedItem('label') as HTMLInputElement;
+                const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
                 if (isPin) {
-                    onUpdatePin(item.id, input.value);
+                    onUpdatePin(item.id, labelInput.value, notesInput.value);
                 } else {
-                    onUpdateLine(item.id, input.value);
+                    onUpdateLine(item.id, labelInput.value, notesInput.value);
                 }
                 map.closePopup();
             });
@@ -154,7 +157,7 @@ const Map = ({
     useEffect(() => {
         if(itemToEdit && mapRef.current) {
             showEditPopup(itemToEdit);
-        } else if (!itemToEdit && mapRef.current && popupRef.current) {
+        } else if (!itemToEdit && mapRef.current && popupRef.current && popupRef.current.isOpen()) {
             mapRef.current.closePopup(popupRef.current);
         }
     }, [itemToEdit])
@@ -221,7 +224,10 @@ const Map = ({
                 if (pin.labelVisible !== false) {
                     marker.bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' });
                 }
-                marker.on('click', () => onEditItem(pin));
+                marker.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    onEditItem(pin)
+                });
             });
         }
     }, [pins, onEditItem]);
@@ -304,6 +310,10 @@ const Map = ({
 
             return () => {
                 map.off('move', updatePreviewLine);
+                if (previewLineRef.current) {
+                    previewLineRef.current.remove();
+                    previewLineRef.current = null;
+                }
             };
         } else if (previewLineRef.current) {
             previewLineRef.current.remove();
@@ -323,6 +333,7 @@ const Map = ({
         const content = `
             <form id="${formId}" class="flex flex-col gap-2">
                 <input type="text" name="label" placeholder="Enter label" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
+                <textarea name="notes" placeholder="Add notes..." class="p-2 border rounded-md text-sm bg-background text-foreground border-border min-h-[60px]"></textarea>
                 <div class="flex justify-end gap-2">
                     <button type="button" class="cancel-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Cancel</button>
                     <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
@@ -355,13 +366,15 @@ const Map = ({
             form?.addEventListener('submit', (ev) => {
                 ev.preventDefault();
                 cleanup();
-                const input = (ev.target as HTMLFormElement).elements.namedItem('label') as HTMLInputElement;
+                const formElements = (ev.target as HTMLFormElement).elements;
+                const labelInput = formElements.namedItem('label') as HTMLInputElement;
+                const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
                 const newId = `${type}-${Date.now()}`;
                 
                 if (type === 'pin') {
-                    onPinSave(newId, input.value, latlng.lat, latlng.lng);
+                    onPinSave(newId, labelInput.value, latlng.lat, latlng.lng, notesInput.value);
                 } else if (type === 'line' && path) {
-                    onLineSave(newId, input.value, path);
+                    onLineSave(newId, labelInput.value, path, notesInput.value);
                 }
                 map.closePopup();
             });

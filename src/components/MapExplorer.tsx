@@ -24,8 +24,8 @@ const Map = dynamic(() => import('@/components/Map'), {
   loading: () => <div className="w-full h-full bg-muted flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>,
 });
 
-type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean };
-type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean };
+type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
+type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
 
 export default function MapExplorer() {
   const [log, setLog] = useState<string[]>(['App Initialized']);
@@ -132,25 +132,26 @@ export default function MapExplorer() {
     }
   };
 
-  const handlePinSave = (id: string, label: string, lat: number, lng: number) => {
-    const newPin: Pin = { id, lat, lng, label, labelVisible: true };
+  const handlePinSave = (id: string, label: string, lat: number, lng: number, notes: string) => {
+    const newPin: Pin = { id, lat, lng, label, labelVisible: true, notes };
     setPins(prev => [...prev, newPin]);
     setPendingPin(null);
   };
 
-  const handleLineSave = (id: string, label: string, path: LatLng[]) => {
+  const handleLineSave = (id: string, label: string, path: LatLng[], notes: string) => {
       const newLine: Line = {
           id,
           path: path.map(p => ({ lat: p.lat, lng: p.lng })),
           label,
           labelVisible: true,
+          notes,
       };
       setLines(prev => [...prev, newLine]);
       setPendingLine(null);
   };
 
-  const handleUpdatePin = (id: string, label: string) => {
-    setPins(prev => prev.map(p => p.id === id ? { ...p, label } : p));
+  const handleUpdatePin = (id: string, label: string, notes: string) => {
+    setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes } : p));
     setItemToEdit(null);
   };
 
@@ -159,8 +160,8 @@ export default function MapExplorer() {
     setItemToEdit(null);
   };
   
-  const handleUpdateLine = (id: string, label: string) => {
-    setLines(prev => prev.map(l => l.id === id ? { ...l, label } : l));
+  const handleUpdateLine = (id: string, label: string, notes: string) => {
+    setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes } : l));
     setItemToEdit(null);
   };
   
