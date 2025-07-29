@@ -322,11 +322,12 @@ const Map = ({
                 }).addTo(layer);
 
                 if(line.label && line.labelVisible !== false) {
+                    const center = L.polyline(latlngs).getBounds().getCenter();
                     polyline.bindTooltip(line.label, {
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
-                    });
+                    }).openTooltip(center);
                 }
                 polyline.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
@@ -626,5 +627,3 @@ const Map = ({
 };
 
 export default Map;
-
-    
