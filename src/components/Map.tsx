@@ -38,7 +38,7 @@ interface MapProps {
     onDeletePin: (id: string) => void;
     onUpdateLine: (id: string, label: string, notes: string) => void;
     onDeleteLine: (id: string) => void;
-    onUpdateArea: (id: string, label: string, notes: string) => void;
+    onUpdateArea: (id: string, label: string, notes: string, path: {lat: number, lng: number}[]) => void;
     onDeleteArea: (id: string) => void;
     onToggleLabel: (id: string, type: 'pin' | 'line' | 'area') => void;
     onToggleFill: (id: string) => void;
@@ -110,20 +110,23 @@ const Map = ({
             coordsHtml = `<p class="text-xs text-muted-foreground">Lat: ${item.lat.toFixed(4)}, Lng: ${item.lng.toFixed(4)}</p>`;
         } else if ('path' in item) {
             if (isArea) {
-                const pointsHtml = item.path.map((p, i) => `<li>Point ${i+1}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</li>`).join('');
+                const pointsHtml = item.path.map((p, i) => `
+                    <div class="flex items-center gap-2">
+                        <span class="font-semibold w-8">P${i+1}:</span>
+                        <input type="number" step="0.0001" name="lat-${i}" value="${p.lat.toFixed(4)}" class="p-1 border rounded-md text-xs bg-background text-foreground border-border w-24" />
+                        <input type="number" step="0.0001" name="lng-${i}" value="${p.lng.toFixed(4)}" class="p-1 border rounded-md text-xs bg-background text-foreground border-border w-24" />
+                    </div>
+                `).join('');
                 
-                let areaHtml = '';
-                if (window.L.GeometryUtil) {
-                    const polygonForArea = L.polygon(item.path.map(p => [p.lat, p.lng] as LatLngExpression));
-                    const areaMeters = L.GeometryUtil.geodesicArea(polygonForArea.getLatLngs()[0] as LatLng[]);
-                    const areaHectares = areaMeters / 10000;
-                    areaHtml = `<p class="font-semibold mt-2">Area: ${areaHectares.toFixed(4)} hectares</p>`;
-                }
-                
-                coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
-                    <ul class="list-disc pl-4 max-h-20 overflow-y-auto">${pointsHtml}</ul>
-                    ${areaHtml}
-                </div>`;
+                coordsHtml = `<div class="text-xs text-muted-foreground space-y-1 max-h-32 overflow-y-auto pr-2">
+                    ${pointsHtml}
+                </div>
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button" class="calculate-area-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Calculate Area (ha)</button>
+                    <p id="area-result" class="text-sm font-semibold"></p>
+                </div>
+                `;
+
             } else { // isLine
                 const startPoint = L.latLng(item.path[0].lat, item.path[0].lng);
                 const endPoint = L.latLng(item.path[item.path.length - 1].lat, item.path[item.path.length - 1].lng);
@@ -145,13 +148,12 @@ const Map = ({
             fillButtonHtml = `<button type="button" class="toggle-fill-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${fillVisible ? 'Hide' : 'Show'} Fill</button>`
         }
 
-
         const content = `
             <form id="${formId}" class="flex flex-col gap-2">
                 <input type="text" name="label" value="${item.label}" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
                 <textarea name="notes" placeholder="Add notes..." class="p-2 border rounded-md text-sm bg-background text-foreground border-border min-h-[60px]">${item.notes || ''}</textarea>
                 ${coordsHtml}
-                <div class="flex justify-between items-center gap-2 flex-wrap">
+                <div class="flex justify-between items-center gap-2 flex-wrap pt-2">
                     <div class="flex gap-2">
                         <button type="button" class="toggle-label-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${labelVisible ? 'Hide' : 'Show'} Label</button>
                         ${fillButtonHtml}
@@ -164,7 +166,7 @@ const Map = ({
             </form>
         `;
 
-        popupRef.current = L.popup({ closeButton: true, closeOnClick: true, className: 'p-0', maxHeight: 300 })
+        popupRef.current = L.popup({ closeButton: true, closeOnClick: true, className: 'p-0 w-[320px]', maxHeight: 400 })
             .setLatLng(latlng)
             .setContent(content)
             .openOn(map);
@@ -180,7 +182,7 @@ const Map = ({
             const deleteButton = form?.querySelector('.delete-btn');
             const toggleLabelButton = form?.querySelector('.toggle-label-btn');
             const toggleFillButton = form?.querySelector('.toggle-fill-btn');
-
+            const calculateAreaButton = form?.querySelector('.calculate-area-btn');
 
             form?.addEventListener('submit', (ev) => {
                 ev.preventDefault();
@@ -190,7 +192,11 @@ const Map = ({
                 if (isPin) {
                     onUpdatePin(item.id, labelInput.value, notesInput.value);
                 } else if (isArea) {
-                    onUpdateArea(item.id, labelInput.value, notesInput.value);
+                    const newPath = (item as Area).path.map((_, i) => ({
+                        lat: parseFloat((formElements.namedItem(`lat-${i}`) as HTMLInputElement).value),
+                        lng: parseFloat((formElements.namedItem(`lng-${i}`) as HTMLInputElement).value),
+                    }));
+                    onUpdateArea(item.id, labelInput.value, notesInput.value, newPath);
                 } else {
                     onUpdateLine(item.id, labelInput.value, notesInput.value);
                 }
@@ -211,6 +217,22 @@ const Map = ({
             toggleLabelButton?.addEventListener('click', () => {
                 onToggleLabel(item.id, isPin ? 'pin' : isArea ? 'area' : 'line');
                 map.closePopup();
+            });
+            
+            calculateAreaButton?.addEventListener('click', () => {
+                if (!isArea || !window.L.GeometryUtil) {
+                     document.getElementById('area-result')!.innerText = 'Util not loaded.';
+                     return;
+                };
+
+                const currentPath = (item as Area).path.map((_, i) => L.latLng(
+                    parseFloat((form!.elements.namedItem(`lat-${i}`) as HTMLInputElement).value),
+                    parseFloat((form!.elements.namedItem(`lng-${i}`) as HTMLInputElement).value)
+                ));
+
+                const areaMeters = L.GeometryUtil.geodesicArea(currentPath);
+                const areaHectares = areaMeters / 10000;
+                document.getElementById('area-result')!.innerText = `${areaHectares.toFixed(4)} ha`;
             });
 
             if (isArea) {
@@ -327,7 +349,7 @@ const Map = ({
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
-                    }).openTooltip(center);
+                    }).openTooltip();
                 }
                 polyline.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);

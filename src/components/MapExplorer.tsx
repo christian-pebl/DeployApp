@@ -220,8 +220,8 @@ export default function MapExplorer() {
     setItemToEdit(null);
   };
 
-  const handleUpdateArea = (id: string, label: string, notes: string) => {
-    setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes } : a));
+  const handleUpdateArea = (id: string, label: string, notes: string, path: {lat: number, lng: number}[]) => {
+    setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path } : a));
     setItemToEdit(null);
   };
 
@@ -486,7 +486,7 @@ export default function MapExplorer() {
                         className="h-12 rounded-md shadow-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
                         onClick={handleAddAreaCorner}
                     >
-                        <CornerUpLeft className="mr-2 h-5 w-5" /> Add Corner
+                        <Plus className="mr-2 h-5 w-5" /> Add Corner
                     </Button>
                     <Button 
                         className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
