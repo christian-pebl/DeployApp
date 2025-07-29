@@ -14,8 +14,15 @@ import type {
     Popup,
     LatLngTuple,
     Polyline,
-    Polygon
+    Polygon,
+    LeafletMouseEvent
 } from 'leaflet';
+
+declare module 'leaflet' {
+    namespace GeometryUtil {
+        function geodesicArea(latlngs: LatLng[]): number;
+    }
+}
 
 declare global {
   var L: {
@@ -29,9 +36,7 @@ declare global {
     control: {
         zoom: (options: { position: string }) => Control.Zoom
     };
-    GeometryUtil: {
-        geodesicArea(latlngs: LatLng[]): number;
-    };
+    GeometryUtil: typeof import('leaflet').GeometryUtil;
     DomEvent: {
         stopPropagation(e: LeafletEvent): any;
     }
