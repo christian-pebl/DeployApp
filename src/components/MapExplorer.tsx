@@ -490,7 +490,7 @@ export default function MapExplorer() {
             </div>
 
             {isObjectListOpen && (
-              <Card className="absolute top-4 left-4 z-[1001] w-[350px] sm:w-[400px] h-[calc(100%-2rem)] flex flex-col bg-card/90 backdrop-blur-sm">
+              <Card className="absolute top-4 left-4 z-[1002] w-[350px] sm:w-[400px] h-[calc(100%-2rem)] flex flex-col bg-card/90 backdrop-blur-sm">
                 <div className="p-4 border-b flex justify-between items-center">
                     <h2 className="text-lg font-semibold">Map Objects</h2>
                     <Button variant="ghost" size="icon" onClick={() => setIsObjectListOpen(false)} className="h-8 w-8">
@@ -558,7 +558,7 @@ export default function MapExplorer() {
             )}
 
             <div className="absolute top-4 left-4 z-[1001] flex flex-col gap-2">
-                 <DropdownMenu>
+                <DropdownMenu>
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -608,8 +608,7 @@ export default function MapExplorer() {
                         </DropdownMenuSub>
                     </DropdownMenuContent>
                 </DropdownMenu>
-            </div>
-            <div className="absolute top-20 left-4 z-[1000] flex flex-col gap-2">
+
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
