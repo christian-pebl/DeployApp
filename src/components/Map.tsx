@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent } from 'leaflet';
+import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions } from 'leaflet';
 
 type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
-type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
+type Line = { id:string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
 type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
 
 
@@ -78,6 +78,7 @@ const Map = ({
     const previewAreaLineRef = useRef<Polyline | null>(null);
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
     const popupRef = useRef<Popup | null>(null);
+    const previewAreaPointsRef = useRef<LayerGroup | null>(null);
 
     const showEditPopup = (item: Pin | Line | Area) => {
         const map = mapRef.current;
@@ -118,7 +119,7 @@ const Map = ({
                 }
 
                 coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
-                    <ul class="list-disc pl-4">${pointsHtml}</ul>
+                    <ul class="list-disc pl-4 max-h-20 overflow-y-auto">${pointsHtml}</ul>
                     ${areaHtml}
                 </div>`;
             } else { // isLine
@@ -231,6 +232,8 @@ const Map = ({
             pinLayerRef.current = L.layerGroup().addTo(map);
             lineLayerRef.current = L.layerGroup().addTo(map);
             areaLayerRef.current = L.layerGroup().addTo(map);
+            previewAreaPointsRef.current = L.layerGroup().addTo(map);
+
 
             map.on('click', onMapClick);
             
@@ -314,33 +317,48 @@ const Map = ({
     }, [lines, onEditItem]);
 
     useEffect(() => {
-        if (areaLayerRef.current && typeof window.L !== 'undefined') {
+        if (areaLayerRef.current && typeof window.L !== 'undefined' && mapRef.current) {
             const layer = areaLayerRef.current;
             layer.clearLayers();
-            const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary');
             const secondaryFgColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary-foreground');
-
+            const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary');
+    
+            const cornerMarkerOptions: CircleMarkerOptions = {
+                radius: 6,
+                fillColor: `hsl(${secondaryColor})`,
+                color: `hsl(${secondaryFgColor})`,
+                weight: 2,
+                fillOpacity: 1
+            };
+    
             areas.forEach(area => {
-                const latlngs = area.path.map(p => [p.lat, p.lng] as LatLngExpression);
-                if (latlngs.length < 3) return;
-
+                const latlngs = area.path.map(p => L.latLng(p.lat, p.lng));
+                if (latlngs.length < 2) return;
+    
+                const areaGroup = L.layerGroup().addTo(layer);
+    
                 const polygon = L.polygon(latlngs, {
                     color: `hsl(${secondaryFgColor})`,
                     weight: 2,
-                    fillColor: `hsl(${secondaryColor})`,
-                    fillOpacity: 0.5
-                }).addTo(layer);
-
+                    fillOpacity: 0.0 // Make the area fill transparent
+                }).addTo(areaGroup);
+    
+                latlngs.forEach(latlng => {
+                    L.circleMarker(latlng, cornerMarkerOptions).addTo(areaGroup);
+                });
+    
                 if (area.label && area.labelVisible !== false) {
+                    const center = polygon.getBounds().getCenter();
                     polygon.bindTooltip(area.label, {
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-secondary-foreground bg-secondary/80 border-0',
-                    });
+                    }).openTooltip(center);
                 }
-                polygon.on('click', (e) => {
+    
+                areaGroup.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
-                    onEditItem(area)
+                    onEditItem(area);
                 });
             });
         }
@@ -417,18 +435,36 @@ const Map = ({
                 previewAreaLineRef.current.remove();
                 previewAreaLineRef.current = null;
             }
+            if (previewAreaPointsRef.current) {
+                previewAreaPointsRef.current.clearLayers();
+            }
         };
     
         if (isDrawingArea) {
+            const secondaryFgColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary-foreground');
+            const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary');
+            const cornerMarkerOptions: CircleMarkerOptions = {
+                radius: 6,
+                fillColor: `hsl(${secondaryColor})`,
+                color: `hsl(${secondaryFgColor})`,
+                weight: 2,
+                fillOpacity: 1
+            };
+
             const updatePreview = () => {
                 cleanupLayers();
+                
+                if (previewAreaPointsRef.current) {
+                     pendingAreaPath.forEach(point => {
+                        L.circleMarker(point, cornerMarkerOptions).addTo(previewAreaPointsRef.current!);
+                    });
+                }
 
                 if (pendingAreaPath.length > 0) {
                      previewAreaRef.current = L.polygon(pendingAreaPath, {
-                        color: 'hsl(var(--secondary-foreground))',
+                        color: `hsl(${secondaryFgColor})`,
                         weight: 2,
-                        fillColor: 'hsl(var(--secondary))',
-                        fillOpacity: 0.5,
+                        fillOpacity: 0.0,
                         dashArray: '5, 5',
                     }).addTo(map);
                 }
@@ -438,7 +474,7 @@ const Map = ({
                     const center = map.getCenter();
                     const linePath = [lastPoint, center];
                     previewAreaLineRef.current = L.polyline(linePath, {
-                        color: 'hsl(var(--secondary-foreground))',
+                        color: `hsl(${secondaryFgColor})`,
                         weight: 2,
                         dashArray: '5, 5',
                     }).addTo(map);
