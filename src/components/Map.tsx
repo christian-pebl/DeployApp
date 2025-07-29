@@ -61,6 +61,46 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
+// Shoelace formula implementation for area calculation
+function calculatePolygonArea(path: { lat: number; lng: number }[]): number {
+    if (path.length < 3) {
+      return 0;
+    }
+
+    const points = [...path];
+    if (points[0].lat !== points[points.length - 1].lat || points[0].lng !== points[points.length - 1].lng) {
+      points.push(points[0]);
+    }
+    
+    // Sort points to form a simple polygon
+    const centroid = points.reduce((acc, p) => ({ lat: acc.lat + p.lat / points.length, lng: acc.lng + p.lng / points.length }), { lat: 0, lng: 0 });
+    const sortedPoints = points.slice(0, -1).sort((a, b) => {
+      const angleA = Math.atan2(a.lat - centroid.lat, a.lng - centroid.lng);
+      const angleB = Math.atan2(b.lat - centroid.lat, b.lng - centroid.lng);
+      return angleA - angleB;
+    });
+    sortedPoints.push(sortedPoints[0]);
+
+
+    let area = 0;
+    for (let i = 0; i < sortedPoints.length - 1; i++) {
+        const p1 = sortedPoints[i];
+        const p2 = sortedPoints[i+1];
+        area += (p1.lng * p2.lat - p2.lng * p1.lat);
+    }
+    const areaSqDegrees = Math.abs(area / 2);
+
+    // Approximate conversion from square degrees to square meters
+    // This is a rough approximation that works best for small areas not near the poles.
+    const avgLatRad = (path.reduce((sum, p) => sum + p.lat, 0) / path.length) * (Math.PI / 180);
+    const metersPerDegree = 111320 * Math.cos(avgLatRad);
+    const areaSqMeters = areaSqDegrees * Math.pow(metersPerDegree, 2);
+
+    // Convert to hectares
+    return areaSqMeters / 10000;
+}
+
+
 const Map = ({ 
     mapRef, center, zoom, pins, lines, areas, currentLocation, 
     onLocationFound, onLocationError, onMove, isDrawingLine, lineStartPoint,
@@ -100,7 +140,8 @@ const Map = ({
             const polygon = L.polygon(item.path.map(p => L.latLng(p.lat, p.lng)));
             latlng = polygon.getBounds().getCenter();
         } else { // isLine
-            latlng = L.latLng((item.path[0].lat + item.path[item.path.length - 1].lat) / 2, (item.path[0].lng + item.path[item.path.length - 1].lng) / 2);
+            const line = L.polyline((item as Line).path.map(p => L.latLng(p.lat, p.lng)));
+            latlng = line.getBounds().getCenter();
         }
         
         const formId = `edit-form-${item.id}`;
@@ -223,18 +264,14 @@ const Map = ({
                 if (!isArea) return;
                 const areaResultEl = document.getElementById('area-result');
                 if (!areaResultEl) return;
-                if (!(window as any).L.GeometryUtil) {
-                    areaResultEl.innerText = 'Util not loaded, try again.';
-                    return;
-                }
-
-                const currentPath = (item as Area).path.map((_, i) => L.latLng(
-                    parseFloat((form!.elements.namedItem(`lat-${i}`) as HTMLInputElement).value),
-                    parseFloat((form!.elements.namedItem(`lng-${i}`) as HTMLInputElement).value)
-                ));
-
-                const areaMeters = (window as any).L.GeometryUtil.geodesicArea(currentPath);
-                const areaHectares = areaMeters / 10000;
+                
+                const formElements = (form as HTMLFormElement).elements;
+                const currentPath = (item as Area).path.map((_, i) => ({
+                    lat: parseFloat((formElements.namedItem(`lat-${i}`) as HTMLInputElement).value),
+                    lng: parseFloat((formElements.namedItem(`lng-${i}`) as HTMLInputElement).value),
+                }));
+                
+                const areaHectares = calculatePolygonArea(currentPath);
                 areaResultEl.innerText = `${areaHectares.toFixed(4)} ha`;
             });
 
