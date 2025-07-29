@@ -240,43 +240,45 @@ export default function MapExplorer() {
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
-                <ScrollArea className="flex-1">
-                    <div className="p-4">
-                        <h3 className="text-lg font-semibold mb-2">Pins</h3>
-                        {pins.length > 0 ? (
-                            <ul className="space-y-2">
-                                {pins.map(pin => (
-                                    <li key={pin.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
-                                        <span className="font-medium truncate pr-2">{pin.label}</span>
-                                        <div className="flex items-center gap-1">
-                                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(pin)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
-                                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(pin)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePin(pin.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : <p className="text-sm text-muted-foreground">No pins added yet.</p>}
-                        
-                        <Separator className="my-4" />
+                <TooltipProvider>
+                  <ScrollArea className="flex-1">
+                      <div className="p-4">
+                          <h3 className="text-lg font-semibold mb-2">Pins</h3>
+                          {pins.length > 0 ? (
+                              <ul className="space-y-2">
+                                  {pins.map(pin => (
+                                      <li key={pin.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                          <span className="font-medium truncate pr-2">{pin.label}</span>
+                                          <div className="flex items-center gap-1">
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(pin)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(pin)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePin(pin.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                          </div>
+                                      </li>
+                                  ))}
+                              </ul>
+                          ) : <p className="text-sm text-muted-foreground">No pins added yet.</p>}
+                          
+                          <Separator className="my-4" />
 
-                        <h3 className="text-lg font-semibold mb-2">Lines</h3>
-                        {lines.length > 0 ? (
-                            <ul className="space-y-2">
-                                {lines.map(line => (
-                                    <li key={line.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
-                                        <span className="font-medium truncate pr-2">{line.label}</span>
-                                        <div className="flex items-center gap-1">
-                                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(line)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
-                                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(line)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(line.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : <p className="text-sm text-muted-foreground">No lines drawn yet.</p>}
-                    </div>
-                </ScrollArea>
+                          <h3 className="text-lg font-semibold mb-2">Lines</h3>
+                          {lines.length > 0 ? (
+                              <ul className="space-y-2">
+                                  {lines.map(line => (
+                                      <li key={line.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                          <span className="font-medium truncate pr-2">{line.label}</span>
+                                          <div className="flex items-center gap-1">
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(line)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(line)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(line.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                          </div>
+                                      </li>
+                                  ))}
+                              </ul>
+                          ) : <p className="text-sm text-muted-foreground">No lines drawn yet.</p>}
+                      </div>
+                  </ScrollArea>
+                </TooltipProvider>
               </Card>
             )}
 
