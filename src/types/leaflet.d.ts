@@ -1,9 +1,7 @@
 import 'leaflet';
-import 'leaflet-geometryutil';
 
 declare module 'leaflet' {
-    namespace GeometryUtil {
-        function geodesicArea(latlngs: LatLng[]): number;
-        // Add other functions from leaflet-geometryutil if needed
-    }
+    // This empty declaration is enough to allow the project to compile.
+    // The `leaflet-geometryutil` package doesn't have great TS support,
+    // so we import it directly where needed and accept the dynamic nature.
 }

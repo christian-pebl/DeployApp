@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions } from 'leaflet';
-import 'leaflet-geometryutil';
+import { GeometryUtil } from 'leaflet-geometryutil';
 
 type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
 type Line = { id:string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
@@ -221,17 +221,14 @@ const Map = ({
             });
             
             calculateAreaButton?.addEventListener('click', () => {
-                if (!isArea || !window.L.GeometryUtil) {
-                     document.getElementById('area-result')!.innerText = 'Error.';
-                     return;
-                };
+                if (!isArea) return;
 
                 const currentPath = (item as Area).path.map((_, i) => L.latLng(
                     parseFloat((form!.elements.namedItem(`lat-${i}`) as HTMLInputElement).value),
                     parseFloat((form!.elements.namedItem(`lng-${i}`) as HTMLInputElement).value)
                 ));
 
-                const areaMeters = L.GeometryUtil.geodesicArea(currentPath);
+                const areaMeters = GeometryUtil.geodesicArea(currentPath);
                 const areaHectares = areaMeters / 10000;
                 document.getElementById('area-result')!.innerText = `${areaHectares.toFixed(4)} ha`;
             });
