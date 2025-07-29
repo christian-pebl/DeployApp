@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import type { LatLng, LatLngExpression, Map as LeafletMap } from 'leaflet';
+import type { LatLng, LatLngExpression, Map as LeafletMap, LeafletMouseEvent } from 'leaflet';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, Square } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -26,11 +26,14 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
 type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
+type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
+
 
 export default function MapExplorer() {
   const [log, setLog] = useState<string[]>(['App Initialized']);
   const [pins, setPins] = useState<Pin[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
+  const [areas, setAreas] = useState<Area[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945],
     zoom: 13,
@@ -40,11 +43,17 @@ export default function MapExplorer() {
 
   const [pendingPin, setPendingPin] = useState<LatLng | null>(null);
   const [pendingLine, setPendingLine] = useState<{ path: LatLng[] } | null>(null);
+  const [pendingArea, setPendingArea] = useState<{ path: LatLng[] } | null>(null);
+
   const [isDrawingLine, setIsDrawingLine] = useState(false);
   const [lineStartPoint, setLineStartPoint] = useState<LatLng | null>(null);
+  
+  const [isDrawingArea, setIsDrawingArea] = useState(false);
+  const [pendingAreaPath, setPendingAreaPath] = useState<LatLng[]>([]);
+
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLng | null>(null);
   const [isObjectListOpen, setIsObjectListOpen] = useState(false);
-  const [itemToEdit, setItemToEdit] = useState<Pin | Line | null>(null);
+  const [itemToEdit, setItemToEdit] = useState<Pin | Line | Area | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
@@ -134,6 +143,27 @@ export default function MapExplorer() {
     }
   };
 
+  const handleDrawArea = () => {
+    setIsDrawingArea(true);
+    setPendingAreaPath([]);
+  }
+
+  const handleConfirmArea = () => {
+    if(pendingAreaPath.length < 3) {
+        toast({ variant: "destructive", title: "Area Incomplete", description: "An area must have at least 3 points."});
+        return;
+    }
+    setPendingArea({ path: pendingAreaPath });
+    setIsDrawingArea(false);
+    setPendingAreaPath([]);
+  }
+
+  const handleMapClick = (e: LeafletMouseEvent) => {
+    if (isDrawingArea) {
+      setPendingAreaPath(prev => [...prev, e.latlng]);
+    }
+  };
+
   const handlePinSave = (id: string, label: string, lat: number, lng: number, notes: string) => {
     const newPin: Pin = { id, lat, lng, label, labelVisible: true, notes };
     setPins(prev => [...prev, newPin]);
@@ -150,6 +180,18 @@ export default function MapExplorer() {
       };
       setLines(prev => [...prev, newLine]);
       setPendingLine(null);
+  };
+  
+  const handleAreaSave = (id: string, label: string, path: LatLng[], notes: string) => {
+      const newArea: Area = {
+          id,
+          path: path.map(p => ({ lat: p.lat, lng: p.lng })),
+          label,
+          labelVisible: true,
+          notes,
+      };
+      setAreas(prev => [...prev, newArea]);
+      setPendingArea(null);
   };
 
   const handleUpdatePin = (id: string, label: string, notes: string) => {
@@ -172,16 +214,28 @@ export default function MapExplorer() {
     setItemToEdit(null);
   };
 
-  const handleToggleLabel = (id: string, type: 'pin' | 'line') => {
+  const handleUpdateArea = (id: string, label: string, notes: string) => {
+    setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes } : a));
+    setItemToEdit(null);
+  };
+
+  const handleDeleteArea = (id: string) => {
+    setAreas(prev => prev.filter(a => a.id !== id));
+    setItemToEdit(null);
+  };
+
+  const handleToggleLabel = (id: string, type: 'pin' | 'line' | 'area') => {
     if (type === 'pin') {
       setPins(pins.map(p => p.id === id ? { ...p, labelVisible: !(p.labelVisible ?? true) } : p));
-    } else {
+    } else if (type === 'line') {
       setLines(lines.map(l => l.id === id ? { ...l, labelVisible: !(l.labelVisible ?? true) } : l));
+    } else {
+      setAreas(areas.map(a => a.id === id ? { ...a, labelVisible: !(a.labelVisible ?? true) } : a));
     }
     setItemToEdit(null);
   };
 
-  const handleViewItem = (item: Pin | Line) => {
+  const handleViewItem = (item: Pin | Line | Area) => {
     const map = mapRef.current;
     if (!map) return;
     if ('lat' in item) {
@@ -192,7 +246,7 @@ export default function MapExplorer() {
     setIsObjectListOpen(false);
   }
 
-  const handleEditItem = (item: Pin | Line | null) => {
+  const handleEditItem = (item: Pin | Line | Area | null) => {
     setItemToEdit(item);
   }
 
@@ -206,7 +260,6 @@ export default function MapExplorer() {
         return;
     }
 
-    // Check for lat,lng
     const latLngRegex = /^(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)$/;
     const match = searchQuery.match(latLngRegex);
     if (match) {
@@ -220,9 +273,8 @@ export default function MapExplorer() {
         }
     }
 
-    // Check for pin/line label
     const lowerCaseQuery = searchQuery.toLowerCase();
-    const item = [...pins, ...lines].find(i => i.label.toLowerCase() === lowerCaseQuery);
+    const item = [...pins, ...lines, ...areas].find(i => i.label.toLowerCase() === lowerCaseQuery);
     if (item) {
         addLog(`Found object with label: ${item.label}`);
         handleViewItem(item);
@@ -230,7 +282,6 @@ export default function MapExplorer() {
         return;
     }
 
-    // Geocode address
     try {
         addLog(`No object found. Attempting to geocode address: ${searchQuery}`);
         const result = await geocodeAddress({ address: searchQuery });
@@ -263,22 +314,31 @@ export default function MapExplorer() {
               zoom={view.zoom}
               pins={pins}
               lines={lines}
+              areas={areas}
               currentLocation={currentLocation}
               onLocationFound={handleLocationFound}
               onLocationError={handleLocationError}
               onMove={(center) => setCurrentMapCenter(center)}
               isDrawingLine={isDrawingLine}
               lineStartPoint={lineStartPoint}
+              isDrawingArea={isDrawingArea}
+              onMapClick={handleMapClick}
+              pendingAreaPath={pendingAreaPath}
               pendingPin={pendingPin}
               onPinSave={handlePinSave}
               onPinCancel={() => setPendingPin(null)}
               pendingLine={pendingLine}
               onLineSave={handleLineSave}
               onLineCancel={() => setPendingLine(null)}
+              pendingArea={pendingArea}
+              onAreaSave={handleAreaSave}
+              onAreaCancel={() => setPendingArea(null)}
               onUpdatePin={handleUpdatePin}
               onDeletePin={handleDeletePin}
               onUpdateLine={handleUpdateLine}
               onDeleteLine={handleDeleteLine}
+              onUpdateArea={handleUpdateArea}
+              onDeleteArea={handleDeleteArea}
               onToggleLabel={handleToggleLabel}
               itemToEdit={itemToEdit}
               onEditItem={handleEditItem}
@@ -332,6 +392,24 @@ export default function MapExplorer() {
                                   ))}
                               </ul>
                           ) : <p className="text-sm text-muted-foreground">No lines drawn yet.</p>}
+                          
+                          <Separator className="my-4" />
+
+                          <h3 className="text-lg font-semibold mb-2">Areas</h3>
+                          {areas.length > 0 ? (
+                              <ul className="space-y-2">
+                                  {areas.map(area => (
+                                      <li key={area.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                          <span className="font-medium truncate pr-2">{area.label}</span>
+                                          <div className="flex items-center gap-1">
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(area)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(area)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteArea(area.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                          </div>
+                                      </li>
+                                  ))}
+                              </ul>
+                          ) : <p className="text-sm text-muted-foreground">No areas drawn yet.</p>}
                       </div>
                   </ScrollArea>
                 </TooltipProvider>
@@ -362,6 +440,14 @@ export default function MapExplorer() {
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
+                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawArea}>
+                                <Square className="h-6 w-6" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Draw an Area</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
                             <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={() => setIsObjectListOpen(true)}>
                                 <Menu className="h-6 w-6" />
                             </Button>
@@ -371,24 +457,24 @@ export default function MapExplorer() {
                 </TooltipProvider>
             </div>
             
-            {isDrawingLine && (
+            {(isDrawingLine || isDrawingArea) && (
                 <Button 
                     className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
-                    onClick={handleConfirmLine}
+                    onClick={isDrawingLine ? handleConfirmLine : handleConfirmArea}
                 >
-                    <Check className="mr-2 h-5 w-5" /> Confirm Line
+                    <Check className="mr-2 h-5 w-5" /> {isDrawingLine ? 'Confirm Line' : 'Finish Area'}
                 </Button>
             )}
 
             <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-                <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 p-2 rounded-lg shadow-lg border">
+                <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
                     <Input
                         type="text"
                         placeholder="Search address or label..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        className="border-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
                     />
                     <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching} className="h-9 w-9">
                         {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}

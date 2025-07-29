@@ -1,11 +1,12 @@
-
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup, LocationEvent, LeafletMouseEvent } from 'leaflet';
+import React, { useEffect, useRef } from 'react';
+import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent } from 'leaflet';
 
 type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
 type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
+type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
+
 
 interface MapProps {
     mapRef: React.MutableRefObject<LeafletMap | null>;
@@ -13,25 +14,34 @@ interface MapProps {
     zoom: number;
     pins: Pin[];
     lines: Line[];
+    areas: Area[];
     currentLocation: LatLng | null;
     onLocationFound: (latlng: LatLng) => void;
     onLocationError: (error: any) => void;
     onMove: (center: LatLng) => void;
     isDrawingLine: boolean;
     lineStartPoint: LatLng | null;
+    isDrawingArea: boolean;
+    onMapClick: (e: LeafletMouseEvent) => void;
+    pendingAreaPath: LatLng[];
     pendingPin: LatLng | null;
     onPinSave: (id: string, label: string, lat: number, lng: number, notes: string) => void;
     onPinCancel: () => void;
     pendingLine: { path: LatLng[] } | null;
     onLineSave: (id: string, label: string, path: LatLng[], notes: string) => void;
     onLineCancel: () => void;
+    pendingArea: { path: LatLng[] } | null;
+    onAreaSave: (id: string, label: string, path: LatLng[], notes: string) => void;
+    onAreaCancel: () => void;
     onUpdatePin: (id: string, label: string, notes: string) => void;
     onDeletePin: (id: string) => void;
     onUpdateLine: (id: string, label: string, notes: string) => void;
     onDeleteLine: (id: string) => void;
-    onToggleLabel: (id: string, type: 'pin' | 'line') => void;
-    itemToEdit: Pin | Line | null;
-    onEditItem: (item: Pin | Line | null) => void;
+    onUpdateArea: (id: string, label: string, notes: string) => void;
+    onDeleteArea: (id: string) => void;
+    onToggleLabel: (id: string, type: 'pin' | 'line' | 'area') => void;
+    itemToEdit: Pin | Line | Area | null;
+    onEditItem: (item: Pin | Line | Area | null) => void;
 }
 
 
@@ -50,21 +60,25 @@ const createCustomIcon = (color: string) => {
 };
 
 const Map = ({ 
-    mapRef, center, zoom, pins, lines, currentLocation, 
+    mapRef, center, zoom, pins, lines, areas, currentLocation, 
     onLocationFound, onLocationError, onMove, isDrawingLine, lineStartPoint,
+    isDrawingArea, onMapClick, pendingAreaPath,
     pendingPin, onPinSave, onPinCancel,
     pendingLine, onLineSave, onLineCancel,
-    onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine, onToggleLabel,
+    pendingArea, onAreaSave, onAreaCancel,
+    onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine, onUpdateArea, onDeleteArea, onToggleLabel,
     itemToEdit, onEditItem
 }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
     const lineLayerRef = useRef<LayerGroup | null>(null);
+    const areaLayerRef = useRef<LayerGroup | null>(null);
     const previewLineRef = useRef<Polyline | null>(null);
+    const previewAreaRef = useRef<Polygon | null>(null);
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
     const popupRef = useRef<Popup | null>(null);
 
-    const showEditPopup = (item: Pin | Line) => {
+    const showEditPopup = (item: Pin | Line | Area) => {
         const map = mapRef.current;
         if (!map || typeof window.L === 'undefined') return;
 
@@ -73,23 +87,42 @@ const Map = ({
         }
 
         const isPin = 'lat' in item;
-        const latlng = isPin ? L.latLng(item.lat, item.lng) : L.latLng((item.path[0].lat + item.path[1].lat) / 2, (item.path[0].lng + item.path[1].lng) / 2);
+        const isArea = !isPin && 'path' in item && L.Polygon.prototype.isPrototypeOf(L.polyline(item.path.map(p => [p.lat, p.lng])) as any);
+
+        let latlng: LatLng;
+        if (isPin) {
+            latlng = L.latLng(item.lat, item.lng);
+        } else if (isArea) {
+            const polygon = L.polygon(item.path.map(p => L.latLng(p.lat, p.lng)));
+            latlng = polygon.getBounds().getCenter();
+        } else {
+            latlng = L.latLng((item.path[0].lat + item.path[item.path.length-1].lat) / 2, (item.path[0].lng + item.path[item.path.length-1].lng) / 2);
+        }
         
         const formId = `edit-form-${item.id}`;
         
         let coordsHtml = '';
         if (isPin) {
             coordsHtml = `<p class="text-xs text-muted-foreground">Lat: ${item.lat.toFixed(4)}, Lng: ${item.lng.toFixed(4)}</p>`;
-        } else {
-            const startPoint = L.latLng(item.path[0].lat, item.path[0].lng);
-            const endPoint = L.latLng(item.path[1].lat, item.path[1].lng);
-            const distance = startPoint.distanceTo(endPoint);
+        } else if ('path' in item) {
+            if (isArea) {
+                const polygon = L.polygon(item.path.map(p => L.latLng(p.lat, p.lng)));
+                const area = L.GeometryUtil.geodesicArea(polygon.getLatLngs()[0]);
+                coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
+                  <p class="font-semibold">Area: ${area.toFixed(2)} square meters</p>
+                  <p>${item.path.length} vertices</p>
+                </div>`;
+            } else {
+                const startPoint = L.latLng(item.path[0].lat, item.path[0].lng);
+                const endPoint = L.latLng(item.path[item.path.length - 1].lat, item.path[item.path.length - 1].lng);
+                const distance = startPoint.distanceTo(endPoint);
 
-            coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
-                <p>Start: ${item.path[0].lat.toFixed(4)}, ${item.path[0].lng.toFixed(4)}</p>
-                <p>End: ${item.path[1].lat.toFixed(4)}, ${item.path[1].lng.toFixed(4)}</p>
-                <p class="font-semibold">Distance: ${distance.toFixed(2)} meters</p>
-            </div>`;
+                coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
+                    <p>Start: ${item.path[0].lat.toFixed(4)}, ${item.path[0].lng.toFixed(4)}</p>
+                    <p>End: ${item.path[item.path.length - 1].lat.toFixed(4)}, ${item.path[item.path.length - 1].lng.toFixed(4)}</p>
+                    <p class="font-semibold">Distance: ${distance.toFixed(2)} meters</p>
+                </div>`;
+            }
         }
 
         const labelVisible = item.labelVisible !== false;
@@ -132,6 +165,8 @@ const Map = ({
                 const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
                 if (isPin) {
                     onUpdatePin(item.id, labelInput.value, notesInput.value);
+                } else if (isArea) {
+                    onUpdateArea(item.id, labelInput.value, notesInput.value);
                 } else {
                     onUpdateLine(item.id, labelInput.value, notesInput.value);
                 }
@@ -141,6 +176,8 @@ const Map = ({
             deleteButton?.addEventListener('click', () => {
                 if (isPin) {
                     onDeletePin(item.id);
+                } else if (isArea) {
+                    onDeleteArea(item.id);
                 } else {
                     onDeleteLine(item.id);
                 }
@@ -148,7 +185,7 @@ const Map = ({
             });
 
             toggleLabelButton?.addEventListener('click', () => {
-                onToggleLabel(item.id, isPin ? 'pin' : 'line');
+                onToggleLabel(item.id, isPin ? 'pin' : isArea ? 'area' : 'line');
                 map.closePopup();
             });
         }, 0);
@@ -184,6 +221,9 @@ const Map = ({
             
             pinLayerRef.current = L.layerGroup().addTo(map);
             lineLayerRef.current = L.layerGroup().addTo(map);
+            areaLayerRef.current = L.layerGroup().addTo(map);
+
+            map.on('click', onMapClick);
             
             map.on('move', () => {
                 if (mapRef.current) {
@@ -253,7 +293,7 @@ const Map = ({
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
-                    });
+                    }).setLatLng(polyline.getCenter());
                 }
                 polyline.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
@@ -262,6 +302,39 @@ const Map = ({
             });
         }
     }, [lines, onEditItem]);
+
+    useEffect(() => {
+        if (areaLayerRef.current && typeof window.L !== 'undefined') {
+            const layer = areaLayerRef.current;
+            layer.clearLayers();
+            const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary');
+            const secondaryFgColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary-foreground');
+
+            areas.forEach(area => {
+                const latlngs = area.path.map(p => [p.lat, p.lng] as LatLngExpression);
+                if (latlngs.length < 3) return;
+
+                const polygon = L.polygon(latlngs, {
+                    color: `hsl(${secondaryFgColor})`,
+                    weight: 2,
+                    fillColor: `hsl(${secondaryColor})`,
+                    fillOpacity: 0.5
+                }).addTo(layer);
+
+                if (area.label && area.labelVisible !== false) {
+                    polygon.bindTooltip(area.label, {
+                        permanent: true,
+                        direction: 'center',
+                        className: 'font-sans font-bold text-secondary-foreground bg-secondary/80 border-0',
+                    }).setLatLng(polygon.getBounds().getCenter());
+                }
+                polygon.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    onEditItem(area)
+                });
+            });
+        }
+    }, [areas, onEditItem]);
 
 
     useEffect(() => {
@@ -320,8 +393,30 @@ const Map = ({
             previewLineRef.current = null;
         }
     }, [isDrawingLine, lineStartPoint]);
+    
+    useEffect(() => {
+        const map = mapRef.current;
+        if (map && isDrawingArea) {
+            if (previewAreaRef.current) {
+                previewAreaRef.current.setLatLngs(pendingAreaPath);
+            } else if (pendingAreaPath.length > 0) {
+                 previewAreaRef.current = L.polygon(pendingAreaPath, {
+                    color: 'hsl(var(--secondary-foreground))',
+                    weight: 2,
+                    fillColor: 'hsl(var(--secondary))',
+                    fillOpacity: 0.5,
+                    dashArray: '5, 5',
+                }).addTo(map);
+            }
 
-    const showPopup = (latlng: LatLng, type: 'pin' | 'line', path?: LatLng[]) => {
+        } else if(previewAreaRef.current) {
+            previewAreaRef.current.remove();
+            previewAreaRef.current = null;
+        }
+    }, [isDrawingArea, pendingAreaPath]);
+
+
+    const showPopup = (latlng: LatLng, type: 'pin' | 'line' | 'area', path?: LatLng[]) => {
         const map = mapRef.current;
         if (!map) return;
 
@@ -350,6 +445,7 @@ const Map = ({
             map.closePopup();
             if (type === 'pin') onPinCancel();
             if (type === 'line') onLineCancel();
+            if (type === 'area') onAreaCancel();
         };
 
         const cleanup = () => {
@@ -375,6 +471,8 @@ const Map = ({
                     onPinSave(newId, labelInput.value, latlng.lat, latlng.lng, notesInput.value);
                 } else if (type === 'line' && path) {
                     onLineSave(newId, labelInput.value, path, notesInput.value);
+                } else if (type === 'area' && path) {
+                    onAreaSave(newId, labelInput.value, path, notesInput.value);
                 }
                 map.closePopup();
             });
@@ -410,6 +508,15 @@ const Map = ({
             showPopup(midPoint, 'line', pendingLine.path);
         }
     }, [pendingLine]);
+    
+    useEffect(() => {
+        if (pendingArea && mapRef.current) {
+             const polygon = L.polygon(pendingArea.path);
+             const center = polygon.getBounds().getCenter();
+             showPopup(center, 'area', pendingArea.path);
+        }
+    }, [pendingArea]);
+
 
     return <div ref={mapContainerRef} className="h-full w-full z-0" />;
 };
