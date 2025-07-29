@@ -36,7 +36,7 @@ declare global {
     control: {
         zoom: (options: { position: string }) => Control.Zoom
     };
-    GeometryUtil: typeof import('leaflet').GeometryUtil;
+    GeometryUtil?: typeof import('leaflet').GeometryUtil;
     DomEvent: {
         stopPropagation(e: LeafletEvent): any;
     }
