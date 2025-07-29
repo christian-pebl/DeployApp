@@ -79,7 +79,9 @@ const Map = ({
             lineLayerRef.current = L.layerGroup().addTo(map);
             
             map.on('move', () => {
-                onMove(map.getCenter());
+                if (mapRef.current) {
+                    onMove(mapRef.current.getCenter());
+                }
             });
 
             map.locate({ watch: true, setView: false });
@@ -128,22 +130,18 @@ const Map = ({
                 const latlngs = line.path.map(p => [p.lat, p.lng] as LatLngExpression);
                 if (latlngs.length < 2) return;
 
-                const poly = L.polyline(latlngs, {
+                const polyline = L.polyline(latlngs, {
                     color: `hsl(${primaryColor})`,
                     weight: 4,
                     opacity: 0.8
                 }).addTo(layer);
 
                 if(line.label) {
-                    const midIndex = Math.floor(latlngs.length / 2);
-                    L.tooltip({
+                    polyline.bindTooltip(line.label, {
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
-                    })
-                    .setLatLng(latlngs[midIndex] as LatLng)
-                    .setContent(line.label)
-                    .addTo(layer);
+                    });
                 }
             });
         }
@@ -175,22 +173,33 @@ const Map = ({
     }, [currentLocation]);
 
     useEffect(() => {
-        if (mapRef.current && isDrawingLine && lineStartPoint) {
-            if (!previewLineRef.current) {
-                previewLineRef.current = L.polyline([lineStartPoint, mapRef.current.getCenter()], {
-                    color: 'hsl(var(--primary))',
-                    weight: 4,
-                    opacity: 0.8,
-                    dashArray: '5, 10',
-                }).addTo(mapRef.current);
-            } else {
-                previewLineRef.current.setLatLngs([lineStartPoint, mapRef.current.getCenter()]);
-            }
+        const map = mapRef.current;
+        if (map && isDrawingLine && lineStartPoint) {
+            const updatePreviewLine = () => {
+                const center = map.getCenter();
+                if (previewLineRef.current) {
+                    previewLineRef.current.setLatLngs([lineStartPoint, center]);
+                } else {
+                    previewLineRef.current = L.polyline([lineStartPoint, center], {
+                        color: 'hsl(var(--primary))',
+                        weight: 4,
+                        opacity: 0.8,
+                        dashArray: '5, 10',
+                    }).addTo(map);
+                }
+            };
+            
+            map.on('move', updatePreviewLine);
+            updatePreviewLine(); // Initial draw
+
+            return () => {
+                map.off('move', updatePreviewLine);
+            };
         } else if (previewLineRef.current) {
             previewLineRef.current.remove();
             previewLineRef.current = null;
         }
-    }, [isDrawingLine, lineStartPoint, onMove]);
+    }, [isDrawingLine, lineStartPoint]);
 
     const showPopup = (latlng: LatLng, type: 'pin' | 'line', path?: LatLng[]) => {
         const map = mapRef.current;
@@ -222,7 +231,12 @@ const Map = ({
             if (type === 'line') onLineCancel();
         };
 
+        const cleanup = () => {
+            popupRef.current?.off('remove', handleCancel);
+        }
+
         popupRef.current.on('remove', handleCancel);
+
 
         setTimeout(() => {
             const form = document.getElementById(formId);
@@ -230,6 +244,7 @@ const Map = ({
 
             form?.addEventListener('submit', (ev) => {
                 ev.preventDefault();
+                cleanup();
                 const input = (ev.target as HTMLFormElement).elements.namedItem('label') as HTMLInputElement;
                 const newId = `${type}-${Date.now()}`;
                 
@@ -241,7 +256,10 @@ const Map = ({
                 map.closePopup();
             });
 
-            cancelButton?.addEventListener('click', handleCancel);
+            cancelButton?.addEventListener('click', () => {
+                cleanup();
+                handleCancel();
+            });
         }, 0);
     };
 
@@ -254,13 +272,9 @@ const Map = ({
 
             const cleanup = () => {
                 tempMarker.remove();
-                if (popupRef.current) {
-                    popupRef.current.off('remove', cleanup);
-                }
+                popupRef.current?.off('remove', cleanup);
             }
-            if (popupRef.current) {
-                popupRef.current.on('remove', cleanup);
-            }
+            popupRef.current?.on('remove', cleanup);
         }
     }, [pendingPin]);
 
