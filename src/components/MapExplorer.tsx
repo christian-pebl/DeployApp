@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, Square } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, Square, CornerUpLeft } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -147,6 +147,12 @@ export default function MapExplorer() {
     setIsDrawingArea(true);
     setPendingAreaPath([]);
   }
+  
+  const handleAddAreaCorner = () => {
+    if(currentMapCenter) {
+      setPendingAreaPath(prev => [...prev, currentMapCenter]);
+    }
+  }
 
   const handleConfirmArea = () => {
     if(pendingAreaPath.length < 3) {
@@ -159,9 +165,7 @@ export default function MapExplorer() {
   }
 
   const handleMapClick = (e: LeafletMouseEvent) => {
-    if (isDrawingArea) {
-      setPendingAreaPath(prev => [...prev, e.latlng]);
-    }
+    // This is now empty, but kept for potential future use where clicking on the map is desired behavior.
   };
 
   const handlePinSave = (id: string, label: string, lat: number, lng: number, notes: string) => {
@@ -329,10 +333,10 @@ export default function MapExplorer() {
               onPinCancel={() => setPendingPin(null)}
               pendingLine={pendingLine}
               onLineSave={handleLineSave}
-              onLineCancel={() => setPendingLine(null)}
+              onLineCancel={() => {setIsDrawingLine(false); setLineStartPoint(null); setPendingLine(null);}}
               pendingArea={pendingArea}
               onAreaSave={handleAreaSave}
-              onAreaCancel={() => setPendingArea(null)}
+              onAreaCancel={() => {setIsDrawingArea(false); setPendingAreaPath([]); setPendingArea(null);}}
               onUpdatePin={handleUpdatePin}
               onDeletePin={handleDeletePin}
               onUpdateLine={handleUpdateLine}
@@ -457,13 +461,31 @@ export default function MapExplorer() {
                 </TooltipProvider>
             </div>
             
-            {(isDrawingLine || isDrawingArea) && (
+            {isDrawingLine && (
                 <Button 
                     className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
-                    onClick={isDrawingLine ? handleConfirmLine : handleConfirmArea}
+                    onClick={handleConfirmLine}
                 >
-                    <Check className="mr-2 h-5 w-5" /> {isDrawingLine ? 'Confirm Line' : 'Finish Area'}
+                    <Check className="mr-2 h-5 w-5" /> Confirm Line
                 </Button>
+            )}
+
+            {isDrawingArea && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2">
+                    <Button 
+                        className="h-12 rounded-md shadow-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                        onClick={handleAddAreaCorner}
+                    >
+                        <CornerUpLeft className="mr-2 h-5 w-5" /> Add Corner
+                    </Button>
+                    <Button 
+                        className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
+                        onClick={handleConfirmArea}
+                        disabled={pendingAreaPath.length < 3}
+                    >
+                        <Check className="mr-2 h-5 w-5" /> Finish Area
+                    </Button>
+                </div>
             )}
 
             <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">

@@ -75,6 +75,7 @@ const Map = ({
     const areaLayerRef = useRef<LayerGroup | null>(null);
     const previewLineRef = useRef<Polyline | null>(null);
     const previewAreaRef = useRef<Polygon | null>(null);
+    const previewAreaLineRef = useRef<Polyline | null>(null);
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
     const popupRef = useRef<Popup | null>(null);
 
@@ -396,21 +397,61 @@ const Map = ({
     
     useEffect(() => {
         const map = mapRef.current;
-        if (map && isDrawingArea) {
+        if (!map) return;
+    
+        const cleanupLayers = () => {
             if (previewAreaRef.current) {
-                previewAreaRef.current.setLatLngs(pendingAreaPath);
-            } else if (pendingAreaPath.length > 0) {
-                 previewAreaRef.current = L.polygon(pendingAreaPath, {
-                    color: 'hsl(var(--secondary-foreground))',
-                    weight: 2,
-                    fillColor: 'hsl(var(--secondary))',
-                    fillOpacity: 0.5,
-                    dashArray: '5, 5',
-                }).addTo(map);
+                previewAreaRef.current.remove();
+                previewAreaRef.current = null;
             }
-        } else if(previewAreaRef.current) {
-            previewAreaRef.current.remove();
-            previewAreaRef.current = null;
+            if (previewAreaLineRef.current) {
+                previewAreaLineRef.current.remove();
+                previewAreaLineRef.current = null;
+            }
+        };
+    
+        if (isDrawingArea) {
+            const updatePreview = () => {
+                if (previewAreaRef.current) {
+                    previewAreaRef.current.setLatLngs(pendingAreaPath);
+                } else if (pendingAreaPath.length > 0) {
+                    previewAreaRef.current = L.polygon(pendingAreaPath, {
+                        color: 'hsl(var(--secondary-foreground))',
+                        weight: 2,
+                        fillColor: 'hsl(var(--secondary))',
+                        fillOpacity: 0.5,
+                    }).addTo(map);
+                }
+    
+                const lastPoint = pendingAreaPath[pendingAreaPath.length - 1];
+                if (lastPoint) {
+                    const center = map.getCenter();
+                    const linePath = [lastPoint, center];
+                    if (previewAreaLineRef.current) {
+                        previewAreaLineRef.current.setLatLngs(linePath);
+                    } else {
+                        previewAreaLineRef.current = L.polyline(linePath, {
+                            color: 'hsl(var(--secondary-foreground))',
+                            weight: 2,
+                            dashArray: '5, 5',
+                        }).addTo(map);
+                    }
+                } else if (previewAreaLineRef.current) {
+                    // No points yet, so no preview line to draw
+                    previewAreaLineRef.current.remove();
+                    previewAreaLineRef.current = null;
+                }
+            };
+    
+            map.on('move', updatePreview);
+            updatePreview(); // Initial draw
+    
+            return () => {
+                map.off('move', updatePreview);
+                cleanupLayers();
+            };
+        } else {
+            cleanupLayers();
         }
     }, [isDrawingArea, pendingAreaPath]);
 
