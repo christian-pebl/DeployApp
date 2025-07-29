@@ -373,14 +373,13 @@ export default function Home() {
 ---
 ## `src/components/Map.tsx`
 ```tsx
-
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import type { LatLngExpression, Map as LeafletMap, Marker as LeafletMarker, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup, LocationEvent, LeafletMouseEvent } from 'leaflet';
+import React, { useEffect, useRef } from 'react';
+import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, LayerGroup, Popup, LocationEvent } from 'leaflet';
 
-type Pin = { id: string; lat: number; lng: number; label: string };
-type Line = { id: string; path: { lat: number; lng: number }[]; label: string };
+type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
+type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
 
 interface MapProps {
     mapRef: React.MutableRefObject<LeafletMap | null>;
@@ -395,11 +394,18 @@ interface MapProps {
     isDrawingLine: boolean;
     lineStartPoint: LatLng | null;
     pendingPin: LatLng | null;
-    onPinSave: (id: string, label: string, lat: number, lng: number) => void;
+    onPinSave: (id: string, label: string, lat: number, lng: number, notes: string) => void;
     onPinCancel: () => void;
     pendingLine: { path: LatLng[] } | null;
-    onLineSave: (id: string, label: string, path: LatLng[]) => void;
+    onLineSave: (id: string, label: string, path: LatLng[], notes: string) => void;
     onLineCancel: () => void;
+    onUpdatePin: (id: string, label: string, notes: string) => void;
+    onDeletePin: (id: string) => void;
+    onUpdateLine: (id: string, label: string, notes: string) => void;
+    onDeleteLine: (id: string) => void;
+    onToggleLabel: (id: string, type: 'pin' | 'line') => void;
+    itemToEdit: Pin | Line | null;
+    onEditItem: (item: Pin | Line | null) => void;
 }
 
 
@@ -421,7 +427,9 @@ const Map = ({
     mapRef, center, zoom, pins, lines, currentLocation, 
     onLocationFound, onLocationError, onMove, isDrawingLine, lineStartPoint,
     pendingPin, onPinSave, onPinCancel,
-    pendingLine, onLineSave, onLineCancel
+    pendingLine, onLineSave, onLineCancel,
+    onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine, onToggleLabel,
+    itemToEdit, onEditItem
 }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
@@ -429,6 +437,104 @@ const Map = ({
     const previewLineRef = useRef<Polyline | null>(null);
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
     const popupRef = useRef<Popup | null>(null);
+
+    const showEditPopup = (item: Pin | Line) => {
+        const map = mapRef.current;
+        if (!map || typeof window.L === 'undefined') return;
+
+        if (popupRef.current && popupRef.current.isOpen()) {
+            map.closePopup();
+        }
+
+        const isPin = 'lat' in item;
+        const latlng = isPin ? L.latLng(item.lat, item.lng) : L.latLng((item.path[0].lat + item.path[1].lat) / 2, (item.path[0].lng + item.path[1].lng) / 2);
+        
+        const formId = `edit-form-${item.id}`;
+        
+        let coordsHtml = '';
+        if (isPin) {
+            coordsHtml = `<p class="text-xs text-muted-foreground">Lat: ${item.lat.toFixed(4)}, Lng: ${item.lng.toFixed(4)}</p>`;
+        } else {
+            const startPoint = L.latLng(item.path[0].lat, item.path[0].lng);
+            const endPoint = L.latLng(item.path[item.path.length - 1].lat, item.path[item.path.length - 1].lng);
+            const distance = startPoint.distanceTo(endPoint);
+
+            coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
+                <p>Start: ${item.path[0].lat.toFixed(4)}, ${item.path[0].lng.toFixed(4)}</p>
+                <p>End: ${item.path[item.path.length - 1].lat.toFixed(4)}, ${item.path[item.path.length - 1].lng.toFixed(4)}</p>
+                <p class="font-semibold">Distance: ${distance.toFixed(2)} meters</p>
+            </div>`;
+        }
+
+        const labelVisible = item.labelVisible !== false;
+
+        const content = `
+            <form id="${formId}" class="flex flex-col gap-2">
+                <input type="text" name="label" value="${item.label}" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
+                <textarea name="notes" placeholder="Add notes..." class="p-2 border rounded-md text-sm bg-background text-foreground border-border min-h-[60px]">${item.notes || ''}</textarea>
+                ${coordsHtml}
+                <div class="flex justify-between items-center gap-2">
+                    <button type="button" class="toggle-label-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${labelVisible ? 'Hide' : 'Show'} Label</button>
+                    <div class="flex gap-2">
+                        <button type="button" class="delete-btn px-3 py-1 text-sm rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/80">Delete</button>
+                        <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
+                    </div>
+                </div>
+            </form>
+        `;
+
+        popupRef.current = L.popup({ closeButton: true, closeOnClick: true, className: 'p-0' })
+            .setLatLng(latlng)
+            .setContent(content)
+            .openOn(map);
+
+        const handleCleanup = () => {
+            onEditItem(null);
+        };
+        
+        popupRef.current.on('remove', handleCleanup);
+
+        setTimeout(() => {
+            const form = document.getElementById(formId);
+            const deleteButton = form?.querySelector('.delete-btn');
+            const toggleLabelButton = form?.querySelector('.toggle-label-btn');
+
+            form?.addEventListener('submit', (ev) => {
+                ev.preventDefault();
+                const formElements = (ev.target as HTMLFormElement).elements;
+                const labelInput = formElements.namedItem('label') as HTMLInputElement;
+                const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
+                if (isPin) {
+                    onUpdatePin(item.id, labelInput.value, notesInput.value);
+                } else {
+                    onUpdateLine(item.id, labelInput.value, notesInput.value);
+                }
+                map.closePopup();
+            });
+
+            deleteButton?.addEventListener('click', () => {
+                if (isPin) {
+                    onDeletePin(item.id);
+                } else {
+                    onDeleteLine(item.id);
+                }
+                map.closePopup();
+            });
+
+            toggleLabelButton?.addEventListener('click', () => {
+                onToggleLabel(item.id, isPin ? 'pin' : 'line');
+                map.closePopup();
+            });
+        }, 0);
+    };
+
+    useEffect(() => {
+        if(itemToEdit && mapRef.current) {
+            showEditPopup(itemToEdit);
+        } else if (!itemToEdit && mapRef.current && popupRef.current && popupRef.current.isOpen()) {
+            mapRef.current.closePopup(popupRef.current);
+        }
+    }, [itemToEdit])
 
     useEffect(() => {
         if (typeof window.L === 'undefined') return;
@@ -454,7 +560,9 @@ const Map = ({
             lineLayerRef.current = L.layerGroup().addTo(map);
             
             map.on('move', () => {
-                onMove(map.getCenter());
+                if (mapRef.current) {
+                    onMove(mapRef.current.getCenter());
+                }
             });
 
             map.locate({ watch: true, setView: false });
@@ -486,12 +594,17 @@ const Map = ({
             const markerIcon = createCustomIcon(`hsl(${accentColor})`);
 
             pins.forEach(pin => {
-                L.marker([pin.lat, pin.lng], { icon: markerIcon })
-                  .bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' })
-                  .addTo(layer);
+                const marker = L.marker([pin.lat, pin.lng], { icon: markerIcon }).addTo(layer);
+                if (pin.labelVisible !== false) {
+                    marker.bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' });
+                }
+                marker.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    onEditItem(pin)
+                });
             });
         }
-    }, [pins]);
+    }, [pins, onEditItem]);
 
     useEffect(() => {
         if (lineLayerRef.current && typeof window.L !== 'undefined') {
@@ -503,26 +616,28 @@ const Map = ({
                 const latlngs = line.path.map(p => [p.lat, p.lng] as LatLngExpression);
                 if (latlngs.length < 2) return;
 
-                const poly = L.polyline(latlngs, {
+                const polyline = L.polyline(latlngs, {
                     color: `hsl(${primaryColor})`,
                     weight: 4,
                     opacity: 0.8
                 }).addTo(layer);
 
-                if(line.label) {
+                if(line.label && line.labelVisible !== false) {
                     const midIndex = Math.floor(latlngs.length / 2);
-                    L.tooltip({
+                    polyline.bindTooltip(line.label, {
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
                     })
-                    .setLatLng(latlngs[midIndex] as LatLng)
-                    .setContent(line.label)
-                    .addTo(layer);
+                    .setLatLng(latlngs[midIndex] as LatLng);
                 }
+                polyline.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    onEditItem(line)
+                });
             });
         }
-    }, [lines]);
+    }, [lines, onEditItem]);
 
 
     useEffect(() => {
@@ -550,22 +665,37 @@ const Map = ({
     }, [currentLocation]);
 
     useEffect(() => {
-        if (mapRef.current && isDrawingLine && lineStartPoint) {
-            if (!previewLineRef.current) {
-                previewLineRef.current = L.polyline([lineStartPoint, mapRef.current.getCenter()], {
-                    color: 'hsl(var(--primary))',
-                    weight: 4,
-                    opacity: 0.8,
-                    dashArray: '5, 10',
-                }).addTo(mapRef.current);
-            } else {
-                previewLineRef.current.setLatLngs([lineStartPoint, mapRef.current.getCenter()]);
-            }
+        const map = mapRef.current;
+        if (map && isDrawingLine && lineStartPoint) {
+            const updatePreviewLine = () => {
+                const center = map.getCenter();
+                if (previewLineRef.current) {
+                    previewLineRef.current.setLatLngs([lineStartPoint, center]);
+                } else {
+                    previewLineRef.current = L.polyline([lineStartPoint, center], {
+                        color: 'hsl(var(--primary))',
+                        weight: 4,
+                        opacity: 0.8,
+                        dashArray: '5, 10',
+                    }).addTo(map);
+                }
+            };
+            
+            map.on('move', updatePreviewLine);
+            updatePreviewLine(); // Initial draw
+
+            return () => {
+                map.off('move', updatePreviewLine);
+                if (previewLineRef.current) {
+                    previewLineRef.current.remove();
+                    previewLineRef.current = null;
+                }
+            };
         } else if (previewLineRef.current) {
             previewLineRef.current.remove();
             previewLineRef.current = null;
         }
-    }, [isDrawingLine, lineStartPoint, onMove]);
+    }, [isDrawingLine, lineStartPoint]);
 
     const showPopup = (latlng: LatLng, type: 'pin' | 'line', path?: LatLng[]) => {
         const map = mapRef.current;
@@ -579,6 +709,7 @@ const Map = ({
         const content = `
             <form id="${formId}" class="flex flex-col gap-2">
                 <input type="text" name="label" placeholder="Enter label" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
+                <textarea name="notes" placeholder="Add notes..." class="p-2 border rounded-md text-sm bg-background text-foreground border-border min-h-[60px]"></textarea>
                 <div class="flex justify-end gap-2">
                     <button type="button" class="cancel-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Cancel</button>
                     <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
@@ -597,7 +728,12 @@ const Map = ({
             if (type === 'line') onLineCancel();
         };
 
+        const cleanup = () => {
+            popupRef.current?.off('remove', handleCancel);
+        }
+
         popupRef.current.on('remove', handleCancel);
+
 
         setTimeout(() => {
             const form = document.getElementById(formId);
@@ -605,18 +741,24 @@ const Map = ({
 
             form?.addEventListener('submit', (ev) => {
                 ev.preventDefault();
-                const input = (ev.target as HTMLFormElement).elements.namedItem('label') as HTMLInputElement;
+                cleanup();
+                const formElements = (ev.target as HTMLFormElement).elements;
+                const labelInput = formElements.namedItem('label') as HTMLInputElement;
+                const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
                 const newId = `${type}-${Date.now()}`;
                 
                 if (type === 'pin') {
-                    onPinSave(newId, input.value, latlng.lat, latlng.lng);
+                    onPinSave(newId, labelInput.value, latlng.lat, latlng.lng, notesInput.value);
                 } else if (type === 'line' && path) {
-                    onLineSave(newId, input.value, path);
+                    onLineSave(newId, labelInput.value, path, notesInput.value);
                 }
                 map.closePopup();
             });
 
-            cancelButton?.addEventListener('click', handleCancel);
+            cancelButton?.addEventListener('click', () => {
+                cleanup();
+                handleCancel();
+            });
         }, 0);
     };
 
@@ -629,13 +771,9 @@ const Map = ({
 
             const cleanup = () => {
                 tempMarker.remove();
-                if (popupRef.current) {
-                    popupRef.current.off('remove', cleanup);
-                }
+                popupRef.current?.off('remove', cleanup);
             }
-            if (popupRef.current) {
-                popupRef.current.on('remove', cleanup);
-            }
+            popupRef.current?.on('remove', cleanup);
         }
     }, [pendingPin]);
 
@@ -659,7 +797,6 @@ export default Map;
 ---
 ## `src/components/MapExplorer.tsx`
 ```tsx
-
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -668,13 +805,16 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Minus, Plus, Edit, Trash2, Save } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Card } from '@/components/ui/card';
 
 
 const Map = dynamic(() => import('@/components/Map'), {
@@ -682,8 +822,8 @@ const Map = dynamic(() => import('@/components/Map'), {
   loading: () => <div className="w-full h-full bg-muted flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>,
 });
 
-type Pin = { id: string; lat: number; lng: number; label: string };
-type Line = { id: string; path: { lat: number; lng: number }[]; label: string };
+type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; };
+type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; };
 
 export default function MapExplorer() {
   const [log, setLog] = useState<string[]>(['App Initialized']);
@@ -701,6 +841,8 @@ export default function MapExplorer() {
   const [isDrawingLine, setIsDrawingLine] = useState(false);
   const [lineStartPoint, setLineStartPoint] = useState<LatLng | null>(null);
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLng | null>(null);
+  const [isObjectListOpen, setIsObjectListOpen] = useState(false);
+  const [itemToEdit, setItemToEdit] = useState<Pin | Line | null>(null);
 
   const { toast } = useToast();
   
@@ -788,21 +930,67 @@ export default function MapExplorer() {
     }
   };
 
-  const handlePinSave = (id: string, label: string, lat: number, lng: number) => {
-    const newPin: Pin = { id, lat, lng, label };
+  const handlePinSave = (id: string, label: string, lat: number, lng: number, notes: string) => {
+    const newPin: Pin = { id, lat, lng, label, labelVisible: true, notes };
     setPins(prev => [...prev, newPin]);
     setPendingPin(null);
   };
 
-  const handleLineSave = (id: string, label: string, path: LatLng[]) => {
+  const handleLineSave = (id: string, label: string, path: LatLng[], notes: string) => {
       const newLine: Line = {
           id,
           path: path.map(p => ({ lat: p.lat, lng: p.lng })),
           label,
+          labelVisible: true,
+          notes,
       };
       setLines(prev => [...prev, newLine]);
       setPendingLine(null);
   };
+
+  const handleUpdatePin = (id: string, label: string, notes: string) => {
+    setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes } : p));
+    setItemToEdit(null);
+  };
+
+  const handleDeletePin = (id: string) => {
+    setPins(prev => prev.filter(p => p.id !== id));
+    setItemToEdit(null);
+  };
+  
+  const handleUpdateLine = (id: string, label: string, notes: string) => {
+    setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes } : l));
+    setItemToEdit(null);
+  };
+  
+  const handleDeleteLine = (id: string) => {
+    setLines(prev => prev.filter(l => l.id !== id));
+    setItemToEdit(null);
+  };
+
+  const handleToggleLabel = (id: string, type: 'pin' | 'line') => {
+    if (type === 'pin') {
+      setPins(pins.map(p => p.id === id ? { ...p, labelVisible: !(p.labelVisible ?? true) } : p));
+    } else {
+      setLines(lines.map(l => l.id === id ? { ...l, labelVisible: !(l.labelVisible ?? true) } : l));
+    }
+    setItemToEdit(null);
+  };
+
+  const handleViewItem = (item: Pin | Line) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if ('lat' in item) {
+      map.setView([item.lat, item.lng], 17);
+    } else {
+       map.fitBounds(item.path.map(p => [p.lat, p.lng]) as [[number, number]]);
+    }
+    setIsObjectListOpen(false);
+  }
+
+  const handleEditItem = (item: Pin | Line | null) => {
+    setItemToEdit(item);
+  }
 
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
@@ -827,11 +1015,68 @@ export default function MapExplorer() {
               pendingLine={pendingLine}
               onLineSave={handleLineSave}
               onLineCancel={() => setPendingLine(null)}
+              onUpdatePin={handleUpdatePin}
+              onDeletePin={handleDeletePin}
+              onUpdateLine={handleUpdateLine}
+              onDeleteLine={handleDeleteLine}
+              onToggleLabel={handleToggleLabel}
+              itemToEdit={itemToEdit}
+              onEditItem={handleEditItem}
             />
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
                 <Plus className="h-8 w-8 text-blue-500" />
             </div>
+
+            {isObjectListOpen && (
+              <Card className="absolute top-4 left-4 z-[1001] w-[350px] sm:w-[400px] h-[calc(100%-2rem)] flex flex-col bg-card/90 backdrop-blur-sm">
+                <div className="p-4 border-b flex justify-between items-center">
+                    <h2 className="text-lg font-semibold">Map Objects</h2>
+                    <Button variant="ghost" size="icon" onClick={() => setIsObjectListOpen(false)} className="h-8 w-8">
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+                <TooltipProvider>
+                  <ScrollArea className="flex-1">
+                      <div className="p-4">
+                          <h3 className="text-lg font-semibold mb-2">Pins</h3>
+                          {pins.length > 0 ? (
+                              <ul className="space-y-2">
+                                  {pins.map(pin => (
+                                      <li key={pin.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                          <span className="font-medium truncate pr-2">{pin.label}</span>
+                                          <div className="flex items-center gap-1">
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(pin)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(pin)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePin(pin.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                          </div>
+                                      </li>
+                                  ))}
+                              </ul>
+                          ) : <p className="text-sm text-muted-foreground">No pins added yet.</p>}
+                          
+                          <Separator className="my-4" />
+
+                          <h3 className="text-lg font-semibold mb-2">Lines</h3>
+                          {lines.length > 0 ? (
+                              <ul className="space-y-2">
+                                  {lines.map(line => (
+                                      <li key={line.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                          <span className="font-medium truncate pr-2">{line.label}</span>
+                                          <div className="flex items-center gap-1">
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(line)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(line)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(line.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                          </div>
+                                      </li>
+                                  ))}
+                              </ul>
+                          ) : <p className="text-sm text-muted-foreground">No lines drawn yet.</p>}
+                      </div>
+                  </ScrollArea>
+                </TooltipProvider>
+              </Card>
+            )}
 
             <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
                 <TooltipProvider>
@@ -846,10 +1091,22 @@ export default function MapExplorer() {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawLine}>
-                                <Minus className="h-6 w-6" />
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 stroke-current">
+                                    <path d="M4 20L20 4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <circle cx="3.5" cy="20.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
+                                    <circle cx="20.5" cy="3.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
+                                </svg>
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Draw a Line</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={() => setIsObjectListOpen(true)}>
+                                <Menu className="h-6 w-6" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>List Objects</p></TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
             </div>
