@@ -447,7 +447,7 @@ const Map = ({
         }
 
         const isPin = 'lat' in item;
-        const latlng = isPin ? L.latLng(item.lat, item.lng) : L.latLng((item.path[0].lat + item.path[1].lat) / 2, (item.path[0].lng + item.path[1].lng) / 2);
+        const latlng = isPin ? L.latLng(item.lat, item.lng) : L.latLng((item.path[0].lat + item.path[item.path.length - 1].lat) / 2, (item.path[0].lng + item.path[item.path.length - 1].lng) / 2);
         
         const formId = `edit-form-${item.id}`;
         
@@ -624,12 +624,12 @@ const Map = ({
 
                 if(line.label && line.labelVisible !== false) {
                     const midIndex = Math.floor(latlngs.length / 2);
+                    const midPoint = latlngs[midIndex] as LatLngExpression;
                     polyline.bindTooltip(line.label, {
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
-                    })
-                    .setLatLng(latlngs[midIndex] as LatLng);
+                    }).setLatLng(midPoint);
                 }
                 polyline.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
@@ -803,9 +803,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { LatLng, LatLngExpression, Map as LeafletMap } from 'leaflet';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -843,6 +844,8 @@ export default function MapExplorer() {
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLng | null>(null);
   const [isObjectListOpen, setIsObjectListOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<Pin | Line | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   const { toast } = useToast();
   
@@ -992,6 +995,62 @@ export default function MapExplorer() {
     setItemToEdit(item);
   }
 
+  const handleSearch = async () => {
+    if (!searchQuery) return;
+    addLog(`Searching for: ${searchQuery}`);
+    setIsSearching(true);
+    const map = mapRef.current;
+    if (!map) {
+        setIsSearching(false);
+        return;
+    }
+
+    // Check for lat,lng
+    const latLngRegex = /^(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)$/;
+    const match = searchQuery.match(latLngRegex);
+    if (match) {
+        const lat = parseFloat(match[1]);
+        const lng = parseFloat(match[2]);
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            addLog(`Found coordinates. Panning to ${lat}, ${lng}`);
+            map.setView([lat, lng], 15);
+            setIsSearching(false);
+            return;
+        }
+    }
+
+    // Check for pin/line label
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    const item = [...pins, ...lines].find(i => i.label.toLowerCase() === lowerCaseQuery);
+    if (item) {
+        addLog(`Found object with label: ${item.label}`);
+        handleViewItem(item);
+        setIsSearching(false);
+        return;
+    }
+
+    // Geocode address
+    try {
+        addLog(`No object found. Attempting to geocode address: ${searchQuery}`);
+        const result = await geocodeAddress({ address: searchQuery });
+        if (result.latitude && result.longitude) {
+            addLog(`Geocoding successful. Panning to ${result.latitude}, ${result.longitude}`);
+            map.setView([result.latitude, result.longitude], 15);
+        } else {
+            throw new Error('Geocoding failed to return coordinates.');
+        }
+    } catch (error) {
+        addLog(`Error during geocoding: ${(error as Error).message}`);
+        toast({
+            variant: "destructive",
+            title: "Search Failed",
+            description: `Could not find a location or object for "${searchQuery}".`,
+        });
+    } finally {
+        setIsSearching(false);
+    }
+  };
+
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
        
@@ -1121,41 +1180,56 @@ export default function MapExplorer() {
             )}
 
             <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="default" 
-                      size="icon" 
-                      className="h-12 w-12 rounded-full shadow-lg"
-                      onClick={handleLocateMe}
-                      disabled={isLocating && !currentLocation}
-                    >
-                      {isLocating && !currentLocation ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
+                <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
+                    <Input
+                        type="text"
+                        placeholder="Search address or label..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                        className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                    />
+                    <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching} className="h-9 w-9">
+                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                     </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Center on Me</p>
-                  </TooltipContent>
-                </Tooltip>
-
-                <div className="flex flex-col gap-1 bg-background rounded-full shadow-lg border">
-                   <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={handleZoomIn}>
-                            <ZoomIn className="h-5 w-5" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left"><p>Zoom In</p></TooltipContent>
-                  </Tooltip>
+                </div>
+              <TooltipProvider>
+                <div className="flex gap-2 justify-end">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={handleZoomOut}>
-                          <ZoomOut className="h-5 w-5" />
+                      <Button 
+                        variant="default" 
+                        size="icon" 
+                        className="h-12 w-12 rounded-full shadow-lg"
+                        onClick={handleLocateMe}
+                        disabled={isLocating && !currentLocation}
+                      >
+                        {isLocating && !currentLocation ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="left"><p>Zoom Out</p></TooltipContent>
+                    <TooltipContent>
+                      <p>Center on Me</p>
+                    </TooltipContent>
                   </Tooltip>
+
+                  <div className="flex flex-col gap-1 bg-background rounded-full shadow-lg border">
+                     <Tooltip>
+                      <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={handleZoomIn}>
+                              <ZoomIn className="h-5 w-5" />
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left"><p>Zoom In</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={handleZoomOut}>
+                            <ZoomOut className="h-5 w-5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left"><p>Zoom Out</p></TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
               </TooltipProvider>
             </div>
@@ -3008,7 +3082,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
       <input
         type={type}
         className={cn(
-          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          "flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
           className
         )}
         ref={ref}
@@ -3235,7 +3309,7 @@ const MenubarRadioItem = React.forwardRef<
   <MenubarPrimitive.RadioItem
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
     {...props}
@@ -3320,7 +3394,6 @@ export {
 ---
 ## `src/components/ui/popover.tsx`
 ```tsx
-
 "use client"
 
 import * as React from "react"
