@@ -109,6 +109,8 @@ const Map = ({
             coordsHtml = `<p class="text-xs text-muted-foreground">Lat: ${item.lat.toFixed(4)}, Lng: ${item.lng.toFixed(4)}</p>`;
         } else if ('path' in item) {
             if (isArea) {
+                const pointsHtml = item.path.map((p, i) => `<li>Point ${i+1}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</li>`).join('');
+                
                 let areaHtml = '';
                 if (L.GeometryUtil) {
                     const polygonForArea = L.polygon(item.path.map(p => [p.lat, p.lng] as LatLngExpression));
@@ -116,7 +118,6 @@ const Map = ({
                     const areaHectares = areaMeters / 10000;
                     areaHtml = `<p class="font-semibold mt-2">Area: ${areaHectares.toFixed(4)} hectares</p>`;
                 }
-                const pointsHtml = item.path.map((p, i) => `<li>Point ${i+1}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</li>`).join('');
                 
                 coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
                     <ul class="list-disc pl-4 max-h-20 overflow-y-auto">${pointsHtml}</ul>
@@ -162,7 +163,7 @@ const Map = ({
             </form>
         `;
 
-        popupRef.current = L.popup({ closeButton: true, closeOnClick: true, className: 'p-0', maxHeight: 250 })
+        popupRef.current = L.popup({ closeButton: true, closeOnClick: true, className: 'p-0', maxHeight: 300 })
             .setLatLng(latlng)
             .setContent(content)
             .openOn(map);
