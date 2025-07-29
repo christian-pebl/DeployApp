@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, CornerUpLeft, FolderPlus, FolderKanban, Folder, FolderSymlink, Trash } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, CornerUpLeft, FolderPlus, FolderKanban, Folder, FolderSymlink, Trash, ChevronsUpDown } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -26,6 +26,11 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Dialog,
   DialogContent,
@@ -96,7 +101,7 @@ export default function MapExplorer() {
   const [isManageProjectsDialogOpen, setIsManageProjectsDialogOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const [viewedProjectId, setViewedProjectId] = useState<string | null>(null);
-
+  const [isProjectFilterOpen, setIsProjectFilterOpen] = useState(false);
 
   const { toast } = useToast();
   
@@ -497,6 +502,53 @@ export default function MapExplorer() {
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
+
+                <div className="p-4 border-b space-y-2">
+                    <h3 className="text-md font-semibold">Projects</h3>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => setIsNewProjectDialogOpen(true)}>
+                            <FolderPlus className="mr-2 h-4 w-4"/> New Project
+                        </Button>
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => setIsManageProjectsDialogOpen(true)}>
+                            <FolderKanban className="mr-2 h-4 w-4"/> Manage
+                        </Button>
+                    </div>
+                     <Popover open={isProjectFilterOpen} onOpenChange={setIsProjectFilterOpen}>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={isProjectFilterOpen}
+                                className="w-full justify-between"
+                            >
+                                {viewedProjectId ? projects.find(p => p.id === viewedProjectId)?.name : "Filter by project..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[320px] p-0">
+                           <div
+                                className="flex items-center justify-between px-3 py-2 text-sm font-medium border-b cursor-pointer hover:bg-accent"
+                                onClick={() => { setViewedProjectId(null); setIsProjectFilterOpen(false); }}
+                            >
+                                Show All Objects
+                                {viewedProjectId === null && <Check className="h-4 w-4" />}
+                           </div>
+                           <ScrollArea className="h-[200px]">
+                            {projects.map((project) => (
+                                <div
+                                    key={project.id}
+                                    className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                                    onClick={() => { setViewedProjectId(project.id); setIsProjectFilterOpen(false); }}
+                                >
+                                    {project.name}
+                                    {viewedProjectId === project.id && <Check className="h-4 w-4" />}
+                                </div>
+                            ))}
+                           </ScrollArea>
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                
                 <TooltipProvider>
                   <ScrollArea className="flex-1">
                       <div className="p-4">
@@ -514,7 +566,7 @@ export default function MapExplorer() {
                                       </li>
                                   ))}
                               </ul>
-                          ) : <p className="text-sm text-muted-foreground">No pins added yet.</p>}
+                          ) : <p className="text-sm text-muted-foreground">No pins found.</p>}
                           
                           <Separator className="my-4" />
 
@@ -532,12 +584,12 @@ export default function MapExplorer() {
                                       </li>
                                   ))}
                               </ul>
-                          ) : <p className="text-sm text-muted-foreground">No lines drawn yet.</p>}
+                          ) : <p className="text-sm text-muted-foreground">No lines found.</p>}
                           
                           <Separator className="my-4" />
 
                           <h3 className="text-lg font-semibold mb-2">Areas</h3>
-                          {displayedAreas.length > 0 ? (
+                          {areas.length > 0 ? (
                               <ul className="space-y-2">
                                   {displayedAreas.map(area => (
                                       <li key={area.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
@@ -550,7 +602,7 @@ export default function MapExplorer() {
                                       </li>
                                   ))}
                               </ul>
-                          ) : <p className="text-sm text-muted-foreground">No areas drawn yet.</p>}
+                          ) : <p className="text-sm text-muted-foreground">No areas found.</p>}
                       </div>
                   </ScrollArea>
                 </TooltipProvider>
@@ -558,57 +610,6 @@ export default function MapExplorer() {
             )}
 
             <div className="absolute top-4 left-4 z-[1001] flex flex-col gap-2">
-                <DropdownMenu>
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg">
-                                        <Folder className="h-6 w-6" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Projects</p>
-                                {activeProject && <p className="text-muted-foreground text-xs">Active: {activeProject.name}</p>}
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                    <DropdownMenuContent className="w-56">
-                        <DropdownMenuLabel>Projects</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setIsNewProjectDialogOpen(true)}>
-                            <FolderPlus className="mr-2 h-4 w-4" />
-                            <span>New Project...</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setIsManageProjectsDialogOpen(true)}>
-                             <FolderKanban className="mr-2 h-4 w-4" />
-                            <span>Manage Projects...</span>
-                        </DropdownMenuItem>
-                         <DropdownMenuSeparator />
-                        <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>
-                                <FolderSymlink className="mr-2 h-4 w-4" />
-                                <span>Select Active Project</span>
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                                <DropdownMenuItem onClick={() => setActiveProjectId(null)}>
-                                    {activeProjectId === null && <Check className="mr-2 h-4 w-4"/>}
-                                    <span className={activeProjectId === null ? 'pl-0' : 'pl-6'}>None</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator/>
-                                {projects.map(project => (
-                                    <DropdownMenuItem key={project.id} onClick={() => setActiveProjectId(project.id)}>
-                                        {activeProjectId === project.id && <Check className="mr-2 h-4 w-4"/>}
-                                        <span className={activeProjectId === project.id ? 'pl-0' : 'pl-6'}>{project.name}</span>
-                                    </DropdownMenuItem>
-                                ))}
-                                {projects.length === 0 && <DropdownMenuLabel className="text-xs text-muted-foreground text-center">No projects yet.</DropdownMenuLabel>}
-                            </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -678,14 +679,29 @@ export default function MapExplorer() {
                 </div>
             )}
             
-            {viewedProjectId && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-card/80 backdrop-blur-sm p-2 rounded-lg shadow-lg border flex items-center gap-2">
-                    <p className="font-semibold text-sm">Viewing: {projects.find(p => p.id === viewedProjectId)?.name}</p>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setViewedProjectId(null)}>
-                        <X className="h-4 w-4"/>
-                    </Button>
-                </div>
-            )}
+            <div className="absolute bottom-4 left-4 z-[1000] bg-card/80 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
+                <p className="font-semibold text-sm">
+                    Active Project: {activeProject ? activeProject.name : 'None'}
+                </p>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="mt-1 text-xs">Change Active Project</Button>
+                    </DropdownMenuTrigger>
+                     <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => setActiveProjectId(null)}>
+                            {activeProjectId === null ? <Check className="mr-2 h-4 w-4"/> : <div className="mr-2 h-4 w-4"/>}
+                            <span>None</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator/>
+                        {projects.map(project => (
+                            <DropdownMenuItem key={project.id} onClick={() => setActiveProjectId(project.id)}>
+                                {activeProjectId === project.id ? <Check className="mr-2 h-4 w-4"/> : <div className="mr-2 h-4 w-4"/>}
+                                <span>{project.name}</span>
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
 
             <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
                 <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
