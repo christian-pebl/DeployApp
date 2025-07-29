@@ -143,6 +143,22 @@ export default function MapExplorer() {
       setPendingLine(null);
   };
 
+  const handleUpdatePin = (id: string, label: string) => {
+    setPins(prev => prev.map(p => p.id === id ? { ...p, label } : p));
+  };
+
+  const handleDeletePin = (id: string) => {
+    setPins(prev => prev.filter(p => p.id !== id));
+  };
+  
+  const handleUpdateLine = (id: string, label: string) => {
+    setLines(prev => prev.map(l => l.id === id ? { ...l, label } : l));
+  };
+  
+  const handleDeleteLine = (id: string) => {
+    setLines(prev => prev.filter(l => l.id !== id));
+  };
+
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
        
@@ -166,6 +182,10 @@ export default function MapExplorer() {
               pendingLine={pendingLine}
               onLineSave={handleLineSave}
               onLineCancel={() => setPendingLine(null)}
+              onUpdatePin={handleUpdatePin}
+              onDeletePin={handleDeletePin}
+              onUpdateLine={handleUpdateLine}
+              onDeleteLine={handleDeleteLine}
             />
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">

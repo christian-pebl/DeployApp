@@ -25,6 +25,10 @@ interface MapProps {
     pendingLine: { path: LatLng[] } | null;
     onLineSave: (id: string, label: string, path: LatLng[]) => void;
     onLineCancel: () => void;
+    onUpdatePin: (id: string, label: string) => void;
+    onDeletePin: (id: string) => void;
+    onUpdateLine: (id: string, label: string) => void;
+    onDeleteLine: (id: string) => void;
 }
 
 
@@ -46,7 +50,8 @@ const Map = ({
     mapRef, center, zoom, pins, lines, currentLocation, 
     onLocationFound, onLocationError, onMove, isDrawingLine, lineStartPoint,
     pendingPin, onPinSave, onPinCancel,
-    pendingLine, onLineSave, onLineCancel
+    pendingLine, onLineSave, onLineCancel,
+    onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine
 }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
@@ -54,6 +59,71 @@ const Map = ({
     const previewLineRef = useRef<Polyline | null>(null);
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
     const popupRef = useRef<Popup | null>(null);
+
+    const showEditPopup = (item: Pin | Line) => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        if (popupRef.current && popupRef.current.isOpen()) {
+            map.closePopup();
+        }
+
+        const isPin = 'lat' in item;
+        const latlng = isPin ? L.latLng(item.lat, item.lng) : L.latLng((item.path[0].lat + item.path[1].lat) / 2, (item.path[0].lng + item.path[1].lng) / 2);
+        
+        const formId = `edit-form-${item.id}`;
+        
+        let coordsHtml = '';
+        if (isPin) {
+            coordsHtml = `<p class="text-xs text-muted-foreground">Lat: ${item.lat.toFixed(4)}, Lng: ${item.lng.toFixed(4)}</p>`;
+        } else {
+            coordsHtml = `<div class="text-xs text-muted-foreground">
+                <p>Start: ${item.path[0].lat.toFixed(4)}, ${item.path[0].lng.toFixed(4)}</p>
+                <p>End: ${item.path[1].lat.toFixed(4)}, ${item.path[1].lng.toFixed(4)}</p>
+            </div>`;
+        }
+
+        const content = `
+            <form id="${formId}" class="flex flex-col gap-2">
+                <input type="text" name="label" value="${item.label}" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
+                ${coordsHtml}
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="delete-btn px-3 py-1 text-sm rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/80">Delete</button>
+                    <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
+                </div>
+            </form>
+        `;
+
+        popupRef.current = L.popup({ closeButton: true, closeOnClick: true, className: 'p-0' })
+            .setLatLng(latlng)
+            .setContent(content)
+            .openOn(map);
+        
+        setTimeout(() => {
+            const form = document.getElementById(formId);
+            const deleteButton = form?.querySelector('.delete-btn');
+
+            form?.addEventListener('submit', (ev) => {
+                ev.preventDefault();
+                const input = (ev.target as HTMLFormElement).elements.namedItem('label') as HTMLInputElement;
+                if (isPin) {
+                    onUpdatePin(item.id, input.value);
+                } else {
+                    onUpdateLine(item.id, input.value);
+                }
+                map.closePopup();
+            });
+
+            deleteButton?.addEventListener('click', () => {
+                if (isPin) {
+                    onDeletePin(item.id);
+                } else {
+                    onDeleteLine(item.id);
+                }
+                map.closePopup();
+            });
+        }, 0);
+    };
 
     useEffect(() => {
         if (typeof window.L === 'undefined') return;
@@ -113,9 +183,10 @@ const Map = ({
             const markerIcon = createCustomIcon(`hsl(${accentColor})`);
 
             pins.forEach(pin => {
-                L.marker([pin.lat, pin.lng], { icon: markerIcon })
+                const marker = L.marker([pin.lat, pin.lng], { icon: markerIcon })
                   .bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' })
                   .addTo(layer);
+                marker.on('click', () => showEditPopup(pin));
             });
         }
     }, [pins]);
@@ -143,6 +214,7 @@ const Map = ({
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
                     });
                 }
+                polyline.on('click', () => showEditPopup(line));
             });
         }
     }, [lines]);
