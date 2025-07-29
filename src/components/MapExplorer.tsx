@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Minus, Plus, Edit, Trash2, Save } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Edit, Trash2, Save } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -185,7 +185,11 @@ export default function MapExplorer() {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawLine}>
-                                <Minus className="h-6 w-6" />
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 stroke-current">
+                                    <path d="M4 20L20 4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <circle cx="3.5" cy="20.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
+                                    <circle cx="20.5" cy="3.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
+                                </svg>
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Draw a Line</p></TooltipContent>
@@ -194,13 +198,8 @@ export default function MapExplorer() {
             </div>
             
             {isDrawingLine && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-background/80 p-2 rounded-md shadow-md">
-                    <p className="text-sm font-semibold">Pan map to draw line</p>
-                </div>
-            )}
-             {isDrawingLine && (
                 <Button 
-                    className="absolute bottom-24 right-4 z-[1000] h-12 rounded-full shadow-lg"
+                    className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
                     onClick={handleConfirmLine}
                 >
                     <Check className="mr-2 h-5 w-5" /> Confirm Line
