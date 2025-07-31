@@ -22,8 +22,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -94,7 +92,6 @@ export default function MapExplorer() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
-  const [isManageProjectsDialogOpen, setIsManageProjectsDialogOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(['all']);
 
@@ -521,6 +518,10 @@ useEffect(() => {
         if (newSelection.length === allPossibleSelections.length) {
             return ['all'];
         }
+        
+        if (newSelection.length === 0) {
+            return ['all'];
+        }
 
         return newSelection;
     });
@@ -625,109 +626,152 @@ useEffect(() => {
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
-
+                
                 <div className="p-4 border-b space-y-2">
-                    <h3 className="text-md font-semibold">Projects</h3>
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => setIsNewProjectDialogOpen(true)}>
-                            <FolderPlus className="mr-2 h-4 w-4"/> New Project
-                        </Button>
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => setIsManageProjectsDialogOpen(true)}>
-                            <FolderKanban className="mr-2 h-4 w-4"/> Manage
+                    <div className='flex justify-between items-center'>
+                        <h3 className="text-md font-semibold">Projects</h3>
+                        <Button variant="outline" size="sm" onClick={() => setIsNewProjectDialogOpen(true)}>
+                            <FolderPlus className="mr-2 h-4 w-4"/> New
                         </Button>
                     </div>
-                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="w-full">Filter by project</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56" align="start">
-                            <DropdownMenuLabel>Visible Projects</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                             <DropdownMenuCheckboxItem
+                     <div className="border-t -mx-4 px-4 pt-4 mt-2">
+                        <div className="flex items-center space-x-2">
+                            <Checkbox 
+                                id="toggle-all-visibility" 
                                 checked={selectedProjectIds.includes('all')}
                                 onCheckedChange={() => handleProjectSelection('all')}
-                                onSelect={(e) => e.preventDefault()}
+                            />
+                            <label
+                                htmlFor="toggle-all-visibility"
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                             >
                                 All Projects
-                            </DropdownMenuCheckboxItem>
-                            <DropdownMenuSeparator />
-                            {projects.map((project) => (
-                                <DropdownMenuCheckboxItem
-                                    key={project.id}
-                                    checked={selectedProjectIds.includes('all') || selectedProjectIds.includes(project.id)}
-                                    onCheckedChange={() => handleProjectSelection(project.id)}
-                                    onSelect={(e) => e.preventDefault()}
-                                >
-                                    {project.name}
-                                </DropdownMenuCheckboxItem>
+                            </label>
+                        </div>
+                    </div>
+                    <ScrollArea className="h-32 -mx-4 px-4">
+                        <ul className="space-y-2 pt-2">
+                            {projects.map(project => (
+                                <li key={project.id} className="flex items-center justify-between p-2 rounded-md border bg-card/50">
+                                    <div className="flex items-center gap-3 truncate pr-2">
+                                        <Checkbox
+                                            id={`vis-${project.id}`}
+                                            checked={selectedProjectIds.includes('all') || selectedProjectIds.includes(project.id)}
+                                            onCheckedChange={() => handleProjectSelection(project.id)}
+                                        />
+                                        <div className="space-y-0.5">
+                                            <label htmlFor={`vis-${project.id}`} className="font-medium text-sm cursor-pointer">{project.name}</label>
+                                            <p className="text-xs text-muted-foreground">{getObjectCountForProject(project.id)} objects</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                                            setProjectToEdit(project)
+                                        }}><Pencil className="h-4 w-4"/></Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent className="z-[1004]">
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        This will permanently delete the project "{project.name}" and all {getObjectCountForProject(project.id)} of its associated map objects. This action cannot be undone.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteProject(project.id)}>Delete</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                </li>
                             ))}
-                            {unassignedObjectCount > 0 && (
-                                <DropdownMenuCheckboxItem
-                                    checked={selectedProjectIds.includes('all') || selectedProjectIds.includes('unassigned')}
-                                    onCheckedChange={() => handleProjectSelection('unassigned')}
-                                    onSelect={(e) => e.preventDefault()}
-                                >
-                                    Unassigned
-                                </DropdownMenuCheckboxItem>
+                             {unassignedObjectCount > 0 && (
+                                <li className="flex items-center justify-between p-2 rounded-md border bg-card/50">
+                                    <div className="flex items-center gap-3 truncate pr-2">
+                                        <Checkbox
+                                            id="vis-unassigned"
+                                            checked={selectedProjectIds.includes('all') || selectedProjectIds.includes('unassigned')}
+                                            onCheckedChange={() => handleProjectSelection('unassigned')}
+                                        />
+                                        <div className="space-y-0.5">
+                                            <label htmlFor="vis-unassigned" className="font-medium text-sm cursor-pointer">Unassigned</label>
+                                            <p className="text-xs text-muted-foreground">{unassignedObjectCount} objects</p>
+                                        </div>
+                                    </div>
+                                </li>
                             )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                            {projects.length === 0 && unassignedObjectCount === 0 && (
+                                <div className="text-center text-muted-foreground py-4">
+                                    <p>No projects yet.</p>
+                                </div>
+                            )}
+                        </ul>
+                    </ScrollArea>
                 </div>
                 
                 <TooltipProvider>
                   <ScrollArea className="flex-1">
-                      <div className="p-4">
-                          <h3 className="text-lg font-semibold mb-2">Pins</h3>
-                          {displayedPins.length > 0 ? (
-                              <ul className="space-y-2">
-                                  {displayedPins.map(pin => (
-                                      <li key={pin.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
-                                          <span className="font-medium truncate pr-2">{pin.label}</span>
-                                          <div className="flex items-center gap-1">
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(pin)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(pin)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePin(pin.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
-                                          </div>
-                                      </li>
-                                  ))}
-                              </ul>
-                          ) : <p className="text-sm text-muted-foreground">No pins found.</p>}
+                      <div className="p-4 space-y-4">
+                          <div>
+                            <h3 className="text-lg font-semibold mb-2">Pins</h3>
+                            {displayedPins.length > 0 ? (
+                                <ul className="space-y-2">
+                                    {displayedPins.map(pin => (
+                                        <li key={pin.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                            <span className="font-medium truncate pr-2">{pin.label}</span>
+                                            <div className="flex items-center gap-1">
+                                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(pin)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
+                                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(pin)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePin(pin.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : <p className="text-sm text-muted-foreground">No pins found.</p>}
+                          </div>
                           
-                          <Separator className="my-4" />
+                          <Separator />
 
-                          <h3 className="text-lg font-semibold mb-2">Lines</h3>
-                          {displayedLines.length > 0 ? (
-                              <ul className="space-y-2">
-                                  {displayedLines.map(line => (
-                                      <li key={line.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
-                                          <span className="font-medium truncate pr-2">{line.label}</span>
-                                          <div className="flex items-center gap-1">
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(line)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(line)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(line.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
-                                          </div>
-                                      </li>
-                                  ))}
-                              </ul>
-                          ) : <p className="text-sm text-muted-foreground">No lines found.</p>}
+                          <div>
+                            <h3 className="text-lg font-semibold mb-2">Lines</h3>
+                            {displayedLines.length > 0 ? (
+                                <ul className="space-y-2">
+                                    {displayedLines.map(line => (
+                                        <li key={line.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                            <span className="font-medium truncate pr-2">{line.label}</span>
+                                            <div className="flex items-center gap-1">
+                                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(line)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
+                                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(line)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(line.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : <p className="text-sm text-muted-foreground">No lines found.</p>}
+                          </div>
                           
-                          <Separator className="my-4" />
+                          <Separator />
 
-                          <h3 className="text-lg font-semibold mb-2">Areas</h3>
-                           {displayedAreas.length > 0 ? (
-                              <ul className="space-y-2">
-                                  {displayedAreas.map(area => (
-                                      <li key={area.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
-                                          <span className="font-medium truncate pr-2">{area.label}</span>
-                                          <div className="flex items-center gap-1">
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(area)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(area)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteArea(area.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
-                                          </div>
-                                      </li>
-                                  ))}
-                              </ul>
-                          ) : <p className="text-sm text-muted-foreground">No areas found.</p>}
+                          <div>
+                            <h3 className="text-lg font-semibold mb-2">Areas</h3>
+                             {displayedAreas.length > 0 ? (
+                                <ul className="space-y-2">
+                                    {displayedAreas.map(area => (
+                                        <li key={area.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                            <span className="font-medium truncate pr-2">{area.label}</span>
+                                            <div className="flex items-center gap-1">
+                                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(area)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
+                                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(area)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteArea(area.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : <p className="text-sm text-muted-foreground">No areas found.</p>}
+                          </div>
                       </div>
                   </ScrollArea>
                 </TooltipProvider>
@@ -876,92 +920,6 @@ useEffect(() => {
                     <Button type="submit">Create Project</Button>
                 </DialogFooter>
             </form>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={isManageProjectsDialogOpen} onOpenChange={setIsManageProjectsDialogOpen}>
-        <DialogContent className="max-w-3xl h-[80vh] flex flex-col z-[1003]">
-            <DialogHeader>
-                <DialogTitle>Manage Projects</DialogTitle>
-                <DialogDescription>Edit, delete, or view your projects.</DialogDescription>
-            </DialogHeader>
-             <div className="border-t -mx-6 px-6 pt-4">
-                <div className="flex items-center space-x-2">
-                    <Checkbox 
-                        id="toggle-all-visibility" 
-                        checked={selectedProjectIds.includes('all')}
-                        onCheckedChange={() => handleProjectSelection('all')}
-                    />
-                    <label
-                        htmlFor="toggle-all-visibility"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                        Toggle All Projects
-                    </label>
-                </div>
-            </div>
-            <ScrollArea className="flex-1 -mx-6 px-6 border-t mt-4 pt-4">
-                <ul className="space-y-2">
-                    {projects.map(project => (
-                        <li key={project.id} className="flex items-center justify-between p-3 rounded-md border bg-card">
-                            <div className="flex items-center gap-3 truncate pr-4">
-                                <Checkbox
-                                    id={`vis-${project.id}`}
-                                    checked={selectedProjectIds.includes('all') || selectedProjectIds.includes(project.id)}
-                                    onCheckedChange={() => handleProjectSelection(project.id)}
-                                />
-                                <div className="space-y-1">
-                                    <label htmlFor={`vis-${project.id}`} className="font-semibold cursor-pointer">{project.name}</label>
-                                    <p className="text-sm text-muted-foreground">{getObjectCountForProject(project.id)} objects</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                                <Button variant="outline" size="sm" onClick={() => {
-                                    setProjectToEdit(project)
-                                }}>Edit</Button>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="destructive" size="sm">Delete</Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent className="z-[1004]">
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                This will permanently delete the project "{project.name}" and all {getObjectCountForProject(project.id)} of its associated map objects. This action cannot be undone.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteProject(project.id)}>Delete</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            </div>
-                        </li>
-                    ))}
-                    {unassignedObjectCount > 0 && (
-                         <li className="flex items-center justify-between p-3 rounded-md border bg-card">
-                             <div className="flex items-center gap-3 truncate pr-4">
-                                <Checkbox
-                                    id="vis-unassigned"
-                                    checked={selectedProjectIds.includes('all') || selectedProjectIds.includes('unassigned')}
-                                    onCheckedChange={() => handleProjectSelection('unassigned')}
-                                />
-                                <div className="space-y-1">
-                                     <label htmlFor="vis-unassigned" className="font-semibold cursor-pointer">Unassigned</label>
-                                    <p className="text-sm text-muted-foreground">{unassignedObjectCount} objects</p>
-                                </div>
-                            </div>
-                         </li>
-                    )}
-                    {projects.length === 0 && (
-                        <div className="text-center text-muted-foreground py-8">
-                            <p>You haven't created any projects yet.</p>
-                            <Button variant="link" onClick={() => { setIsManageProjectsDialogOpen(false); setIsNewProjectDialogOpen(true); }}>Create one now</Button>
-                        </div>
-                    )}
-                </ul>
-            </ScrollArea>
         </DialogContent>
       </Dialog>
       
