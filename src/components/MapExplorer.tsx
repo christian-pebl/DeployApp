@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, FolderKanban, ChevronsUpDown } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, FolderKanban } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -21,12 +21,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -96,8 +93,7 @@ export default function MapExplorer() {
   const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
   const [isManageProjectsDialogOpen, setIsManageProjectsDialogOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
-  const [viewedProjectId, setViewedProjectId] = useState<string | null>(null);
-  const [isProjectFilterOpen, setIsProjectFilterOpen] = useState(false);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(['all']);
 
   const { toast } = useToast();
   
@@ -412,9 +408,7 @@ export default function MapExplorer() {
       if (activeProjectId === projectId) {
           setActiveProjectId(null);
       }
-      if (viewedProjectId === projectId) {
-          setViewedProjectId(null);
-      }
+      setSelectedProjectIds(prev => prev.filter(id => id !== projectId));
       
       toast({ title: "Project Deleted", description: `"${project.name}" and all its objects have been deleted.` });
   }
@@ -426,21 +420,40 @@ export default function MapExplorer() {
   }
 
   const displayedPins = useMemo(() => {
-    if (!viewedProjectId) return pins;
-    return pins.filter(p => p.projectId === viewedProjectId);
-  }, [pins, viewedProjectId]);
+    if (selectedProjectIds.includes('all')) return pins;
+    return pins.filter(p => p.projectId && selectedProjectIds.includes(p.projectId));
+  }, [pins, selectedProjectIds]);
 
   const displayedLines = useMemo(() => {
-    if (!viewedProjectId) return lines;
-    return lines.filter(l => l.projectId === viewedProjectId);
-  }, [lines, viewedProjectId]);
+    if (selectedProjectIds.includes('all')) return lines;
+    return lines.filter(l => l.projectId && selectedProjectIds.includes(l.projectId));
+  }, [lines, selectedProjectIds]);
 
   const displayedAreas = useMemo(() => {
-    if (!viewedProjectId) return areas;
-    return areas.filter(a => a.projectId === viewedProjectId);
-  }, [areas, viewedProjectId]);
+    if (selectedProjectIds.includes('all')) return areas;
+    return areas.filter(a => a.projectId && selectedProjectIds.includes(a.projectId));
+  }, [areas, selectedProjectIds]);
   
   const activeProject = projects.find(p => p.id === activeProjectId);
+
+  const handleProjectSelection = (id: string, checked: boolean) => {
+    if (id === 'all') {
+      setSelectedProjectIds(checked ? ['all'] : []);
+    } else {
+      let newSelection = [...selectedProjectIds.filter(pId => pId !== 'all')];
+      if (checked) {
+        newSelection.push(id);
+      } else {
+        newSelection = newSelection.filter(pId => pId !== id);
+      }
+      
+      if (newSelection.length === 0 || newSelection.length === projects.length) {
+          setSelectedProjectIds(['all']);
+      } else {
+          setSelectedProjectIds(newSelection);
+      }
+    }
+  }
 
 
   return (
@@ -509,40 +522,33 @@ export default function MapExplorer() {
                             <FolderKanban className="mr-2 h-4 w-4"/> Manage
                         </Button>
                     </div>
-                     <Popover open={isProjectFilterOpen} onOpenChange={setIsProjectFilterOpen}>
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={isProjectFilterOpen}
-                                className="w-full justify-between"
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full">Filter by project</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56" align="start">
+                            <DropdownMenuLabel>Visible Projects</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                             <DropdownMenuCheckboxItem
+                                checked={selectedProjectIds.includes('all')}
+                                onCheckedChange={(checked) => handleProjectSelection('all', checked)}
+                                onSelect={(e) => e.preventDefault()}
                             >
-                                {viewedProjectId ? projects.find(p => p.id === viewedProjectId)?.name : "Filter by project..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[320px] p-0">
-                           <div
-                                className="flex items-center justify-between px-3 py-2 text-sm font-medium border-b cursor-pointer hover:bg-accent"
-                                onClick={() => { setViewedProjectId(null); setIsProjectFilterOpen(false); }}
-                            >
-                                Show All Objects
-                                {viewedProjectId === null && <Check className="h-4 w-4" />}
-                           </div>
-                           <ScrollArea className="h-[200px]">
+                                All Projects
+                            </DropdownMenuCheckboxItem>
                             {projects.map((project) => (
-                                <div
+                                <DropdownMenuCheckboxItem
                                     key={project.id}
-                                    className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-accent"
-                                    onClick={() => { setViewedProjectId(project.id); setIsProjectFilterOpen(false); }}
+                                    checked={!selectedProjectIds.includes('all') && selectedProjectIds.includes(project.id)}
+                                    onCheckedChange={(checked) => handleProjectSelection(project.id, checked)}
+                                    disabled={selectedProjectIds.includes('all')}
+                                    onSelect={(e) => e.preventDefault()}
                                 >
                                     {project.name}
-                                    {viewedProjectId === project.id && <Check className="h-4 w-4" />}
-                                </div>
+                                </DropdownMenuCheckboxItem>
                             ))}
-                           </ScrollArea>
-                        </PopoverContent>
-                    </Popover>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
                 
                 <TooltipProvider>
@@ -585,7 +591,7 @@ export default function MapExplorer() {
                           <Separator className="my-4" />
 
                           <h3 className="text-lg font-semibold mb-2">Areas</h3>
-                          {areas.length > 0 ? (
+                           {displayedAreas.length > 0 ? (
                               <ul className="space-y-2">
                                   {displayedAreas.map(area => (
                                       <li key={area.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
@@ -605,7 +611,7 @@ export default function MapExplorer() {
               </Card>
             )}
 
-            <div className="absolute top-4 left-4 z-[1001] flex flex-col gap-2">
+             <div className="absolute top-4 left-4 z-[1001] flex flex-col gap-2">
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -809,7 +815,7 @@ export default function MapExplorer() {
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                                 <Button variant="outline" size="sm" onClick={() => {
-                                    setViewedProjectId(project.id);
+                                    setSelectedProjectIds([project.id]);
                                     setIsManageProjectsDialogOpen(false);
                                     setIsObjectListOpen(true);
                                 }}>View Objects</Button>
