@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -804,30 +805,6 @@ useEffect(() => {
                     </Button>
                 </div>
             )}
-            
-            <div className="absolute bottom-4 left-4 z-[1000] bg-card/80 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
-                <p className="font-semibold text-sm">
-                    Active Project: {activeProject ? activeProject.name : 'None'}
-                </p>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="mt-1 text-xs">Change Active Project</Button>
-                    </DropdownMenuTrigger>
-                     <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => setActiveProjectId(null)}>
-                            {activeProjectId === null ? <Check className="mr-2 h-4 w-4"/> : <div className="mr-2 h-4 w-4"/>}
-                            <span>None</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator/>
-                        {projects.map(project => (
-                            <DropdownMenuItem key={project.id} onClick={() => setActiveProjectId(project.id)}>
-                                {activeProjectId === project.id ? <Check className="mr-2 h-4 w-4"/> : <div className="mr-2 h-4 w-4"/>}
-                                <span>{project.name}</span>
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
 
             <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
                 <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
