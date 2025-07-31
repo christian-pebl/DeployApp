@@ -235,7 +235,7 @@ const Map = ({
                 const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
                 const projectIdInput = formElements.namedItem('projectId') as HTMLSelectElement;
                 
-                const projectId = projectIdInput.value;
+                const projectId = projectIdInput.value || undefined;
 
                 if (isPin) {
                     onUpdatePin(item.id, labelInput.value, notesInput.value, projectId);

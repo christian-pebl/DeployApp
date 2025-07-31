@@ -2,6 +2,22 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { LatLng, LatLngExpression, Map as LeafletMap, LeafletMouseEvent } from 'leaflet';
+import type { User } from 'firebase/auth';
+import {
+  collection,
+  doc,
+  getDocs,
+  writeBatch,
+  query,
+  where,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, FolderKanban } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -23,6 +39,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -55,15 +72,15 @@ const Map = dynamic(() => import('@/components/Map'), {
   loading: () => <div className="w-full h-full bg-muted flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>,
 });
 
-type Project = { id: string; name: string; description?: string; createdAt: string; };
-type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; projectId?: string; };
-type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; projectId?: string; };
-type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; projectId?: string; };
+type Project = { id: string; name: string; description?: string; createdAt: any; userId: string; };
+type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; projectId?: string; userId: string; };
+type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; projectId?: string; userId: string; };
+type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; projectId?: string; userId: string; };
 
 type PendingAction = 'pin' | 'line' | 'area' | null;
 
 
-export default function MapExplorer() {
+export default function MapExplorer({ user }: { user: User }) {
   const [log, setLog] = useState<string[]>(['App Initialized']);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -98,13 +115,51 @@ export default function MapExplorer() {
 
   const [isAssignProjectDialogOpen, setIsAssignProjectDialogOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [dataLoading, setDataLoading] = useState(true);
 
+  const router = useRouter();
   const { toast } = useToast();
   
   const initialLocationFound = useRef(false);
   const mapRef = useRef<LeafletMap | null>(null);
   const newProjectFormRef = useRef<HTMLFormElement>(null);
   const editProjectFormRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    const loadData = async () => {
+        if (!user) return;
+        setDataLoading(true);
+        try {
+            const projectsQuery = query(collection(db, "projects"), where("userId", "==", user.uid));
+            const projectsSnapshot = await getDocs(projectsQuery);
+            const loadedProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+            setProjects(loadedProjects);
+
+            const pinsQuery = query(collection(db, "pins"), where("userId", "==", user.uid));
+            const pinsSnapshot = await getDocs(pinsQuery);
+            const loadedPins = pinsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pin));
+            setPins(loadedPins);
+
+            const linesQuery = query(collection(db, "lines"), where("userId", "==", user.uid));
+            const linesSnapshot = await getDocs(linesQuery);
+            const loadedLines = linesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Line));
+            setLines(loadedLines);
+
+            const areasQuery = query(collection(db, "areas"), where("userId", "==", user.uid));
+            const areasSnapshot = await getDocs(areasQuery);
+            const loadedAreas = areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area));
+            setAreas(loadedAreas);
+
+        } catch (error) {
+            console.error("Error loading data:", error);
+            toast({ variant: 'destructive', title: "Error loading data", description: "Could not load map data from the server."});
+        } finally {
+            setDataLoading(false);
+        }
+    };
+
+    loadData();
+  }, [user, toast]);
 
   const addLog = (entry: string) => {
     setLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${entry}`]);
@@ -258,67 +313,129 @@ useEffect(() => {
     }
   };
 
-  const handlePinSave = (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => {
-    const newPin: Pin = { id, lat, lng, label, labelVisible: true, notes, projectId: projectId ?? activeProjectId ?? undefined };
-    setPins(prev => [...prev, newPin]);
-    setPendingPin(null);
+  const handlePinSave = async (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => {
+    const newPinData = { lat, lng, label, labelVisible: true, notes, projectId: projectId ?? activeProjectId ?? undefined, userId: user.uid };
+    try {
+      const docRef = await addDoc(collection(db, "pins"), newPinData);
+      setPins(prev => [...prev, { id: docRef.id, ...newPinData }]);
+      setPendingPin(null);
+    } catch(e) {
+      console.error(e);
+      toast({variant: 'destructive', title: 'Failed to save pin'})
+    }
   };
 
-  const handleLineSave = (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
-      const newLine: Line = {
-          id,
-          path: path.map(p => ({ lat: p.lat, lng: p.lng })),
-          label,
-          labelVisible: true,
-          notes,
-          projectId: projectId ?? activeProjectId ?? undefined
-      };
-      setLines(prev => [...prev, newLine]);
+  const handleLineSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
+    const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
+    const newLineData = {
+        path: pathData,
+        label,
+        labelVisible: true,
+        notes,
+        projectId: projectId ?? activeProjectId ?? undefined,
+        userId: user.uid,
+    };
+    try {
+      const docRef = await addDoc(collection(db, "lines"), newLineData);
+      setLines(prev => [...prev, { id: docRef.id, ...newLineData }]);
       setPendingLine(null);
+    } catch (e) {
+      console.error(e);
+      toast({variant: 'destructive', title: 'Failed to save line'})
+    }
   };
   
-  const handleAreaSave = (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
-      const newArea: Area = {
-          id,
-          path: path.map(p => ({ lat: p.lat, lng: p.lng })),
-          label,
-          labelVisible: true,
-          fillVisible: true,
-          notes,
-          projectId: projectId ?? activeProjectId ?? undefined
-      };
-      setAreas(prev => [...prev, newArea]);
+  const handleAreaSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
+    const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
+    const newAreaData = {
+        path: pathData,
+        label,
+        labelVisible: true,
+        fillVisible: true,
+        notes,
+        projectId: projectId ?? activeProjectId ?? undefined,
+        userId: user.uid,
+    };
+    try {
+      const docRef = await addDoc(collection(db, "areas"), newAreaData);
+      setAreas(prev => [...prev, { id: docRef.id, ...newAreaData }]);
       setPendingArea(null);
+    } catch (e) {
+      console.error(e);
+      toast({variant: 'destructive', title: 'Failed to save area'})
+    }
   };
 
-  const handleUpdatePin = (id: string, label: string, notes: string, projectId?: string) => {
-    setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes, projectId } : p));
-    setItemToEdit(null);
+  const handleUpdatePin = async (id: string, label: string, notes: string, projectId?: string) => {
+    const pinRef = doc(db, "pins", id);
+    const updatedData = { label, notes, projectId };
+    try {
+      await updateDoc(pinRef, updatedData);
+      setPins(prev => prev.map(p => p.id === id ? { ...p, ...updatedData } : p));
+      setItemToEdit(null);
+    } catch (e) {
+      console.error(e);
+      toast({variant: 'destructive', title: 'Failed to update pin'})
+    }
   };
 
-  const handleDeletePin = (id: string) => {
-    setPins(prev => prev.filter(p => p.id !== id));
-    setItemToEdit(null);
+  const handleDeletePin = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "pins", id));
+      setPins(prev => prev.filter(p => p.id !== id));
+      setItemToEdit(null);
+    } catch(e) {
+      console.error(e);
+      toast({variant: 'destructive', title: 'Failed to delete pin'})
+    }
   };
   
-  const handleUpdateLine = (id: string, label: string, notes: string, projectId?: string) => {
-    setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes, projectId } : l));
-    setItemToEdit(null);
+  const handleUpdateLine = async (id: string, label: string, notes: string, projectId?: string) => {
+    const lineRef = doc(db, "lines", id);
+    const updatedData = { label, notes, projectId };
+    try {
+      await updateDoc(lineRef, updatedData);
+      setLines(prev => prev.map(l => l.id === id ? { ...l, ...updatedData } : l));
+      setItemToEdit(null);
+    } catch(e) {
+      console.error(e);
+      toast({variant: 'destructive', title: 'Failed to update line'})
+    }
   };
   
-  const handleDeleteLine = (id: string) => {
-    setLines(prev => prev.filter(l => l.id !== id));
-    setItemToEdit(null);
+  const handleDeleteLine = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "lines", id));
+      setLines(prev => prev.filter(l => l.id !== id));
+      setItemToEdit(null);
+    } catch (e) {
+      console.error(e);
+      toast({variant: 'destructive', title: 'Failed to delete line'})
+    }
   };
 
-  const handleUpdateArea = (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string) => {
-    setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path, projectId } : a));
-    setItemToEdit(null);
+  const handleUpdateArea = async (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string) => {
+    const areaRef = doc(db, "areas", id);
+    const updatedData = { label, notes, path, projectId };
+    try {
+      await updateDoc(areaRef, updatedData);
+      setAreas(prev => prev.map(a => a.id === id ? { ...a, ...updatedData } : a));
+      setItemToEdit(null);
+    } catch (e) {
+      console.error(e);
+      toast({variant: 'destructive', title: 'Failed to update area'})
+    }
   };
 
-  const handleDeleteArea = (id: string) => {
-    setAreas(prev => prev.filter(a => a.id !== id));
-    setItemToEdit(null);
+  const handleDeleteArea = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "areas", id));
+      setAreas(prev => prev.filter(a => a.id !== id));
+      setItemToEdit(null);
+    } catch(e) {
+       console.error(e);
+       toast({variant: 'destructive', title: 'Failed to delete area'})
+    }
   };
 
   const handleToggleLabel = (id: string, type: 'pin' | 'line' | 'area') => {
@@ -405,7 +522,7 @@ useEffect(() => {
     }
   };
 
-  const handleCreateNewProject = (e: React.FormEvent) => {
+  const handleCreateNewProject = async (e: React.FormEvent) => {
     e.preventDefault();
     const form = newProjectFormRef.current;
     if (!form) return;
@@ -414,23 +531,29 @@ useEffect(() => {
     const description = formData.get('description') as string;
     
     if (name) {
-        const newProject: Project = {
-            id: `proj-${Date.now()}`,
+        const newProjectData = {
             name,
             description,
-            createdAt: new Date().toISOString(),
+            createdAt: serverTimestamp(),
+            userId: user.uid,
         };
-        setProjects(prev => [...prev, newProject]);
-        setActiveProjectId(newProject.id);
-        setIsNewProjectDialogOpen(false);
-        toast({ title: "Project Created", description: `"${name}" has been created and set as active.` });
-        if (pendingAction) {
-          executePendingAction();
+        try {
+          const docRef = await addDoc(collection(db, "projects"), newProjectData);
+          setProjects(prev => [...prev, { id: docRef.id, ...newProjectData }]);
+          setActiveProjectId(docRef.id);
+          setIsNewProjectDialogOpen(false);
+          toast({ title: "Project Created", description: `"${name}" has been created and set as active.` });
+          if (pendingAction) {
+            executePendingAction();
+          }
+        } catch (e) {
+          console.error(e);
+          toast({variant: 'destructive', title: 'Failed to create project'});
         }
     }
   };
   
-  const handleUpdateProject = (e: React.FormEvent) => {
+  const handleUpdateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectToEdit) return;
     const form = editProjectFormRef.current;
@@ -439,29 +562,57 @@ useEffect(() => {
     const formData = new FormData(form);
     const name = formData.get('name') as string;
     const description = formData.get('description') as string;
+    const projectRef = doc(db, "projects", projectToEdit.id);
 
     if (name) {
+      try {
+        await updateDoc(projectRef, { name, description });
         setProjects(projects.map(p => p.id === projectToEdit.id ? { ...p, name, description } : p));
         setProjectToEdit(null);
         toast({ title: "Project Updated", description: `"${name}" has been updated.` });
+      } catch (e) {
+        console.error(e);
+        toast({variant: 'destructive', title: 'Failed to update project'});
+      }
     }
   }
   
-  const handleDeleteProject = (projectId: string) => {
+  const handleDeleteProject = async (projectId: string) => {
       const project = projects.find(p => p.id === projectId);
       if(!project) return;
       
-      setProjects(prev => prev.filter(p => p.id !== projectId));
-      setPins(prev => prev.filter(p => p.projectId !== projectId));
-      setLines(prev => prev.filter(l => l.projectId !== projectId));
-      setAreas(prev => prev.filter(a => a.projectId !== projectId));
-      
-      if (activeProjectId === projectId) {
-          setActiveProjectId(null);
+      try {
+        const batch = writeBatch(db);
+        
+        batch.delete(doc(db, "projects", projectId));
+
+        const associatedPins = pins.filter(p => p.projectId === projectId);
+        associatedPins.forEach(p => batch.delete(doc(db, "pins", p.id)));
+
+        const associatedLines = lines.filter(l => l.projectId === projectId);
+        associatedLines.forEach(l => batch.delete(doc(db, "lines", l.id)));
+
+        const associatedAreas = areas.filter(a => a.projectId === projectId);
+        associatedAreas.forEach(a => batch.delete(doc(db, "areas", a.id)));
+
+        await batch.commit();
+
+        setProjects(prev => prev.filter(p => p.id !== projectId));
+        setPins(prev => prev.filter(p => p.projectId !== projectId));
+        setLines(prev => prev.filter(l => l.projectId !== projectId));
+        setAreas(prev => prev.filter(a => a.projectId !== projectId));
+        
+        if (activeProjectId === projectId) {
+            setActiveProjectId(null);
+        }
+        setSelectedProjectIds(prev => prev.filter(id => id !== projectId));
+        
+        toast({ title: "Project Deleted", description: `"${project.name}" and all its objects have been deleted.` });
+
+      } catch (e) {
+        console.error(e);
+        toast({variant: 'destructive', title: 'Failed to delete project'});
       }
-      setSelectedProjectIds(prev => prev.filter(id => id !== projectId));
-      
-      toast({ title: "Project Deleted", description: `"${project.name}" and all its objects have been deleted.` });
   }
 
   const getObjectCountForProject = (projectId: string) => {
@@ -528,6 +679,18 @@ useEffect(() => {
     });
 };
 
+const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
+};
+
+if (dataLoading) {
+    return (
+      <div className="w-full h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+}
 
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
@@ -822,6 +985,31 @@ useEffect(() => {
                 </div>
               <TooltipProvider>
                 <div className="flex gap-2 justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg">
+                            <UserIcon className="h-6 w-6"/>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" align="end">
+                        <DropdownMenuLabel className="font-normal">
+                            <div className="flex flex-col space-y-1">
+                                <p className="text-sm font-medium leading-none">My Account</p>
+                                <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                            </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => router.push('/settings')}>
+                            <Settings className="mr-2 h-4 w-4" />
+                            <span>Settings</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleLogout}>
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Log out</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button 
