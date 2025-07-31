@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
 import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, FolderKanban } from 'lucide-react';
@@ -470,6 +471,12 @@ useEffect(() => {
              lines.filter(l => l.projectId === projectId).length +
              areas.filter(a => a.projectId === projectId).length;
   }
+  
+  const unassignedObjectCount = useMemo(() => {
+    return pins.filter(p => !p.projectId).length +
+           lines.filter(l => !l.projectId).length +
+           areas.filter(a => !a.projectId).length;
+  }, [pins, lines, areas]);
 
   const displayedPins = useMemo(() => {
     if (selectedProjectIds.includes('all')) return pins;
@@ -491,40 +498,28 @@ useEffect(() => {
   const handleProjectSelection = (id: string) => {
     setSelectedProjectIds(currentSelection => {
         let newSelection;
+
+        const isAllSelected = currentSelection.includes('all');
+
         if (id === 'all') {
-            // If 'all' is clicked, toggle between all and none (which defaults back to all)
-            return currentSelection.length === projects.length + 1 ? [] : ['all', ...projects.map(p => p.id), 'unassigned'];
+            return isAllSelected ? [] : ['all'];
         }
 
-        // If 'unassigned' is clicked
-        if (id === 'unassigned') {
-          const allExceptUnassigned = currentSelection.filter(pId => pId !== 'all' && pId !== 'unassigned');
-          if (currentSelection.includes('unassigned')) {
-             newSelection = allExceptUnassigned;
-          } else {
-             newSelection = [...allExceptUnassigned, 'unassigned'];
-          }
+        if (isAllSelected) {
+             newSelection = [id];
         } else {
-           // If an individual project is clicked
-            const allWasSelected = currentSelection.includes('all');
-            let currentVisible = allWasSelected ? [...projects.map(p => p.id), 'unassigned'] : currentSelection;
-    
-            if (currentVisible.includes(id)) {
-                // If the project is already selected, deselect it
-                newSelection = currentVisible.filter(pId => pId !== id && pId !== 'all');
+            if (currentSelection.includes(id)) {
+                newSelection = currentSelection.filter(pId => pId !== id);
             } else {
-                // Otherwise, add it to the selection
-                newSelection = [...currentVisible.filter(pId=> pId !== 'all'), id];
+                newSelection = [...currentSelection, id];
             }
         }
         
-        // If all projects and unassigned are selected, mark 'all' as selected
-        if (newSelection.length === projects.length + 1) {
-            return ['all', ...newSelection];
-        }
+        const allProjectIds = projects.map(p => p.id);
+        const allPossibleSelections = unassignedObjectCount > 0 ? [...allProjectIds, 'unassigned'] : allProjectIds;
 
-        if (newSelection.length === 0) {
-          return ['all', ...projects.map(p => p.id), 'unassigned'];
+        if (newSelection.length === allPossibleSelections.length) {
+            return ['all'];
         }
 
         return newSelection;
@@ -659,22 +654,22 @@ useEffect(() => {
                             {projects.map((project) => (
                                 <DropdownMenuCheckboxItem
                                     key={project.id}
-                                    checked={selectedProjectIds.includes(project.id)}
+                                    checked={selectedProjectIds.includes('all') || selectedProjectIds.includes(project.id)}
                                     onCheckedChange={() => handleProjectSelection(project.id)}
-                                    disabled={selectedProjectIds.includes('all')}
                                     onSelect={(e) => e.preventDefault()}
                                 >
                                     {project.name}
                                 </DropdownMenuCheckboxItem>
                             ))}
-                             <DropdownMenuCheckboxItem
-                                checked={selectedProjectIds.includes('unassigned')}
-                                onCheckedChange={() => handleProjectSelection('unassigned')}
-                                 disabled={selectedProjectIds.includes('all')}
-                                onSelect={(e) => e.preventDefault()}
-                            >
-                                Unassigned
-                            </DropdownMenuCheckboxItem>
+                            {unassignedObjectCount > 0 && (
+                                <DropdownMenuCheckboxItem
+                                    checked={selectedProjectIds.includes('all') || selectedProjectIds.includes('unassigned')}
+                                    onCheckedChange={() => handleProjectSelection('unassigned')}
+                                    onSelect={(e) => e.preventDefault()}
+                                >
+                                    Unassigned
+                                </DropdownMenuCheckboxItem>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -890,20 +885,37 @@ useEffect(() => {
                 <DialogTitle>Manage Projects</DialogTitle>
                 <DialogDescription>Edit, delete, or view your projects.</DialogDescription>
             </DialogHeader>
-            <ScrollArea className="flex-1 -mx-6 px-6">
+             <div className="border-t -mx-6 px-6 pt-4">
+                <div className="flex items-center space-x-2">
+                    <Checkbox 
+                        id="toggle-all-visibility" 
+                        checked={selectedProjectIds.includes('all')}
+                        onCheckedChange={() => handleProjectSelection('all')}
+                    />
+                    <label
+                        htmlFor="toggle-all-visibility"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                        Toggle All Projects
+                    </label>
+                </div>
+            </div>
+            <ScrollArea className="flex-1 -mx-6 px-6 border-t mt-4 pt-4">
                 <ul className="space-y-2">
                     {projects.map(project => (
                         <li key={project.id} className="flex items-center justify-between p-3 rounded-md border bg-card">
-                            <div className="truncate pr-4">
-                                <p className="font-semibold">{project.name}</p>
-                                <p className="text-sm text-muted-foreground">{getObjectCountForProject(project.id)} objects</p>
+                            <div className="flex items-center gap-3 truncate pr-4">
+                                <Checkbox
+                                    id={`vis-${project.id}`}
+                                    checked={selectedProjectIds.includes('all') || selectedProjectIds.includes(project.id)}
+                                    onCheckedChange={() => handleProjectSelection(project.id)}
+                                />
+                                <div className="space-y-1">
+                                    <label htmlFor={`vis-${project.id}`} className="font-semibold cursor-pointer">{project.name}</label>
+                                    <p className="text-sm text-muted-foreground">{getObjectCountForProject(project.id)} objects</p>
+                                </div>
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
-                                <Button variant="outline" size="sm" onClick={() => {
-                                    setSelectedProjectIds([project.id]);
-                                    setIsManageProjectsDialogOpen(false);
-                                    setIsObjectListOpen(true);
-                                }}>View Objects</Button>
                                 <Button variant="outline" size="sm" onClick={() => {
                                     setProjectToEdit(project)
                                 }}>Edit</Button>
@@ -927,6 +939,21 @@ useEffect(() => {
                             </div>
                         </li>
                     ))}
+                    {unassignedObjectCount > 0 && (
+                         <li className="flex items-center justify-between p-3 rounded-md border bg-card">
+                             <div className="flex items-center gap-3 truncate pr-4">
+                                <Checkbox
+                                    id="vis-unassigned"
+                                    checked={selectedProjectIds.includes('all') || selectedProjectIds.includes('unassigned')}
+                                    onCheckedChange={() => handleProjectSelection('unassigned')}
+                                />
+                                <div className="space-y-1">
+                                     <label htmlFor="vis-unassigned" className="font-semibold cursor-pointer">Unassigned</label>
+                                    <p className="text-sm text-muted-foreground">{unassignedObjectCount} objects</p>
+                                </div>
+                            </div>
+                         </li>
+                    )}
                     {projects.length === 0 && (
                         <div className="text-center text-muted-foreground py-8">
                             <p>You haven't created any projects yet.</p>
