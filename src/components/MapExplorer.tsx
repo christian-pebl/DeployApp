@@ -60,6 +60,8 @@ type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?:
 type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; projectId?: string; };
 type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; projectId?: string; };
 
+type PendingAction = 'pin' | 'line' | 'area' | null;
+
 
 export default function MapExplorer() {
   const [log, setLog] = useState<string[]>(['App Initialized']);
@@ -95,6 +97,9 @@ export default function MapExplorer() {
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(['all']);
 
+  const [isAssignProjectDialogOpen, setIsAssignProjectDialogOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+
   const { toast } = useToast();
   
   const initialLocationFound = useRef(false);
@@ -110,6 +115,35 @@ export default function MapExplorer() {
       addLog('Attempting to get user location.');
       setIsLocating(true);
   }, []);
+
+  const executePendingAction = () => {
+    if (!pendingAction) return;
+
+    if (pendingAction === 'pin') {
+        if (mapRef.current) {
+            const center = mapRef.current.getCenter();
+            setPendingPin(center);
+        }
+    } else if (pendingAction === 'line') {
+        if (mapRef.current) {
+            const center = mapRef.current.getCenter();
+            setLineStartPoint(center);
+            setIsDrawingLine(true);
+        }
+    } else if (pendingAction === 'area') {
+        setIsDrawingArea(true);
+        setPendingAreaPath([]);
+    }
+
+    setPendingAction(null);
+};
+
+useEffect(() => {
+    if (activeProjectId && pendingAction) {
+        executePendingAction();
+    }
+}, [activeProjectId, pendingAction]);
+
 
   const handleLocationFound = (latlng: LatLng) => {
     setCurrentLocation(latlng);
@@ -161,6 +195,11 @@ export default function MapExplorer() {
   };
 
   const handleAddPin = () => {
+    if (!activeProjectId) {
+      setPendingAction('pin');
+      setIsAssignProjectDialogOpen(true);
+      return;
+    }
     if (mapRef.current) {
         const center = mapRef.current.getCenter();
         setPendingPin(center);
@@ -168,6 +207,11 @@ export default function MapExplorer() {
   };
 
   const handleDrawLine = () => {
+     if (!activeProjectId) {
+      setPendingAction('line');
+      setIsAssignProjectDialogOpen(true);
+      return;
+    }
     if (mapRef.current) {
         const center = mapRef.current.getCenter();
         setLineStartPoint(center);
@@ -184,6 +228,11 @@ export default function MapExplorer() {
   };
 
   const handleDrawArea = () => {
+    if (!activeProjectId) {
+      setPendingAction('area');
+      setIsAssignProjectDialogOpen(true);
+      return;
+    }
     setIsDrawingArea(true);
     setPendingAreaPath([]);
   }
@@ -376,6 +425,9 @@ export default function MapExplorer() {
         setActiveProjectId(newProject.id);
         setIsNewProjectDialogOpen(false);
         toast({ title: "Project Created", description: `"${name}" has been created and set as active.` });
+        if (pendingAction) {
+          executePendingAction();
+        }
     }
   };
   
@@ -440,34 +492,39 @@ export default function MapExplorer() {
     setSelectedProjectIds(currentSelection => {
         let newSelection;
         if (id === 'all') {
-            // If 'all' is clicked, either select all or deselect all
-            if (currentSelection.includes('all')) {
-                // If 'all' is already selected, deselect it (and everything)
-                 return []; // Or maybe ['all'] to prevent empty view? Let's stick with all.
-            } else {
-                // If 'all' is not selected, select it
-                return ['all'];
-            }
+            // If 'all' is clicked, toggle between all and none (which defaults back to all)
+            return currentSelection.length === projects.length + 1 ? [] : ['all', ...projects.map(p => p.id), 'unassigned'];
         }
 
-        // If an individual project is clicked
-        const allWasSelected = currentSelection.includes('all');
-        if (allWasSelected) {
-            // If 'all' was selected, switch to just this one project
-            newSelection = [id];
+        // If 'unassigned' is clicked
+        if (id === 'unassigned') {
+          const allExceptUnassigned = currentSelection.filter(pId => pId !== 'all' && pId !== 'unassigned');
+          if (currentSelection.includes('unassigned')) {
+             newSelection = allExceptUnassigned;
+          } else {
+             newSelection = [...allExceptUnassigned, 'unassigned'];
+          }
         } else {
-            if (currentSelection.includes(id)) {
+           // If an individual project is clicked
+            const allWasSelected = currentSelection.includes('all');
+            let currentVisible = allWasSelected ? [...projects.map(p => p.id), 'unassigned'] : currentSelection;
+    
+            if (currentVisible.includes(id)) {
                 // If the project is already selected, deselect it
-                newSelection = currentSelection.filter(pId => pId !== id);
+                newSelection = currentVisible.filter(pId => pId !== id && pId !== 'all');
             } else {
                 // Otherwise, add it to the selection
-                newSelection = [...currentSelection, id];
+                newSelection = [...currentVisible.filter(pId=> pId !== 'all'), id];
             }
         }
+        
+        // If all projects and unassigned are selected, mark 'all' as selected
+        if (newSelection.length === projects.length + 1) {
+            return ['all', ...newSelection];
+        }
 
-        // If no projects are selected, or all projects are selected, default to 'all'
-        if (newSelection.length === 0 || newSelection.length === projects.length) {
-            return ['all'];
+        if (newSelection.length === 0) {
+          return ['all', ...projects.map(p => p.id), 'unassigned'];
         }
 
         return newSelection;
@@ -598,6 +655,7 @@ export default function MapExplorer() {
                             >
                                 All Projects
                             </DropdownMenuCheckboxItem>
+                            <DropdownMenuSeparator />
                             {projects.map((project) => (
                                 <DropdownMenuCheckboxItem
                                     key={project.id}
@@ -609,6 +667,14 @@ export default function MapExplorer() {
                                     {project.name}
                                 </DropdownMenuCheckboxItem>
                             ))}
+                             <DropdownMenuCheckboxItem
+                                checked={selectedProjectIds.includes('unassigned')}
+                                onCheckedChange={() => handleProjectSelection('unassigned')}
+                                 disabled={selectedProjectIds.includes('all')}
+                                onSelect={(e) => e.preventDefault()}
+                            >
+                                Unassigned
+                            </DropdownMenuCheckboxItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -886,6 +952,41 @@ export default function MapExplorer() {
                     <Button type="submit">Save Changes</Button>
                 </DialogFooter>
             </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAssignProjectDialogOpen} onOpenChange={setIsAssignProjectDialogOpen}>
+        <DialogContent className="z-[1003]">
+          <DialogHeader>
+            <DialogTitle>Assign to Project</DialogTitle>
+            <DialogDescription>Select a project to assign this new object to, or create a new one.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            {projects.map(project => (
+              <Button
+                key={project.id}
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  setActiveProjectId(project.id);
+                  setIsAssignProjectDialogOpen(false);
+                }}
+              >
+                {project.name}
+              </Button>
+            ))}
+            {projects.length === 0 && <p className="text-sm text-muted-foreground text-center">No projects exist yet.</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => { setIsAssignProjectDialogOpen(false); setPendingAction(null); }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                setIsAssignProjectDialogOpen(false);
+                setIsNewProjectDialogOpen(true);
+              }}>
+              <FolderPlus className="mr-2 h-4 w-4" /> Create New Project
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
