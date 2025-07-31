@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -38,7 +38,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuCheckboxItem,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -65,6 +64,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 
 const Map = dynamic(() => import('@/components/Map'), {
@@ -642,8 +642,6 @@ useEffect(() => {
     return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!a.projectId && selectedProjectIds.includes('unassigned')));
   }, [areas, selectedProjectIds]);
   
-  const activeProject = projects.find(p => p.id === activeProjectId);
-
   const handleProjectSelection = (id: string) => {
     setSelectedProjectIds(currentSelection => {
         let newSelection;
@@ -783,7 +781,7 @@ if (dataLoading) {
             </div>
 
             {isObjectListOpen && (
-              <Card className="absolute top-4 left-20 z-[1002] w-[350px] sm:w-[400px] h-[calc(100%-2rem)] flex flex-col bg-card/90 backdrop-blur-sm">
+              <Card className="absolute top-4 left-20 z-[1002] w-[450px] h-[calc(100%-2rem)] flex flex-col bg-card/90 backdrop-blur-sm">
                 <div className="p-4 border-b flex justify-between items-center">
                     <h2 className="text-lg font-semibold">Map Objects</h2>
                     <Button variant="ghost" size="icon" onClick={() => setIsObjectListOpen(false)} className="h-8 w-8">
@@ -794,9 +792,12 @@ if (dataLoading) {
                 <div className="p-4 border-b space-y-2">
                     <div className='flex justify-between items-center'>
                         <h3 className="text-md font-semibold">Projects</h3>
-                        <Button variant="outline" size="sm" onClick={() => setIsNewProjectDialogOpen(true)}>
-                            <FolderPlus className="mr-2 h-4 w-4"/> New
-                        </Button>
+                        <div className='flex items-center gap-2'>
+                           <Button variant="outline" size='sm' onClick={() => setActiveProjectId(null)} disabled={!activeProjectId}>Clear Active</Button>
+                            <Button variant="outline" size="sm" onClick={() => setIsNewProjectDialogOpen(true)}>
+                                <FolderPlus className="mr-2 h-4 w-4"/> New
+                            </Button>
+                        </div>
                     </div>
                      <div className="border-t -mx-4 px-4 pt-4 mt-2">
                         <div className="flex items-center space-x-2">
@@ -809,14 +810,14 @@ if (dataLoading) {
                                 htmlFor="toggle-all-visibility"
                                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                             >
-                                All Projects
+                                All Projects Visible
                             </label>
                         </div>
                     </div>
                     <ScrollArea className="h-32 -mx-4 px-4">
                         <ul className="space-y-2 pt-2">
                             {projects.map(project => (
-                                <li key={project.id} className="flex items-center justify-between p-2 rounded-md border bg-card/50">
+                                <li key={project.id} className={cn("flex items-center justify-between p-2 rounded-md border", activeProjectId === project.id ? 'bg-primary/10' : 'bg-card/50')}>
                                     <div className="flex items-center gap-3 truncate pr-2">
                                         <Checkbox
                                             id={`vis-${project.id}`}
@@ -829,26 +830,44 @@ if (dataLoading) {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-                                            setProjectToEdit(project)
-                                        }}><Pencil className="h-4 w-4"/></Button>
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent className="z-[1004]">
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                        This will permanently delete the project "{project.name}" and all {getObjectCountForProject(project.id)} of its associated map objects. This action cannot be undone.
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleDeleteProject(project.id)}>Delete</AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button variant={activeProjectId === project.id ? "default" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setActiveProjectId(project.id)}>
+                                                <Star className={cn("h-4 w-4", activeProjectId === project.id ? "text-primary-foreground" : "")}/>
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top"><p>Set Active</p></TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setProjectToEdit(project) }}><Pencil className="h-4 w-4"/></Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top"><p>Edit</p></TooltipContent>
+                                          </Tooltip>
+                                          <AlertDialog>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <AlertDialogTrigger asChild>
+                                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                                  </AlertDialogTrigger>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top"><p>Delete</p></TooltipContent>
+                                              </Tooltip>
+                                              <AlertDialogContent className="z-[1004]">
+                                                  <AlertDialogHeader>
+                                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                      <AlertDialogDescription>
+                                                          This will permanently delete the project "{project.name}" and all {getObjectCountForProject(project.id)} of its associated map objects. This action cannot be undone.
+                                                      </AlertDialogDescription>
+                                                  </AlertDialogHeader>
+                                                  <AlertDialogFooter>
+                                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                      <AlertDialogAction onClick={() => handleDeleteProject(project.id)}>Delete</AlertDialogAction>
+                                                  </AlertDialogFooter>
+                                              </AlertDialogContent>
+                                          </AlertDialog>
+                                        </TooltipProvider>
                                     </div>
                                 </li>
                             ))}
