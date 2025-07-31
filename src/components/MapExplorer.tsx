@@ -421,39 +421,58 @@ export default function MapExplorer() {
 
   const displayedPins = useMemo(() => {
     if (selectedProjectIds.includes('all')) return pins;
-    return pins.filter(p => p.projectId && selectedProjectIds.includes(p.projectId));
+    return pins.filter(p => (p.projectId && selectedProjectIds.includes(p.projectId)) || (!p.projectId && selectedProjectIds.includes('unassigned')));
   }, [pins, selectedProjectIds]);
 
   const displayedLines = useMemo(() => {
     if (selectedProjectIds.includes('all')) return lines;
-    return lines.filter(l => l.projectId && selectedProjectIds.includes(l.projectId));
+    return lines.filter(l => (l.projectId && selectedProjectIds.includes(l.projectId)) || (!l.projectId && selectedProjectIds.includes('unassigned')));
   }, [lines, selectedProjectIds]);
 
   const displayedAreas = useMemo(() => {
     if (selectedProjectIds.includes('all')) return areas;
-    return areas.filter(a => a.projectId && selectedProjectIds.includes(a.projectId));
+    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!a.projectId && selectedProjectIds.includes('unassigned')));
   }, [areas, selectedProjectIds]);
   
   const activeProject = projects.find(p => p.id === activeProjectId);
 
-  const handleProjectSelection = (id: string, checked: boolean) => {
-    if (id === 'all') {
-      setSelectedProjectIds(checked ? ['all'] : []);
-    } else {
-      let newSelection = [...selectedProjectIds.filter(pId => pId !== 'all')];
-      if (checked) {
-        newSelection.push(id);
-      } else {
-        newSelection = newSelection.filter(pId => pId !== id);
-      }
-      
-      if (newSelection.length === 0 || newSelection.length === projects.length) {
-          setSelectedProjectIds(['all']);
-      } else {
-          setSelectedProjectIds(newSelection);
-      }
-    }
-  }
+  const handleProjectSelection = (id: string) => {
+    setSelectedProjectIds(currentSelection => {
+        let newSelection;
+        if (id === 'all') {
+            // If 'all' is clicked, either select all or deselect all
+            if (currentSelection.includes('all')) {
+                // If 'all' is already selected, deselect it (and everything)
+                 return []; // Or maybe ['all'] to prevent empty view? Let's stick with all.
+            } else {
+                // If 'all' is not selected, select it
+                return ['all'];
+            }
+        }
+
+        // If an individual project is clicked
+        const allWasSelected = currentSelection.includes('all');
+        if (allWasSelected) {
+            // If 'all' was selected, switch to just this one project
+            newSelection = [id];
+        } else {
+            if (currentSelection.includes(id)) {
+                // If the project is already selected, deselect it
+                newSelection = currentSelection.filter(pId => pId !== id);
+            } else {
+                // Otherwise, add it to the selection
+                newSelection = [...currentSelection, id];
+            }
+        }
+
+        // If no projects are selected, or all projects are selected, default to 'all'
+        if (newSelection.length === 0 || newSelection.length === projects.length) {
+            return ['all'];
+        }
+
+        return newSelection;
+    });
+};
 
 
   return (
@@ -503,8 +522,51 @@ export default function MapExplorer() {
                 <Plus className="h-8 w-8 text-blue-500" />
             </div>
 
+            <div className="absolute top-4 left-4 z-[1001] flex flex-col gap-2">
+                 <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleAddPin}>
+                                <MapPin className="h-6 w-6" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Add a Pin</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawLine}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 stroke-current">
+                                    <path d="M4 20L20 4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <circle cx="3.5" cy="20.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
+                                    <circle cx="20.5" cy="3.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
+                                </svg>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Draw a Line</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                             <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawArea}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6">
+                                    <path d="M2.57141 6.28571L8.2857 2.57143L20.5714 8.28571L14.8571 21.4286L2.57141 15.7143L2.57141 6.28571Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                                </svg>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Draw an Area</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={() => setIsObjectListOpen(true)}>
+                                <Menu className="h-6 w-6" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>List Objects</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
+
             {isObjectListOpen && (
-              <Card className="absolute top-4 left-4 z-[1002] w-[350px] sm:w-[400px] h-[calc(100%-2rem)] flex flex-col bg-card/90 backdrop-blur-sm">
+              <Card className="absolute top-4 left-20 z-[1002] w-[350px] sm:w-[400px] h-[calc(100%-2rem)] flex flex-col bg-card/90 backdrop-blur-sm">
                 <div className="p-4 border-b flex justify-between items-center">
                     <h2 className="text-lg font-semibold">Map Objects</h2>
                     <Button variant="ghost" size="icon" onClick={() => setIsObjectListOpen(false)} className="h-8 w-8">
@@ -531,7 +593,7 @@ export default function MapExplorer() {
                             <DropdownMenuSeparator />
                              <DropdownMenuCheckboxItem
                                 checked={selectedProjectIds.includes('all')}
-                                onCheckedChange={(checked) => handleProjectSelection('all', checked)}
+                                onCheckedChange={() => handleProjectSelection('all')}
                                 onSelect={(e) => e.preventDefault()}
                             >
                                 All Projects
@@ -539,8 +601,8 @@ export default function MapExplorer() {
                             {projects.map((project) => (
                                 <DropdownMenuCheckboxItem
                                     key={project.id}
-                                    checked={!selectedProjectIds.includes('all') && selectedProjectIds.includes(project.id)}
-                                    onCheckedChange={(checked) => handleProjectSelection(project.id, checked)}
+                                    checked={selectedProjectIds.includes(project.id)}
+                                    onCheckedChange={() => handleProjectSelection(project.id)}
                                     disabled={selectedProjectIds.includes('all')}
                                     onSelect={(e) => e.preventDefault()}
                                 >
@@ -610,49 +672,6 @@ export default function MapExplorer() {
                 </TooltipProvider>
               </Card>
             )}
-
-             <div className="absolute top-4 left-4 z-[1001] flex flex-col gap-2">
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleAddPin}>
-                                <MapPin className="h-6 w-6" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Add a Pin</p></TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawLine}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 stroke-current">
-                                    <path d="M4 20L20 4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                    <circle cx="3.5" cy="20.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
-                                    <circle cx="20.5" cy="3.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
-                                </svg>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Draw a Line</p></TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                             <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawArea}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6">
-                                    <path d="M2.57141 6.28571L8.2857 2.57143L20.5714 8.28571L14.8571 21.4286L2.57141 15.7143L2.57141 6.28571Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
-                                </svg>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Draw an Area</p></TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={() => setIsObjectListOpen(true)}>
-                                <Menu className="h-6 w-6" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>List Objects</p></TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            </div>
             
             {isDrawingLine && (
                 <Button 
