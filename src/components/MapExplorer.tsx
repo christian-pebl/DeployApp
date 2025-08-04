@@ -347,8 +347,9 @@ export default function MapExplorer({ user }: { user: User }) {
     addLog('Entering try block for addDoc(pins)');
     try {
       const docRef = await addDoc(collection(db, "pins"), newPinData);
-      addLog(`Firestore addDoc(pins) successful. New ID: ${docRef.id}`);
-      setPins(prev => [...prev, { id: docRef.id, ...newPinData }]);
+      addLog(`✅ Firestore addDoc(pins) successful. New ID: ${docRef.id}`);
+      const newPin = { id: docRef.id, ...newPinData };
+      setPins(prev => [...prev, newPin]);
       setPendingPin(null);
       toast({title: 'Pin Saved'});
     } catch(e: any) {
@@ -369,8 +370,9 @@ export default function MapExplorer({ user }: { user: User }) {
       addLog('Entering try block for addDoc(lines)');
       try {
         const docRef = await addDoc(collection(db, "lines"), newLineData);
-        addLog(`Firestore addDoc(lines) successful. New ID: ${docRef.id}`);
-        setLines(prev => [...prev, { id: docRef.id, ...newLineData }]);
+        addLog(`✅ Firestore addDoc(lines) successful. New ID: ${docRef.id}`);
+        const newLine = { id: docRef.id, ...newLineData };
+        setLines(prev => [...prev, newLine]);
         setPendingLine(null);
         toast({title: 'Line Saved'});
       } catch (e: any) {
@@ -391,8 +393,9 @@ export default function MapExplorer({ user }: { user: User }) {
     addLog('Entering try block for addDoc(areas)');
     try {
       const docRef = await addDoc(collection(db, "areas"), newAreaData);
-      addLog(`Firestore addDoc(areas) successful. New ID: ${docRef.id}`);
-      setAreas(prev => [...prev, { id: docRef.id, ...newAreaData }]);
+      addLog(`✅ Firestore addDoc(areas) successful. New ID: ${docRef.id}`);
+      const newArea = { id: docRef.id, ...newAreaData };
+      setAreas(prev => [...prev, newArea]);
       setPendingArea(null);
       toast({title: 'Area Saved'});
     } catch (e: any) {
@@ -408,14 +411,14 @@ export default function MapExplorer({ user }: { user: User }) {
     if (projectId) {
       updatedData.projectId = projectId;
     } else {
-      updatedData.projectId = null;
+      delete updatedData.projectId;
     }
     
     addLog(`Updating pin with data: ${JSON.stringify(updatedData)}`);
     addLog('Entering try block for updateDoc(pins)');
     try {
       await updateDoc(pinRef, updatedData);
-      addLog(`Firestore updateDoc(pins) successful for ID: ${id}`);
+      addLog(`✅ Firestore updateDoc(pins) successful for ID: ${id}`);
       setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes, projectId: projectId } : p));
       setItemToEdit(null);
       toast({title: 'Pin Updated'});
@@ -430,7 +433,7 @@ export default function MapExplorer({ user }: { user: User }) {
     addLog('Entering try block for deleteDoc(pins)');
     try {
       await deleteDoc(doc(db, "pins", id));
-      addLog(`Firestore deleteDoc(pins) successful for ID: ${id}`);
+      addLog(`✅ Firestore deleteDoc(pins) successful for ID: ${id}`);
       setPins(prev => prev.filter(p => p.id !== id));
       setItemToEdit(null);
       toast({title: 'Pin Deleted'});
@@ -447,14 +450,14 @@ export default function MapExplorer({ user }: { user: User }) {
      if (projectId) {
       updatedData.projectId = projectId;
     } else {
-      updatedData.projectId = null;
+      delete updatedData.projectId;
     }
 
     addLog(`Updating line with data: ${JSON.stringify(updatedData)}`);
     addLog('Entering try block for updateDoc(lines)');
     try {
       await updateDoc(lineRef, updatedData);
-      addLog(`Firestore updateDoc(lines) successful for ID: ${id}`);
+      addLog(`✅ Firestore updateDoc(lines) successful for ID: ${id}`);
       setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes, projectId: projectId } : l));
       setItemToEdit(null);
       toast({title: 'Line Updated'});
@@ -469,7 +472,7 @@ export default function MapExplorer({ user }: { user: User }) {
     addLog('Entering try block for deleteDoc(lines)');
     try {
       await deleteDoc(doc(db, "lines", id));
-      addLog(`Firestore deleteDoc(lines) successful for ID: ${id}`);
+      addLog(`✅ Firestore deleteDoc(lines) successful for ID: ${id}`);
       setLines(prev => prev.filter(l => l.id !== id));
       setItemToEdit(null);
       toast({title: 'Line Deleted'});
@@ -486,14 +489,14 @@ export default function MapExplorer({ user }: { user: User }) {
     if (projectId) {
       updatedData.projectId = projectId;
     } else {
-      updatedData.projectId = null;
+      delete updatedData.projectId;
     }
 
     addLog(`Updating area with data: ${JSON.stringify(updatedData)}`);
     addLog('Entering try block for updateDoc(areas)');
     try {
       await updateDoc(areaRef, updatedData);
-      addLog(`Firestore updateDoc(areas) successful for ID: ${id}`);
+      addLog(`✅ Firestore updateDoc(areas) successful for ID: ${id}`);
       setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path, projectId: projectId } : a));
       setItemToEdit(null);
       toast({title: 'Area Updated'});
@@ -508,7 +511,7 @@ export default function MapExplorer({ user }: { user: User }) {
     addLog('Entering try block for deleteDoc(areas)');
     try {
       await deleteDoc(doc(db, "areas", id));
-      addLog(`Firestore deleteDoc(areas) successful for ID: ${id}`);
+      addLog(`✅ Firestore deleteDoc(areas) successful for ID: ${id}`);
       setAreas(prev => prev.filter(a => a.id !== id));
       setItemToEdit(null);
       toast({title: 'Area Deleted'});
@@ -621,7 +624,7 @@ export default function MapExplorer({ user }: { user: User }) {
         addLog('Entering try block for addDoc(projects)');
         try {
           const docRef = await addDoc(collection(db, "projects"), newProjectData);
-          addLog(`Firestore addDoc(projects) successful. New ID: ${docRef.id}`);
+          addLog(`✅ Firestore addDoc(projects) successful. New ID: ${docRef.id}`);
           const newProject = { id: docRef.id, ...newProjectData, createdAt: new Date() };
           setProjects(prev => [...prev, newProject]);
           setActiveProjectId(docRef.id);
@@ -655,7 +658,7 @@ export default function MapExplorer({ user }: { user: User }) {
       addLog('Entering try block for updateDoc(projects)');
       try {
         await updateDoc(projectRef, { name, description });
-        addLog(`Firestore updateDoc(projects) successful for ID: ${projectToEdit.id}`);
+        addLog(`✅ Firestore updateDoc(projects) successful for ID: ${projectToEdit.id}`);
         setProjects(projects.map(p => p.id === projectToEdit.id ? { ...p, name, description } : p));
         setProjectToEdit(null);
         toast({ title: "Project Updated", description: `"${name}" has been updated.` });
@@ -691,7 +694,7 @@ export default function MapExplorer({ user }: { user: User }) {
         addLog(` - Marked ${associatedAreas.length} areas for deletion.`);
 
         await batch.commit();
-        addLog(`Firestore batch commit successful.`);
+        addLog(`✅ Firestore batch commit successful.`);
 
         setProjects(prev => prev.filter(p => p.id !== projectId));
         setPins(prev => prev.filter(p => p.projectId !== projectId));
