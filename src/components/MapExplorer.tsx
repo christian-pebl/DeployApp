@@ -251,11 +251,6 @@ useEffect(() => {
   };
 
   const handleAddPin = () => {
-    if (!activeProjectId) {
-      setPendingAction('pin');
-      setIsAssignProjectDialogOpen(true);
-      return;
-    }
     if (mapRef.current) {
         const center = mapRef.current.getCenter();
         setPendingPin(center);
@@ -263,11 +258,6 @@ useEffect(() => {
   };
 
   const handleDrawLine = () => {
-     if (!activeProjectId) {
-      setPendingAction('line');
-      setIsAssignProjectDialogOpen(true);
-      return;
-    }
     if (mapRef.current) {
         const center = mapRef.current.getCenter();
         setLineStartPoint(center);
@@ -284,11 +274,6 @@ useEffect(() => {
   };
 
   const handleDrawArea = () => {
-    if (!activeProjectId) {
-      setPendingAction('area');
-      setIsAssignProjectDialogOpen(true);
-      return;
-    }
     setIsDrawingArea(true);
     setPendingAreaPath([]);
   }
