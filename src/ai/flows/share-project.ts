@@ -19,6 +19,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { logger } from 'genkit/logging';
 
 // Schema for generating a share code
 const GenerateShareCodeInputSchema = z.object({
@@ -94,14 +95,22 @@ export const generateShareCodeFlow = ai.defineFlow(
     outputSchema: GenerateShareCodeOutputSchema,
   },
   async (input) => {
+    logger.info('[SHARE_FLOW] Received request with input:', input);
     const sharesRef = collection(db, 'shares');
     const newShare = {
       projectId: input.projectId,
       originalOwnerId: input.originalOwnerId,
       createdAt: new Date(),
     };
-    const docRef = await addDoc(sharesRef, newShare);
-    return { shareCode: docRef.id };
+    logger.info('[SHARE_FLOW] Attempting to write to shares collection:', newShare);
+    try {
+      const docRef = await addDoc(sharesRef, newShare);
+      logger.info('[SHARE_FLOW] ✅ Successfully created share document with ID:', docRef.id);
+      return { shareCode: docRef.id };
+    } catch (error: any) {
+      logger.error('❌ [SHARE_FLOW] Error writing to shares collection:', error);
+      throw new Error(`Firestore write failed: ${error.message}`);
+    }
   }
 );
 

@@ -606,25 +606,30 @@ export default function MapExplorer({ user }: { user: User }) {
         toast({variant: 'destructive', title: 'Project Name Required'});
         return;
     }
-    const data = {
-        name: newProjectName,
-        description: newProjectDescription,
-    };
     
     setLogLevel('debug');
+    
     addLog("[INIT] firebaseApp.name =" + firebaseApp.name);
     addLog("[INIT] firebaseApp.options.projectId =" + firebaseApp.options.projectId);
     addLog("[INIT] db.app.name =" + db.app.name);
     addLog("[INIT] Current user:" + auth.currentUser);
+    
     const projectsRef = collection(db, 'projects');
     addLog("[INIT] projectsRef.path =" + projectsRef.path);
+    
+    const data = {
+        name: newProjectName,
+        description: newProjectDescription,
+    };
     addLog("[PAYLOAD] raw data:" + JSON.stringify(data));
+    
     const payload = {
         ...data,
         createdAt: serverTimestamp(),
         userId: auth.currentUser?.uid,
     };
     addLog("[PAYLOAD] final payload:" + JSON.stringify(payload));
+    
     const persisted = await navigator.storage?.persisted();
     addLog("[PERSISTENCE] navigator.storage?.persisted() →" + persisted);
 
@@ -798,16 +803,23 @@ const handleLogout = async () => {
 
 const handleGenerateShareCode = async (projectId: string) => {
   setIsGeneratingCode(true);
+  const payload = { projectId, originalOwnerId: user.uid };
+  addLog(`[SHARE] Starting code generation for payload: ${JSON.stringify(payload)}`);
+
   try {
-    const result = await generateShareCode({ projectId, originalOwnerId: user.uid });
+    const result = await generateShareCode(payload);
+    addLog(`[SHARE] Flow returned: ${JSON.stringify(result)}`);
     setShareCode(result.shareCode);
     setIsShareDialogOpen(true);
   } catch (error: any) {
+    addLog(`❌ [SHARE] Error generating share code: ${error.message}`);
     toast({ variant: 'destructive', title: 'Could not generate share code', description: error.message });
   } finally {
     setIsGeneratingCode(false);
+    addLog(`[SHARE] Finished code generation attempt.`);
   }
 };
+
 
 const handleImportProject = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -1057,7 +1069,7 @@ if (dataLoading) {
                                           <Tooltip>
                                                 <TooltipTrigger asChild>
                                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleGenerateShareCode(project.id)} disabled={isGeneratingCode}>
-                                                        <Share2 className="h-4 w-4"/>
+                                                        {isGeneratingCode ? <Loader2 className="h-4 w-4 animate-spin"/> : <Share2 className="h-4 w-4"/>}
                                                     </Button>
                                                 </TooltipTrigger>
                                                 <TooltipContent side="top"><p>Share</p></TooltipContent>
@@ -1346,22 +1358,22 @@ if (dataLoading) {
 
       <Dialog open={isAssignProjectDialogOpen} onOpenChange={setIsAssignProjectDialogOpen}>
         <DialogContent className="z-[1003] sm:max-w-[425px]">
-            <DialogHeader>
-                <DialogTitle>Create Project</DialogTitle>
-                <DialogDescription>
-                    To save items, you must first create a project.
-                </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => { setIsAssignProjectDialogOpen(false); setPendingAction(null); }}>Cancel</Button>
-                <Button
-                    onClick={() => {
-                        setIsAssignProjectDialogOpen(false);
-                        setIsNewProjectDialogOpen(true);
-                    }}>
-                    <FolderPlus className="mr-2 h-4 w-4" /> Create Project
-                </Button>
-            </DialogFooter>
+          <DialogHeader>
+            <DialogTitle>Create a Project First</DialogTitle>
+            <DialogDescription>
+              To save map items like pins, lines, or areas, you need to have a project to contain them.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setIsAssignProjectDialogOpen(false); setPendingAction(null); }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                setIsAssignProjectDialogOpen(false);
+                setIsNewProjectDialogOpen(true);
+              }}>
+              <FolderPlus className="mr-2 h-4 w-4" /> Create Project
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
