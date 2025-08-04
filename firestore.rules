@@ -48,7 +48,7 @@ service cloud.firestore {
     match /shares/{shareId} {
       // Anyone who is logged in can read a share document to import it.
       allow read: if request.auth != null;
-      
+
       // A user can only create a share code for a project they own.
       // This rule looks up the project being shared and verifies ownership.
       allow create: if isOwner(get(/databases/$(database)/documents/projects/$(request.resource.data.projectId)).data.userId);

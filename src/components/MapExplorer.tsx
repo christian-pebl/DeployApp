@@ -822,19 +822,24 @@ const handleImportProject = async (e: React.FormEvent) => {
   if (!importCode) return;
   setIsImporting(true);
   addLog(`[IMPORT_CLIENT] 1. Starting import for share code: ${importCode}`);
+  addLog(`[IMPORT_CLIENT] User authenticated: ${!!auth.currentUser}`);
+  addLog(`[IMPORT_CLIENT] Attempting to fetch share with ID: ${importCode}`);
 
   try {
     const shareRef = doc(db, 'shares', importCode);
-    addLog(`[IMPORT_CLIENT] 2. Fetching share document...`);
     const shareSnap = await getDoc(shareRef);
 
-    if (!shareSnap.exists()) {
+    if (shareSnap.exists()) {
+      addLog(`[IMPORT_CLIENT] Share document found.`);
+    } else {
       addLog(`[IMPORT_CLIENT] ❌ Share code not found.`);
       throw new Error('Invalid share code.');
     }
+
     const shareData = shareSnap.data();
     const projectId = shareData.projectId;
     addLog(`[IMPORT_CLIENT] 3. ✅ Share code found. Corresponds to project ID: ${projectId}`);
+
 
     // Get project
     addLog(`[IMPORT_CLIENT] 4. Fetching project document...`);
