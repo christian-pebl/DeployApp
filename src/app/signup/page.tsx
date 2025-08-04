@@ -34,6 +34,7 @@ export default function SignupPage() {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
       router.push('/');
+      setLoading(false);
     } catch (error: any) {
       toast({
         variant: 'destructive',
