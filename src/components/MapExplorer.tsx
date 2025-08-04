@@ -344,12 +344,12 @@ export default function MapExplorer({ user }: { user: User }) {
     }
     
     addLog(`Attempting to save pin: "${label}" with data: ${JSON.stringify(newPinData)}`);
-    
+    addLog('Entering try block for addDoc(pins)');
     try {
       const docRef = await addDoc(collection(db, "pins"), newPinData);
+      addLog(`Firestore addDoc(pins) successful. New ID: ${docRef.id}`);
       setPins(prev => [...prev, { id: docRef.id, ...newPinData }]);
       setPendingPin(null);
-      addLog(`✅ Pin saved successfully with ID: ${docRef.id}`);
       toast({title: 'Pin Saved'});
     } catch(e: any) {
       addLog(`❌ Error saving pin: ${e.code} - ${e.message}`);
@@ -366,12 +366,12 @@ export default function MapExplorer({ user }: { user: User }) {
       }
 
       addLog(`Attempting to save line: "${label}" with data: ${JSON.stringify(newLineData)}`);
-
+      addLog('Entering try block for addDoc(lines)');
       try {
         const docRef = await addDoc(collection(db, "lines"), newLineData);
+        addLog(`Firestore addDoc(lines) successful. New ID: ${docRef.id}`);
         setLines(prev => [...prev, { id: docRef.id, ...newLineData }]);
         setPendingLine(null);
-        addLog(`✅ Line saved successfully with ID: ${docRef.id}`);
         toast({title: 'Line Saved'});
       } catch (e: any) {
         addLog(`❌ Error saving line: ${e.code} - ${e.message}`);
@@ -388,12 +388,12 @@ export default function MapExplorer({ user }: { user: User }) {
     }
     
     addLog(`Attempting to save area: "${label}" with data: ${JSON.stringify(newAreaData)}`);
-
+    addLog('Entering try block for addDoc(areas)');
     try {
       const docRef = await addDoc(collection(db, "areas"), newAreaData);
+      addLog(`Firestore addDoc(areas) successful. New ID: ${docRef.id}`);
       setAreas(prev => [...prev, { id: docRef.id, ...newAreaData }]);
       setPendingArea(null);
-      addLog(`✅ Area saved successfully with ID: ${docRef.id}`);
       toast({title: 'Area Saved'});
     } catch (e: any) {
       addLog(`❌ Error saving area: ${e.code} - ${e.message}`);
@@ -408,15 +408,16 @@ export default function MapExplorer({ user }: { user: User }) {
     if (projectId) {
       updatedData.projectId = projectId;
     } else {
-      updatedData.projectId = null; // Or use delete operator if you want to remove it
+      updatedData.projectId = null;
     }
     
     addLog(`Updating pin with data: ${JSON.stringify(updatedData)}`);
+    addLog('Entering try block for updateDoc(pins)');
     try {
       await updateDoc(pinRef, updatedData);
+      addLog(`Firestore updateDoc(pins) successful for ID: ${id}`);
       setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes, projectId: projectId } : p));
       setItemToEdit(null);
-      addLog(`✅ Successfully updated pin ID: ${id}`);
       toast({title: 'Pin Updated'});
     } catch (e: any) {
       addLog(`❌ Error updating pin: ${e.code} - ${e.message}`);
@@ -426,11 +427,12 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handleDeletePin = async (id: string) => {
     addLog(`Attempting to delete pin ID: ${id}`);
+    addLog('Entering try block for deleteDoc(pins)');
     try {
       await deleteDoc(doc(db, "pins", id));
+      addLog(`Firestore deleteDoc(pins) successful for ID: ${id}`);
       setPins(prev => prev.filter(p => p.id !== id));
       setItemToEdit(null);
-      addLog(`✅ Successfully deleted pin ID: ${id}`);
       toast({title: 'Pin Deleted'});
     } catch(e: any) {
       addLog(`❌ Error deleting pin: ${e.code} - ${e.message}`);
@@ -449,11 +451,12 @@ export default function MapExplorer({ user }: { user: User }) {
     }
 
     addLog(`Updating line with data: ${JSON.stringify(updatedData)}`);
+    addLog('Entering try block for updateDoc(lines)');
     try {
       await updateDoc(lineRef, updatedData);
+      addLog(`Firestore updateDoc(lines) successful for ID: ${id}`);
       setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes, projectId: projectId } : l));
       setItemToEdit(null);
-      addLog(`✅ Successfully updated line ID: ${id}`);
       toast({title: 'Line Updated'});
     } catch(e: any) {
       addLog(`❌ Error updating line: ${e.code} - ${e.message}`);
@@ -463,11 +466,12 @@ export default function MapExplorer({ user }: { user: User }) {
   
   const handleDeleteLine = async (id: string) => {
     addLog(`Attempting to delete line ID: ${id}`);
+    addLog('Entering try block for deleteDoc(lines)');
     try {
       await deleteDoc(doc(db, "lines", id));
+      addLog(`Firestore deleteDoc(lines) successful for ID: ${id}`);
       setLines(prev => prev.filter(l => l.id !== id));
       setItemToEdit(null);
-      addLog(`✅ Successfully deleted line ID: ${id}`);
       toast({title: 'Line Deleted'});
     } catch (e: any) {
       addLog(`❌ Error deleting line: ${e.code} - ${e.message}`);
@@ -486,11 +490,12 @@ export default function MapExplorer({ user }: { user: User }) {
     }
 
     addLog(`Updating area with data: ${JSON.stringify(updatedData)}`);
+    addLog('Entering try block for updateDoc(areas)');
     try {
       await updateDoc(areaRef, updatedData);
+      addLog(`Firestore updateDoc(areas) successful for ID: ${id}`);
       setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path, projectId: projectId } : a));
       setItemToEdit(null);
-      addLog(`✅ Successfully updated area ID: ${id}`);
       toast({title: 'Area Updated'});
     } catch (e: any) {
       addLog(`❌ Error updating area: ${e.code} - ${e.message}`);
@@ -500,11 +505,12 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handleDeleteArea = async (id: string) => {
     addLog(`Attempting to delete area ID: ${id}`);
+    addLog('Entering try block for deleteDoc(areas)');
     try {
       await deleteDoc(doc(db, "areas", id));
+      addLog(`Firestore deleteDoc(areas) successful for ID: ${id}`);
       setAreas(prev => prev.filter(a => a.id !== id));
       setItemToEdit(null);
-      addLog(`✅ Successfully deleted area ID: ${id}`);
       toast({title: 'Area Deleted'});
     } catch(e: any) {
        addLog(`❌ Error deleting area: ${e.code} - ${e.message}`);
@@ -612,15 +618,16 @@ export default function MapExplorer({ user }: { user: User }) {
             userId: user.uid,
         };
         addLog(`Saving project data to Firestore: ${JSON.stringify(newProjectData)}`);
+        addLog('Entering try block for addDoc(projects)');
         try {
           const docRef = await addDoc(collection(db, "projects"), newProjectData);
+          addLog(`Firestore addDoc(projects) successful. New ID: ${docRef.id}`);
           const newProject = { id: docRef.id, ...newProjectData, createdAt: new Date() };
           setProjects(prev => [...prev, newProject]);
           setActiveProjectId(docRef.id);
           setIsNewProjectDialogOpen(false);
           setNewProjectName('');
           setNewProjectDescription('');
-          addLog(`✅ Successfully created project with ID: ${docRef.id}`);
           toast({ title: "Project Created", description: `"${newProjectName}" has been created and set as active.` });
           if (pendingAction) {
             executePendingAction();
@@ -645,11 +652,12 @@ export default function MapExplorer({ user }: { user: User }) {
     const projectRef = doc(db, "projects", projectToEdit.id);
 
     if (name) {
+      addLog('Entering try block for updateDoc(projects)');
       try {
         await updateDoc(projectRef, { name, description });
+        addLog(`Firestore updateDoc(projects) successful for ID: ${projectToEdit.id}`);
         setProjects(projects.map(p => p.id === projectToEdit.id ? { ...p, name, description } : p));
         setProjectToEdit(null);
-        addLog(`✅ Successfully updated project ID: ${projectToEdit.id}`);
         toast({ title: "Project Updated", description: `"${name}" has been updated.` });
       } catch (e: any) {
         addLog(`❌ Error updating project: ${e.code} - ${e.message}`);
@@ -663,6 +671,7 @@ export default function MapExplorer({ user }: { user: User }) {
       if(!project) return;
       
       addLog(`Attempting to delete project: "${project.name}" (ID: ${projectId})`);
+      addLog('Entering try block for batch delete');
       try {
         const batch = writeBatch(db);
         
@@ -682,6 +691,7 @@ export default function MapExplorer({ user }: { user: User }) {
         addLog(` - Marked ${associatedAreas.length} areas for deletion.`);
 
         await batch.commit();
+        addLog(`Firestore batch commit successful.`);
 
         setProjects(prev => prev.filter(p => p.id !== projectId));
         setPins(prev => prev.filter(p => p.projectId !== projectId));
@@ -693,7 +703,6 @@ export default function MapExplorer({ user }: { user: User }) {
         }
         setSelectedProjectIds(prev => prev.filter(id => id !== projectId));
         
-        addLog(`✅ Successfully deleted project and its ${associatedPins.length + associatedLines.length + associatedAreas.length} objects.`);
         toast({ title: "Project Deleted", description: `"${project.name}" and all its objects have been deleted.` });
 
       } catch (e: any) {
@@ -726,7 +735,7 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const displayedAreas = useMemo(() => {
     if (selectedProjectIds.includes('all')) return areas;
-    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!a.projectId && selectedProjectIds.includes('unassigned')));
+    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!p.projectId && selectedProjectIds.includes('unassigned')));
   }, [areas, selectedProjectIds]);
   
   const handleProjectSelection = (id: string) => {
@@ -1107,37 +1116,37 @@ if (dataLoading) {
                 </div>
             )}
 
-            <div className="absolute top-4 right-4 z-[1000] flex items-center gap-2">
-              <TooltipProvider>
-                  <DropdownMenu>
-                      <Tooltip>
-                          <TooltipTrigger asChild>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full shadow-lg bg-card/90">
-                                  <UserIcon className="h-6 w-6"/>
-                                </Button>
-                              </DropdownMenuTrigger>
-                          </TooltipTrigger>
-                          <TooltipContent><p>Account</p></TooltipContent>
-                      </Tooltip>
-                      <DropdownMenuContent className="w-56" align="end">
-                          <DropdownMenuLabel className="font-normal">
-                              <div className="flex flex-col space-y-1">
-                                  <p className="text-sm font-medium leading-none">My Account</p>
-                                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-                              </div>
-                          </DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => router.push('/settings')}>
-                              <Settings className="mr-2 h-4 w-4" />
-                              <span>Settings</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={handleLogout}>
-                              <LogOut className="mr-2 h-4 w-4" />
-                              <span>Log out</span>
-                          </DropdownMenuItem>
-                      </DropdownMenuContent>
-                  </DropdownMenu>
+            <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+                 <TooltipProvider>
+                    <DropdownMenu>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full shadow-lg bg-card/90">
+                                    <UserIcon className="h-6 w-6"/>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Account</p></TooltipContent>
+                        </Tooltip>
+                        <DropdownMenuContent className="w-56" align="end">
+                            <DropdownMenuLabel className="font-normal">
+                                <div className="flex flex-col space-y-1">
+                                    <p className="text-sm font-medium leading-none">My Account</p>
+                                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                                </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => router.push('/settings')}>
+                                <Settings className="mr-2 h-4 w-4" />
+                                <span>Settings</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleLogout}>
+                                <LogOut className="mr-2 h-4 w-4" />
+                                <span>Log out</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
                   <div className="flex flex-col gap-1 bg-background/90 backdrop-blur-sm rounded-full shadow-lg border p-1">
                      <Tooltip>
