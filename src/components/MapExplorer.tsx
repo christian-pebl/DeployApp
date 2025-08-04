@@ -242,7 +242,6 @@ export default function MapExplorer({ user }: { user: User }) {
     setCurrentLocation(latlng);
     if (!initialLocationFound.current) {
       addLog(`Initial location found: ${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`);
-      setView({ center: latlng, zoom: 15 });
       setIsLocating(false);
       initialLocationFound.current = true;
     }
@@ -262,11 +261,12 @@ export default function MapExplorer({ user }: { user: User }) {
     addLog('Locate me button clicked.');
     if (currentLocation) {
         addLog('Centering view on current location.');
-        mapRef.current?.setView(currentLocation, 15, { animate: true });
+        const newZoom = mapRef.current?.getZoom() ?? 15;
+        setView({ center: currentLocation, zoom: newZoom > 15 ? newZoom : 15 });
     } else if (mapRef.current) {
         addLog('Current location not available, re-attempting location.');
         setIsLocating(true);
-        mapRef.current.locate({ setView: true, maxZoom: 15 });
+        mapRef.current.locate({ setView: false });
     }
   };
   
@@ -1904,3 +1904,5 @@ if (dataLoading || !settings || !view) {
     </div>
   );
 }
+
+    
