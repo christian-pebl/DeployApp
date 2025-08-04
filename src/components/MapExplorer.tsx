@@ -228,13 +228,6 @@ export default function MapExplorer({ user }: { user: User }) {
     }
   };
 
-  useEffect(() => {
-    if (activeProjectId && pendingAction) {
-        executePendingAction();
-    }
-  }, [activeProjectId, pendingAction]);
-
-
   const handleLocationFound = (latlng: LatLng) => {
     setCurrentLocation(latlng);
     if (!initialLocationFound.current) {
@@ -288,7 +281,7 @@ export default function MapExplorer({ user }: { user: User }) {
   
   const handleAddPin = () => {
     addLog('Add Pin action initiated.');
-    if (projects.length === 0 || !activeProjectId) {
+    if (!activeProjectId) {
         addLog('No active project. Prompting to create/select project.');
         setPendingAction('pin');
         setIsAssignProjectDialogOpen(true);
@@ -303,7 +296,7 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handleDrawLine = () => {
     addLog('Draw Line action initiated.');
-    if (projects.length === 0 || !activeProjectId) {
+    if (!activeProjectId) {
         addLog('No active project. Prompting to create/select project.');
         setPendingAction('line');
         setIsAssignProjectDialogOpen(true);
@@ -319,7 +312,7 @@ export default function MapExplorer({ user }: { user: User }) {
   
   const handleDrawArea = () => {
     addLog('Draw Area action initiated.');
-    if (projects.length === 0 || !activeProjectId) {
+    if (!activeProjectId) {
         addLog('No active project. Prompting to create/select project.');
         setPendingAction('area');
         setIsAssignProjectDialogOpen(true);
@@ -1112,6 +1105,7 @@ if (dataLoading) {
               onToggleFill={handleToggleFill}
               itemToEdit={itemToEdit}
               onEditItem={handleEditItem}
+              activeProjectId={activeProjectId}
             />
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
@@ -1226,7 +1220,7 @@ if (dataLoading) {
                                 All Projects Visible
                             </label>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => {if (activeProjectId) { setIsManageTagsDialogOpen(true); } else { toast({ variant: 'destructive', title: 'No Active Project', description: 'Please select an active project to manage its tags.'})}}} >
+                        <Button variant="outline" size="sm" onClick={() => {if (activeProjectId) { setIsManageTagsDialogOpen(true); } else { toast({ variant: 'destructive', title: 'No Active Project', description: 'Please select an active project to manage its tags.'})}}} disabled={!activeProjectId}>
                             <Tag className="mr-2 h-4 w-4"/> Manage Tags
                         </Button>
                     </div>
@@ -1515,6 +1509,7 @@ if (dataLoading) {
         if(!open) {
           setNewProjectName('');
           setNewProjectDescription('');
+          setPendingAction(null);
         }
         setIsNewProjectDialogOpen(open);
       }}>

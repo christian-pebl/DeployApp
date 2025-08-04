@@ -47,6 +47,7 @@ interface MapProps {
     onToggleFill: (id: string) => void;
     itemToEdit: Pin | Line | Area | null;
     onEditItem: (item: Pin | Line | Area | null) => void;
+    activeProjectId: string | null;
 }
 
 
@@ -100,7 +101,7 @@ const Map = ({
     pendingLine, onLineSave, onLineCancel,
     pendingArea, onAreaSave, onAreaCancel,
     onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine, onUpdateArea, onDeleteArea, onToggleLabel, onToggleFill,
-    itemToEdit, onEditItem
+    itemToEdit, onEditItem, activeProjectId
 }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
@@ -627,15 +628,33 @@ const Map = ({
     const showPopup = (latlng: LatLng, type: 'pin' | 'line' | 'area', path?: LatLng[]) => {
         const map = mapRef.current;
         if (!map) return;
-
+    
         if (popupRef.current && popupRef.current.isOpen()) {
             map.closePopup();
         }
-
+    
         const formId = `form-${Date.now()}`;
+    
+        // Get unique labels for the current project
+        const projectPins = pins.filter(p => p.projectId === activeProjectId);
+        const projectLines = lines.filter(l => l.projectId === activeProjectId);
+        const projectAreas = areas.filter(a => a.projectId === activeProjectId);
+        const allLabels = [...projectPins, ...projectLines, ...projectAreas].map(item => item.label);
+        const uniqueLabels = [...new Set(allLabels)];
+    
+        const labelOptions = uniqueLabels.map(label => `<option value="${label}">${label}</option>`).join('');
+    
         const content = `
             <form id="${formId}" class="flex flex-col gap-2">
-                <input type="text" name="label" placeholder="Enter label" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-muted-foreground">Label</label>
+                    <select name="label-select" class="p-2 border rounded-md text-sm bg-background text-foreground border-border w-full">
+                        <option value="">-- Select Existing --</option>
+                        ${labelOptions}
+                        <option value="__new__">-- Create New --</option>
+                    </select>
+                    <input type="text" name="label-new" placeholder="Enter new label" class="p-2 border rounded-md text-sm bg-background text-foreground border-border w-full hidden" />
+                </div>
                 <textarea name="notes" placeholder="Add notes..." class="p-2 border rounded-md text-sm bg-background text-foreground border-border min-h-[60px]"></textarea>
                 <div class="flex justify-end gap-2">
                     <button type="button" class="cancel-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Cancel</button>
@@ -643,48 +662,70 @@ const Map = ({
                 </div>
             </form>
         `;
-
+    
         popupRef.current = L.popup({ closeButton: false, closeOnClick: false, className: 'p-0' })
             .setLatLng(latlng)
             .setContent(content)
             .openOn(map);
-
+    
         const handleCancel = () => {
             map.closePopup();
             if (type === 'pin') onPinCancel();
             if (type === 'line') onLineCancel();
             if (type === 'area') onAreaCancel();
         };
-
+    
         const cleanup = () => {
             popupRef.current?.off('remove', handleCancel);
-        }
-
+        };
+    
         popupRef.current.on('remove', handleCancel);
-
-
+    
         setTimeout(() => {
             const form = document.getElementById(formId);
             const cancelButton = form?.querySelector('.cancel-btn');
-
+            const labelSelect = form?.querySelector('select[name="label-select"]') as HTMLSelectElement;
+            const newLabelInput = form?.querySelector('input[name="label-new"]') as HTMLInputElement;
+    
+            labelSelect?.addEventListener('change', () => {
+                if (labelSelect.value === '__new__') {
+                    newLabelInput.classList.remove('hidden');
+                    newLabelInput.required = true;
+                } else {
+                    newLabelInput.classList.add('hidden');
+                    newLabelInput.required = false;
+                }
+            });
+    
             form?.addEventListener('submit', (ev) => {
                 ev.preventDefault();
                 cleanup();
                 const formElements = (ev.target as HTMLFormElement).elements;
-                const labelInput = formElements.namedItem('label') as HTMLInputElement;
+                let finalLabel = '';
+                if(labelSelect.value === '__new__') {
+                    finalLabel = newLabelInput.value;
+                } else {
+                    finalLabel = labelSelect.value;
+                }
+
+                if (!finalLabel) {
+                    alert("Please select or create a label.");
+                    return;
+                }
+
                 const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
                 const newId = `${type}-${Date.now()}`;
                 
                 if (type === 'pin') {
-                    onPinSave(newId, labelInput.value, latlng.lat, latlng.lng, notesInput.value);
+                    onPinSave(newId, finalLabel, latlng.lat, latlng.lng, notesInput.value);
                 } else if (type === 'line' && path) {
-                    onLineSave(newId, labelInput.value, path, notesInput.value);
+                    onLineSave(newId, finalLabel, path, notesInput.value);
                 } else if (type === 'area' && path) {
-                    onAreaSave(newId, labelInput.value, path, notesInput.value);
+                    onAreaSave(newId, finalLabel, path, notesInput.value);
                 }
                 map.closePopup();
             });
-
+    
             cancelButton?.addEventListener('click', () => {
                 cleanup();
                 handleCancel();
