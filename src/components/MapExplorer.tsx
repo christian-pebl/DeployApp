@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -432,7 +433,7 @@ export default function MapExplorer({ user }: { user: User }) {
       const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
       const newLineData: Omit<Line, 'id' | 'createdAt'> = { 
         path: pathData, 
-        label, 
+        label,
         labelVisible: true, 
         notes, 
         userId: user.uid, 
@@ -599,23 +600,64 @@ export default function MapExplorer({ user }: { user: User }) {
     }
   };
 
-  const handleToggleLabel = (id: string, type: 'pin' | 'line' | 'area') => {
+  const handleToggleLabel = async (id: string, type: 'pin' | 'line' | 'area') => {
     addLog(`Toggling label visibility for ${type} ID: ${id}`);
+    const collectionName = `${type}s`;
+    const docRef = doc(db, collectionName, id);
+
+    let currentItem;
+    let localUpdater: React.Dispatch<React.SetStateAction<any[]>>;
+
     if (type === 'pin') {
-      setPins(pins.map(p => p.id === id ? { ...p, labelVisible: !(p.labelVisible ?? true) } : p));
+        currentItem = pins.find(p => p.id === id);
+        localUpdater = setPins;
     } else if (type === 'line') {
-      setLines(lines.map(l => l.id === id ? { ...l, labelVisible: !(l.labelVisible ?? true) } : l));
+        currentItem = lines.find(l => l.id === id);
+        localUpdater = setLines;
     } else {
-      setAreas(areas.map(a => a.id === id ? { ...a, labelVisible: !(a.labelVisible ?? true) } : a));
+        currentItem = areas.find(a => a.id === id);
+        localUpdater = setAreas;
     }
-    setItemToEdit(null);
-  };
-  
-  const handleToggleFill = (id: string) => {
+
+    if (!currentItem) {
+        addLog(`❌ [ERROR] Could not find item ${id} of type ${type} to toggle label.`);
+        return;
+    }
+
+    const newVisibility = !(currentItem.labelVisible ?? true);
+
+    try {
+        await updateDoc(docRef, { labelVisible: newVisibility });
+        localUpdater(items => items.map(item => item.id === id ? { ...item, labelVisible: newVisibility } : item));
+        setItemToEdit(null);
+        toast({ title: `Label ${newVisibility ? 'shown' : 'hidden'}` });
+    } catch (e: any) {
+        addLog(`❌ [ERROR] Failed to update label visibility: ${e.message}`);
+        toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    }
+};
+
+const handleToggleFill = async (id: string) => {
     addLog(`Toggling fill visibility for area ID: ${id}`);
-    setAreas(areas.map(a => a.id === id ? { ...a, fillVisible: !(a.fillVisible ?? true) } : a));
-    setItemToEdit(null);
-  };
+    const area = areas.find(a => a.id === id);
+    if (!area) {
+        addLog(`❌ [ERROR] Could not find area ${id} to toggle fill.`);
+        return;
+    }
+
+    const newVisibility = !(area.fillVisible ?? true);
+    const docRef = doc(db, 'areas', id);
+
+    try {
+        await updateDoc(docRef, { fillVisible: newVisibility });
+        setAreas(areas.map(a => a.id === id ? { ...a, fillVisible: newVisibility } : a));
+        setItemToEdit(null);
+        toast({ title: `Area fill ${newVisibility ? 'shown' : 'hidden'}` });
+    } catch (e: any) {
+        addLog(`❌ [ERROR] Failed to update fill visibility: ${e.message}`);
+        toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    }
+};
 
   const handleViewItem = (item: Pin | Line | Area) => {
     addLog(`Viewing item: "${item.label}" (ID: ${item.id})`);
