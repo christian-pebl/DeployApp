@@ -559,7 +559,20 @@ const Map = ({
 
     useEffect(() => {
         const map = mapRef.current;
-        if (map && isDrawingLine && lineStartPoint) {
+        if (!map) return;
+
+        const cleanupDrawing = () => {
+            if (previewLineRef.current) {
+                previewLineRef.current.remove();
+                previewLineRef.current = null;
+            }
+            if (distanceTooltipRef.current) {
+                distanceTooltipRef.current.remove();
+                distanceTooltipRef.current = null;
+            }
+        };
+
+        if (isDrawingLine && lineStartPoint) {
             const updatePreviewLine = (e?: LeafletMouseEvent) => {
                 const targetPoint = e ? e.latlng : map.getCenter();
                 if (previewLineRef.current) {
@@ -593,32 +606,18 @@ const Map = ({
                 }
             };
             
+            const moveHandler = () => updatePreviewLine();
             map.on('mousemove', updatePreviewLine);
-            map.on('move', () => updatePreviewLine());
+            map.on('move', moveHandler);
             updatePreviewLine(); // Initial draw
 
             return () => {
                 map.off('mousemove', updatePreviewLine);
-                map.off('move', () => updatePreviewLine());
-
-                if (previewLineRef.current) {
-                    previewLineRef.current.remove();
-                    previewLineRef.current = null;
-                }
-                 if (distanceTooltipRef.current) {
-                    distanceTooltipRef.current.remove();
-                    distanceTooltipRef.current = null;
-                }
+                map.off('move', moveHandler);
+                cleanupDrawing();
             };
-        } else if (previewLineRef.current || distanceTooltipRef.current) {
-             if (previewLineRef.current) {
-                previewLineRef.current.remove();
-                previewLineRef.current = null;
-            }
-            if (distanceTooltipRef.current) {
-                distanceTooltipRef.current.remove();
-                distanceTooltipRef.current = null;
-            }
+        } else {
+            cleanupDrawing();
         }
     }, [isDrawingLine, lineStartPoint, settings]);
     
@@ -681,13 +680,14 @@ const Map = ({
                 }
             };
     
+            const moveHandler = () => updatePreview();
             map.on('mousemove', updatePreview);
-            map.on('move', () => updatePreview());
+            map.on('move', moveHandler);
             updatePreview();
     
             return () => {
                 map.off('mousemove', updatePreview);
-                map.off('move', () => updatePreview());
+                map.off('move', moveHandler);
                 cleanupLayers();
             };
         } else {
