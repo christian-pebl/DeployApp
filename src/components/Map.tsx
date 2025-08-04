@@ -121,7 +121,7 @@ const Map = ({
 
         const isPin = 'lat' in item;
         const isArea = 'path' in item && ('fillVisible' in item);
-        const isLine = 'path' in item && !('fillVisible' in item);
+        const isLine = 'path' in item && !isArea;
 
 
         let latlng: LatLng;

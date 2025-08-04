@@ -187,19 +187,11 @@ export default function MapExplorer({ user }: { user: User }) {
     setPendingAction(null);
 
     if (action === 'pin') {
-        if (mapRef.current) {
-            const center = mapRef.current.getCenter();
-            setPendingPin(center);
-        }
+      handleAddPin();
     } else if (action === 'line') {
-        if (mapRef.current) {
-            const center = mapRef.current.getCenter();
-            setLineStartPoint(center);
-            setIsDrawingLine(true);
-        }
+      handleDrawLine();
     } else if (action === 'area') {
-        setIsDrawingArea(true);
-        setPendingAreaPath([]);
+      handleDrawArea();
     }
   };
 
@@ -267,7 +259,9 @@ export default function MapExplorer({ user }: { user: User }) {
         addLog('No projects found. Prompting to create first project.');
         setPendingAction('pin');
         setIsAssignProjectDialogOpen(true);
-    } else if (mapRef.current) {
+        return;
+    }
+    if (mapRef.current) {
         const center = mapRef.current.getCenter();
         addLog(`Setting pending pin at: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
         setPendingPin(center);
@@ -280,7 +274,9 @@ export default function MapExplorer({ user }: { user: User }) {
         addLog('No projects found. Prompting to create first project.');
         setPendingAction('line');
         setIsAssignProjectDialogOpen(true);
-    } else if (mapRef.current) {
+        return;
+    }
+    if (mapRef.current) {
         const center = mapRef.current.getCenter();
         addLog(`Setting line start point at: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
         setLineStartPoint(center);
@@ -294,11 +290,11 @@ export default function MapExplorer({ user }: { user: User }) {
         addLog('No projects found. Prompting to create first project.');
         setPendingAction('area');
         setIsAssignProjectDialogOpen(true);
-    } else {
-        addLog('Starting area drawing mode.');
-        setIsDrawingArea(true);
-        setPendingAreaPath([]);
+        return;
     }
+    addLog('Starting area drawing mode.');
+    setIsDrawingArea(true);
+    setPendingAreaPath([]);
   }
 
   const handleConfirmLine = () => {
@@ -411,7 +407,7 @@ export default function MapExplorer({ user }: { user: User }) {
     if (projectId) {
       updatedData.projectId = projectId;
     } else {
-      delete updatedData.projectId;
+      updatedData.projectId = null;
     }
     
     addLog(`Updating pin with data: ${JSON.stringify(updatedData)}`);
@@ -450,7 +446,7 @@ export default function MapExplorer({ user }: { user: User }) {
      if (projectId) {
       updatedData.projectId = projectId;
     } else {
-      delete updatedData.projectId;
+      updatedData.projectId = null;
     }
 
     addLog(`Updating line with data: ${JSON.stringify(updatedData)}`);
@@ -489,7 +485,7 @@ export default function MapExplorer({ user }: { user: User }) {
     if (projectId) {
       updatedData.projectId = projectId;
     } else {
-      delete updatedData.projectId;
+      updatedData.projectId = null;
     }
 
     addLog(`Updating area with data: ${JSON.stringify(updatedData)}`);
@@ -613,34 +609,35 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleCreateNewProject = async (e: React.FormEvent) => {
     e.preventDefault();
     addLog(`Attempting to create project: "${newProjectName}"`);
-    if (newProjectName) {
-        const newProjectData = {
-            name: newProjectName,
-            description: newProjectDescription,
-            createdAt: serverTimestamp(),
-            userId: user.uid,
-        };
-        addLog(`Saving project data to Firestore: ${JSON.stringify(newProjectData)}`);
-        addLog('Entering try block for addDoc(projects)');
-        try {
-          const docRef = await addDoc(collection(db, "projects"), newProjectData);
-          addLog(`✅ Firestore addDoc(projects) successful. New ID: ${docRef.id}`);
-          const newProject = { id: docRef.id, ...newProjectData, createdAt: new Date() };
-          setProjects(prev => [...prev, newProject]);
-          setActiveProjectId(docRef.id);
-          setIsNewProjectDialogOpen(false);
-          setNewProjectName('');
-          setNewProjectDescription('');
-          toast({ title: "Project Created", description: `"${newProjectName}" has been created and set as active.` });
-          if (pendingAction) {
-            executePendingAction();
-          }
-        } catch (e: any) {
-          addLog(`❌ Error creating project: ${e.code} - ${e.message}`);
-          toast({variant: 'destructive', title: 'Failed to create project', description: e.message});
-        }
-    } else {
+    if (!newProjectName) {
         addLog('Project creation failed: name is empty.');
+        toast({variant: 'destructive', title: 'Project Name Required'});
+        return;
+    }
+    const newProjectData = {
+        name: newProjectName,
+        description: newProjectDescription,
+        createdAt: serverTimestamp(),
+        userId: user.uid,
+    };
+    addLog(`Saving project data to Firestore: ${JSON.stringify(newProjectData)}`);
+    addLog('Entering try block for addDoc(projects)');
+    try {
+      const docRef = await addDoc(collection(db, "projects"), newProjectData);
+      addLog(`✅ Firestore addDoc(projects) successful. New ID: ${docRef.id}`);
+      const newProject = { id: docRef.id, ...newProjectData, createdAt: new Date() };
+      setProjects(prev => [...prev, newProject]);
+      setActiveProjectId(docRef.id);
+      setIsNewProjectDialogOpen(false);
+      setNewProjectName('');
+      setNewProjectDescription('');
+      toast({ title: "Project Created", description: `"${newProjectName}" has been created and set as active.` });
+      if (pendingAction) {
+        executePendingAction();
+      }
+    } catch (e: any) {
+      addLog(`❌ Error creating project: ${e.code} - ${e.message}`);
+      toast({variant: 'destructive', title: 'Failed to create project', description: e.message});
     }
   };
   
@@ -654,18 +651,21 @@ export default function MapExplorer({ user }: { user: User }) {
 
     const projectRef = doc(db, "projects", projectToEdit.id);
 
-    if (name) {
-      addLog('Entering try block for updateDoc(projects)');
-      try {
-        await updateDoc(projectRef, { name, description });
-        addLog(`✅ Firestore updateDoc(projects) successful for ID: ${projectToEdit.id}`);
-        setProjects(projects.map(p => p.id === projectToEdit.id ? { ...p, name, description } : p));
-        setProjectToEdit(null);
-        toast({ title: "Project Updated", description: `"${name}" has been updated.` });
-      } catch (e: any) {
-        addLog(`❌ Error updating project: ${e.code} - ${e.message}`);
-        toast({variant: 'destructive', title: 'Failed to update project', description: e.message});
-      }
+    if (!name) {
+      toast({variant: 'destructive', title: 'Project Name Required'});
+      return;
+    }
+
+    addLog('Entering try block for updateDoc(projects)');
+    try {
+      await updateDoc(projectRef, { name, description });
+      addLog(`✅ Firestore updateDoc(projects) successful for ID: ${projectToEdit.id}`);
+      setProjects(projects.map(p => p.id === projectToEdit.id ? { ...p, name, description } : p));
+      setProjectToEdit(null);
+      toast({ title: "Project Updated", description: `"${name}" has been updated.` });
+    } catch (e: any) {
+      addLog(`❌ Error updating project: ${e.code} - ${e.message}`);
+      toast({variant: 'destructive', title: 'Failed to update project', description: e.message});
     }
   }
   
@@ -722,8 +722,8 @@ export default function MapExplorer({ user }: { user: User }) {
   
   const unassignedObjectCount = useMemo(() => {
     return pins.filter(p => !p.projectId).length +
-           lines.filter(l => !l.projectId).length +
-           areas.filter(a => !a.projectId).length;
+           lines.filter(l => !p.projectId).length +
+           areas.filter(a => !p.projectId).length;
   }, [pins, lines, areas]);
 
   const displayedPins = useMemo(() => {
@@ -738,7 +738,7 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const displayedAreas = useMemo(() => {
     if (selectedProjectIds.includes('all')) return areas;
-    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!p.projectId && selectedProjectIds.includes('unassigned')));
+    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!a.projectId && selectedProjectIds.includes('unassigned')));
   }, [areas, selectedProjectIds]);
   
   const handleProjectSelection = (id: string) => {
@@ -840,7 +840,7 @@ if (dataLoading) {
             </div>
 
             <div className="absolute top-4 left-4 z-[1001] flex flex-col gap-2">
-                <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
+              <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
                   <Input
                       type="text"
                       placeholder="Search address or label..."
@@ -1119,7 +1119,7 @@ if (dataLoading) {
                 </div>
             )}
 
-            <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+            <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end gap-2">
                  <TooltipProvider>
                     <DropdownMenu>
                         <Tooltip>
