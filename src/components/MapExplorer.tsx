@@ -745,7 +745,7 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const displayedAreas = useMemo(() => {
     if (selectedProjectIds.includes('all')) return areas;
-    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!a.projectId && selectedProjectIds.includes('unassigned')));
+    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!p.projectId && selectedProjectIds.includes('unassigned')));
   }, [areas, selectedProjectIds]);
   
   const handleProjectSelection = (id: string) => {
@@ -802,10 +802,23 @@ const handleGenerateShareCode = async (projectId: string) => {
   };
 
   try {
-    addLog(`[SHARE_CLIENT] 2. Attempting to write to 'shares' collection with payload: ${JSON.stringify(newSharePayload)}`);
-    const docRef = await addDoc(collection(db, 'shares'), newSharePayload);
-    addLog(`[SHARE_CLIENT] 3. ✅ Successfully created share document with ID: ${docRef.id}`);
-    setShareCode(docRef.id);
+    addLog(`[SHARE_CLIENT] 2. Attempting to write to 'shares' collection: ${JSON.stringify(newSharePayload)}`);
+    const batch = writeBatch(db);
+    
+    // Create the share document
+    const shareRef = doc(collection(db, 'shares'));
+    batch.set(shareRef, newSharePayload);
+    addLog(`   - Queued write to /shares/${shareRef.id}`);
+    
+    // Create the lookup document for security rules
+    const shareLookupRef = doc(db, 'shares_by_project', projectId);
+    batch.set(shareLookupRef, { createdAt: serverTimestamp() });
+    addLog(`   - Queued write to /shares_by_project/${projectId}`);
+    
+    await batch.commit();
+
+    addLog(`[SHARE_CLIENT] 3. ✅ Successfully created share document with ID: ${shareRef.id}`);
+    setShareCode(shareRef.id);
     setIsShareDialogOpen(true);
   } catch (error: any) {
     addLog(`[SHARE_CLIENT] 4. ❌ Error generating share code: ${error.message}`);
@@ -822,38 +835,35 @@ const handleImportProject = async (e: React.FormEvent) => {
   if (!importCode) return;
   setIsImporting(true);
   addLog(`[IMPORT_CLIENT] 1. Starting import for share code: ${importCode}`);
-  addLog(`[IMPORT_CLIENT] User authenticated: ${!!auth.currentUser}`);
-  addLog(`[IMPORT_CLIENT] Attempting to fetch share with ID: ${importCode}`);
-
+  
   try {
     const shareRef = doc(db, 'shares', importCode);
+    addLog(`[IMPORT_CLIENT] 2. Fetching share document: /shares/${importCode}`);
     const shareSnap = await getDoc(shareRef);
 
-    if (shareSnap.exists()) {
-      addLog(`[IMPORT_CLIENT] Share document found.`);
-    } else {
+    if (!shareSnap.exists()) {
       addLog(`[IMPORT_CLIENT] ❌ Share code not found.`);
-      throw new Error('Invalid share code.');
+      throw new Error('Invalid share code. Please check the code and try again.');
     }
-
+    addLog(`[IMPORT_CLIENT] 3. ✅ Share document found.`);
+    
     const shareData = shareSnap.data();
     const projectId = shareData.projectId;
-    addLog(`[IMPORT_CLIENT] 3. ✅ Share code found. Corresponds to project ID: ${projectId}`);
-
+    addLog(`[IMPORT_CLIENT] 4. Original project ID from share: ${projectId}`);
 
     // Get project
-    addLog(`[IMPORT_CLIENT] 4. Fetching project document...`);
+    addLog(`[IMPORT_CLIENT] 5. Fetching original project document: /projects/${projectId}`);
     const projectRef = doc(db, 'projects', projectId);
     const projectSnap = await getDoc(projectRef);
     if (!projectSnap.exists()) {
       addLog(`[IMPORT_CLIENT] ❌ Original project with ID ${projectId} not found.`);
-      throw new Error('Original project not found.');
+      throw new Error('Original project not found. It may have been deleted by the owner.');
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
-    addLog(`[IMPORT_CLIENT] 5. ✅ Successfully fetched project: "${project.name}"`);
+    addLog(`[IMPORT_CLIENT] 6. ✅ Successfully fetched project: "${project.name}"`);
 
     // Get associated objects
-    addLog(`[IMPORT_CLIENT] 6. Fetching associated data...`);
+    addLog(`[IMPORT_CLIENT] 7. Fetching associated data for project ${projectId}...`);
     const pinsQuery = query(collection(db, 'pins'), where('projectId', '==', projectId));
     const linesQuery = query(collection(db, 'lines'), where('projectId', '==', projectId));
     const areasQuery = query(collection(db, 'areas'), where('projectId', '==', projectId));
@@ -869,7 +879,7 @@ const handleImportProject = async (e: React.FormEvent) => {
     const importedAreas = areasSnapshot.docs.map(d => d.data() as Area);
     addLog(`   - Found ${importedPins.length} pins, ${importedLines.length} lines, ${importedAreas.length} areas.`);
 
-    addLog(`[IMPORT_CLIENT] 7. Creating batch write...`);
+    addLog(`[IMPORT_CLIENT] 8. Creating batch write for import...`);
     const batch = writeBatch(db);
 
     const newProjectRef = doc(collection(db, 'projects'));
@@ -879,7 +889,7 @@ const handleImportProject = async (e: React.FormEvent) => {
       userId: user.uid,
       createdAt: serverTimestamp(),
     });
-    addLog(`   - Queued new project for creation.`);
+    addLog(`   - Queued new project for creation with ID: ${newProjectRef.id}`);
 
     importedPins.forEach(pin => {
       const { id, userId, ...rest } = pin;
@@ -899,12 +909,12 @@ const handleImportProject = async (e: React.FormEvent) => {
     });
     addLog(`   - Queued ${importedAreas.length} areas for creation.`);
 
-    addLog(`[IMPORT_CLIENT] 8. Committing batch write...`);
+    addLog(`[IMPORT_CLIENT] 9. Committing batch write...`);
     await batch.commit();
-    addLog(`[IMPORT_CLIENT] 9. ✅ Batch commit successful.`);
+    addLog(`[IMPORT_CLIENT] 10. ✅ Batch commit successful.`);
     
     await loadData();
-    addLog(`[IMPORT_CLIENT] 10. ✅ Data reloaded.`);
+    addLog(`[IMPORT_CLIENT] 11. ✅ Data reloaded.`);
     
     toast({ title: 'Project Imported', description: `Successfully imported "${project.name}".` });
     setIsImportProjectDialogOpen(false);
