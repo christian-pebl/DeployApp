@@ -503,7 +503,7 @@ export default function MapExplorer({ user }: { user: User }) {
     try {
       await updateDoc(pinRef, updatedData);
       addLog(`✅ [SUCCESS] Pin updated for ID: ${id}`);
-      setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes, projectId: projectId, tagIds } : p));
+      setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes, projectId: projectId === '' ? undefined : projectId, tagIds } : p));
       setItemToEdit(null);
       toast({title: 'Pin Updated'});
     } catch (e: any) {
@@ -540,7 +540,7 @@ export default function MapExplorer({ user }: { user: User }) {
     try {
       await updateDoc(lineRef, updatedData);
       addLog(`✅ [SUCCESS] Line updated for ID: ${id}`);
-      setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes, projectId: projectId, tagIds } : l));
+      setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes, projectId: projectId === '' ? undefined : projectId, tagIds } : l));
       setItemToEdit(null);
       toast({title: 'Line Updated'});
     } catch(e: any) {
@@ -577,7 +577,7 @@ export default function MapExplorer({ user }: { user: User }) {
     try {
       await updateDoc(areaRef, updatedData);
       addLog(`✅ [SUCCESS] Area updated for ID: ${id}`);
-      setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path, projectId: projectId, tagIds } : a));
+      setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path, projectId: projectId === '' ? undefined : projectId, tagIds } : a));
       setItemToEdit(null);
       toast({title: 'Area Updated'});
     } catch (e: any) {
@@ -1026,6 +1026,32 @@ const handleToggleFill = async (id: string) => {
     });
 };
 
+const handleSetActiveProject = (projectId: string) => {
+    addLog(`Setting active project to ID: ${projectId}`);
+    setActiveProjectId(projectId);
+
+    const map = mapRef.current;
+    if (!map) return;
+
+    const projectPins = pins.filter(p => p.projectId === projectId);
+    const projectLines = lines.filter(l => l.projectId === projectId);
+    const projectAreas = areas.filter(a => a.projectId === projectId);
+
+    const allCoords: LatLngExpression[] = [];
+
+    projectPins.forEach(p => allCoords.push([p.lat, p.lng]));
+    projectLines.forEach(l => l.path.forEach(p => allCoords.push([p.lat, p.lng])));
+    projectAreas.forEach(a => a.path.forEach(p => allCoords.push([p.lat, p.lng])));
+
+    if (allCoords.length > 0) {
+      addLog(`Fitting map to bounds of ${allCoords.length} coordinates for project ${projectId}`);
+      map.fitBounds(allCoords as L.LatLngBoundsExpression, { padding: [50, 50] });
+    } else {
+      addLog(`No objects found for project ${projectId}, not changing view.`);
+    }
+  };
+
+
 const handleLogout = async () => {
     addLog('User logging out.');
     await signOut(auth);
@@ -1386,11 +1412,11 @@ if (dataLoading || !settings || !view) {
                                         <TooltipProvider>
                                           <Tooltip>
                                             <TooltipTrigger asChild>
-                                              <Button variant={activeProjectId === project.id ? "default" : "ghost"} size="icon" className="h-7 w-7" onClick={() => { addLog(`Setting active project to: "${project.name}"`); setActiveProjectId(project.id);}}>
+                                              <Button variant={activeProjectId === project.id ? "default" : "ghost"} size="icon" className="h-7 w-7" onClick={() => handleSetActiveProject(project.id)}>
                                                 <Star className={cn("h-4 w-4", activeProjectId === project.id ? "text-primary-foreground" : "")}/>
                                               </Button>
                                             </TooltipTrigger>
-                                            <TooltipContent side="top"><p>Set Active</p></TooltipContent>
+                                            <TooltipContent side="top"><p>Set Active &amp; View</p></TooltipContent>
                                           </Tooltip>
                                           <Tooltip>
                                                 <TooltipTrigger asChild>
