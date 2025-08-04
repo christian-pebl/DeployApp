@@ -3,7 +3,6 @@
 /**
  * @fileOverview A project sharing AI agent.
  *
- * - generateShareCode - Creates a shareable code for a project.
  * - importSharedProject - Imports a project using a share code.
  */
 
@@ -14,28 +13,11 @@ import {
   doc,
   getDoc,
   getDocs,
-  addDoc,
   query,
   where,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { logger } from 'genkit/logging';
-
-// Schema for generating a share code
-const GenerateShareCodeInputSchema = z.object({
-  projectId: z.string().describe('The ID of the project to share.'),
-  originalOwnerId: z.string().describe('The user ID of the project owner.'),
-});
-export type GenerateShareCodeInput = z.infer<
-  typeof GenerateShareCodeInputSchema
->;
-
-const GenerateShareCodeOutputSchema = z.object({
-  shareCode: z.string().describe('The generated share code.'),
-});
-export type GenerateShareCodeOutput = z.infer<
-  typeof GenerateShareCodeOutputSchema
->;
 
 // Schema for importing a project
 const ImportProjectInputSchema = z.object({
@@ -86,39 +68,6 @@ const ImportProjectOutputSchema = z.object({
   areas: z.array(AreaDataSchema),
 });
 export type ImportProjectOutput = z.infer<typeof ImportProjectOutputSchema>;
-
-// Flow to generate a share code
-export const generateShareCodeFlow = ai.defineFlow(
-  {
-    name: 'generateShareCodeFlow',
-    inputSchema: GenerateShareCodeInputSchema,
-    outputSchema: GenerateShareCodeOutputSchema,
-  },
-  async (input) => {
-    logger.info('[SHARE_FLOW] 3. Received request with input:', input);
-    const sharesRef = collection(db, 'shares');
-    const newShare = {
-      projectId: input.projectId,
-      originalOwnerId: input.originalOwnerId,
-      createdAt: new Date(),
-    };
-    logger.info('[SHARE_FLOW] Attempting to write to shares collection:', newShare);
-    try {
-      const docRef = await addDoc(sharesRef, newShare);
-      logger.info('✅ [SHARE_FLOW] Successfully created share document with ID:', docRef.id);
-      return { shareCode: docRef.id };
-    } catch (error: any) {
-      logger.error('❌ [SHARE_FLOW] Error writing to shares collection:', error);
-      throw new Error(`Firestore write failed: ${error.message}`);
-    }
-  }
-);
-
-export async function generateShareCode(
-  input: GenerateShareCodeInput
-): Promise<GenerateShareCodeOutput> {
-  return generateShareCodeFlow(input);
-}
 
 // Flow to import a project
 export const importSharedProjectFlow = ai.defineFlow(

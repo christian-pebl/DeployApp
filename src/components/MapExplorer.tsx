@@ -27,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { generateShareCode, importSharedProject } from '@/ai/flows/share-project';
+import { importSharedProject } from '@/ai/flows/share-project';
 import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy, Share2, Download } from 'lucide-react';
 import {
   Tooltip,
@@ -799,21 +799,27 @@ const handleLogout = async () => {
 
 const handleGenerateShareCode = async (projectId: string) => {
   setIsGeneratingCode(true);
-  const payload = { projectId, originalOwnerId: user.uid };
-  addLog(`[SHARE_CLIENT] 1. Starting code generation for payload: ${JSON.stringify(payload)}`);
+  addLog(`[SHARE_CLIENT] 1. Starting code generation for project ID: ${projectId}`);
+  
+  const sharesRef = collection(db, 'shares');
+  const newShare = {
+    projectId: projectId,
+    originalOwnerId: user.uid,
+    createdAt: serverTimestamp(),
+  };
 
   try {
-    addLog(`[SHARE_CLIENT] 2. Calling generateShareCode flow...`);
-    const result = await generateShareCode(payload);
-    addLog(`[SHARE_CLIENT] 4. Flow returned successfully: ${JSON.stringify(result)}`);
-    setShareCode(result.shareCode);
+    addLog(`[SHARE_CLIENT] 2. Attempting to write to shares collection: ${JSON.stringify(newShare)}`);
+    const docRef = await addDoc(sharesRef, newShare);
+    addLog(`[SHARE_CLIENT] 3. ✅ Successfully created share document with ID: ${docRef.id}`);
+    setShareCode(docRef.id);
     setIsShareDialogOpen(true);
   } catch (error: any) {
-    addLog(`❌ [SHARE_CLIENT] 4. Error generating share code: ${error.message}`);
+    addLog(`[SHARE_CLIENT] 3. ❌ Error writing to shares collection: ${error.message}`);
     toast({ variant: 'destructive', title: 'Could not generate share code', description: error.message });
   } finally {
+    addLog(`[SHARE_CLIENT] 4. Finished code generation attempt.`);
     setIsGeneratingCode(false);
-    addLog(`[SHARE_CLIENT] 5. Finished code generation attempt.`);
   }
 };
 
@@ -1323,7 +1329,7 @@ if (dataLoading) {
         <DialogContent className="z-[1003]">
             <DialogHeader>
                 <DialogTitle>Create New Project</DialogTitle>
-                <DialogDescription>Enter a name and optional description for your new project.</DialogDescription>
+                <DialogDescription>A project is a container for your map objects.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateNewProject} className="space-y-4">
                 <Input name="name" placeholder="Project Name" required value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} />
@@ -1356,9 +1362,9 @@ if (dataLoading) {
       <Dialog open={isAssignProjectDialogOpen} onOpenChange={setIsAssignProjectDialogOpen}>
         <DialogContent className="z-[1003] sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Create a Project First</DialogTitle>
+            <DialogTitle>Create Your First Project</DialogTitle>
             <DialogDescription>
-              To add items to your map, you need to create a project first.
+              To add items to the map, you need a project to hold them.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
