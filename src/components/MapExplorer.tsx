@@ -344,7 +344,7 @@ export default function MapExplorer({ user }: { user: User }) {
       addLog(`Saving pin data: ${JSON.stringify(newPinData)}`);
       const docRef = await addDoc(collection(db, "pins"), newPinData);
       addLog(`✅ Firestore addDoc(pins) successful. New ID: ${docRef.id}`);
-      const newPin = { id: docRef.id, ...newPinData };
+      const newPin = { ...newPinData, id: docRef.id, createdAt: new Date() };
       setPins(prev => [...prev, newPin]);
       setPendingPin(null);
       toast({title: 'Pin Saved'});
@@ -367,7 +367,7 @@ export default function MapExplorer({ user }: { user: User }) {
         addLog(`Saving line data: ${JSON.stringify(newLineData)}`);
         const docRef = await addDoc(collection(db, "lines"), newLineData);
         addLog(`✅ Firestore addDoc(lines) successful. New ID: ${docRef.id}`);
-        const newLine = { id: docRef.id, ...newLineData };
+        const newLine = { ...newLineData, id: docRef.id, createdAt: new Date() };
         setLines(prev => [...prev, newLine]);
         setPendingLine(null);
         toast({title: 'Line Saved'});
@@ -390,7 +390,7 @@ export default function MapExplorer({ user }: { user: User }) {
       addLog(`Saving area data: ${JSON.stringify(newAreaData)}`);
       const docRef = await addDoc(collection(db, "areas"), newAreaData);
       addLog(`✅ Firestore addDoc(areas) successful. New ID: ${docRef.id}`);
-      const newArea = { id: docRef.id, ...newAreaData };
+      const newArea = { ...newAreaData, id: docRef.id, createdAt: new Date() };
       setAreas(prev => [...prev, newArea]);
       setPendingArea(null);
       toast({title: 'Area Saved'});
@@ -403,7 +403,11 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleUpdatePin = async (id: string, label: string, notes: string, projectId?: string) => {
     const pinRef = doc(db, "pins", id);
     const updatedData: any = { label, notes };
-    updatedData.projectId = projectId ? projectId : null;
+    if (projectId) {
+      updatedData.projectId = projectId;
+    } else {
+      updatedData.projectId = null;
+    }
     
     addLog(`Entering try block for updateDoc(pins) ID: ${id}`);
     try {
@@ -435,7 +439,11 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleUpdateLine = async (id: string, label: string, notes: string, projectId?: string) => {
     const lineRef = doc(db, "lines", id);
     const updatedData: any = { label, notes };
-    updatedData.projectId = projectId ? projectId : null;
+    if (projectId) {
+      updatedData.projectId = projectId;
+    } else {
+      updatedData.projectId = null;
+    }
 
     addLog(`Entering try block for updateDoc(lines) ID: ${id}`);
     try {
@@ -467,7 +475,11 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleUpdateArea = async (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string) => {
     const areaRef = doc(db, "areas", id);
     const updatedData: any = { label, notes, path };
-    updatedData.projectId = projectId ? projectId : null;
+    if (projectId) {
+      updatedData.projectId = projectId;
+    } else {
+      updatedData.projectId = null;
+    }
 
     addLog(`Entering try block for updateDoc(areas) ID: ${id}`);
     try {
@@ -596,36 +608,36 @@ export default function MapExplorer({ user }: { user: User }) {
         description: newProjectDescription,
     };
     
-    addLog("step 1: about to enter try");
+    addLog("📍 step 1: entering addProject");
+    const payload = {
+      ...data,
+      createdAt: serverTimestamp(),
+      userId: user.uid,
+    };
+    addLog(`db instance is: ${db}`);
+    addLog(`collection ref is: ${collection(db, "projects")}`);
+    addLog(`data payload: ${JSON.stringify(payload)}`);
+    const writePromise = addDoc(collection(db, "projects"), payload);
+    addLog(`writePromise is: ${writePromise}`);
     try {
-        addLog("step 2: inside try, before addDoc");
-        const payload = {
-            ...data,
-            createdAt: serverTimestamp(),
-            userId: user.uid
-        };
-        addLog(`data payload: ${JSON.stringify(payload)}`);
+      const docRef = await writePromise;
+      addLog(`✅ step 2: write resolved with ID: ${docRef.id}`);
+      const newProject = { ...payload, id: docRef.id, createdAt: new Date() };
+      setProjects(prev => [...prev, newProject]);
+      setActiveProjectId(docRef.id);
+      setIsNewProjectDialogOpen(false);
+      setNewProjectName('');
+      setNewProjectDescription('');
+      toast({ title: "Project Created", description: `"${newProjectName}" has been created and set as active.` });
 
-        const docRef = await addDoc(collection(db, "projects"), payload);
-        
-        addLog(`step 3: after await, got docRef.id = ${docRef.id}`);
-
-        const newProject = { ...payload, id: docRef.id, createdAt: new Date() };
-        setProjects(prev => [...prev, newProject]);
-        setActiveProjectId(docRef.id);
-        setIsNewProjectDialogOpen(false);
-        setNewProjectName('');
-        setNewProjectDescription('');
-        toast({ title: "Project Created", description: `"${newProjectName}" has been created and set as active.` });
-
-        if (pendingAction) {
-            executePendingAction();
-        }
+      if (pendingAction) {
+          executePendingAction();
+      }
     } catch (err: any) {
-      addLog(`❌ step 4: caught an error: ${err.code} ${err.message}`);
+      addLog(`❌ step 3: write rejected: ${err.code} ${err.message}`);
       toast({variant: 'destructive', title: 'Failed to create project', description: err.message});
     }
-    addLog("step 5: function complete");
+    addLog("📍 step 4: handler complete");
   };
   
   const handleUpdateProject = async (e: React.FormEvent) => {
@@ -1239,9 +1251,9 @@ if (dataLoading) {
       <Dialog open={isAssignProjectDialogOpen} onOpenChange={setIsAssignProjectDialogOpen}>
         <DialogContent className="z-[1003] sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Create First Project</DialogTitle>
+            <DialogTitle>Create Your First Project</DialogTitle>
             <DialogDescription>
-              A project is needed to save map items.
+              To save map items, you need a project to organize them in.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
