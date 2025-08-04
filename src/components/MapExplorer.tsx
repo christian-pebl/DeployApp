@@ -125,7 +125,6 @@ export default function MapExplorer({ user }: { user: User }) {
   
   const initialLocationFound = useRef(false);
   const mapRef = useRef<LeafletMap | null>(null);
-  const editProjectFormRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -556,12 +555,10 @@ useEffect(() => {
   const handleUpdateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectToEdit) return;
-    const form = editProjectFormRef.current;
-    if (!form) return;
 
-    const formData = new FormData(form);
-    const name = formData.get('name') as string;
-    const description = formData.get('description') as string;
+    const name = (e.currentTarget.elements.namedItem('name') as HTMLInputElement).value;
+    const description = (e.currentTarget.elements.namedItem('description') as HTMLTextAreaElement).value;
+
     const projectRef = doc(db, "projects", projectToEdit.id);
 
     if (name) {
@@ -988,22 +985,22 @@ if (dataLoading) {
                 </div>
             )}
 
-            <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-                <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
-                    <Input
-                        type="text"
-                        placeholder="Search address or label..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
-                    />
-                    <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching} className="h-9 w-9">
-                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    </Button>
-                </div>
+            <div className="absolute top-4 right-4 z-[1000] flex items-start gap-2">
+              <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
+                  <Input
+                      type="text"
+                      placeholder="Search address or label..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                  />
+                  <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching} className="h-9 w-9 flex-shrink-0">
+                      {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+              </div>
               <TooltipProvider>
-                <div className="flex gap-2 justify-end">
+                <div className="flex gap-2">
                   <DropdownMenu>
                       <Tooltip>
                           <TooltipTrigger asChild>
@@ -1051,7 +1048,7 @@ if (dataLoading) {
                     </TooltipContent>
                   </Tooltip>
 
-                  <div className="flex flex-col gap-1 bg-background rounded-full shadow-lg border">
+                  <div className="flex flex-col gap-1 bg-background rounded-full shadow-lg border p-1">
                      <Tooltip>
                       <TooltipTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={handleZoomIn}>
@@ -1118,7 +1115,7 @@ if (dataLoading) {
                 <DialogTitle>Edit Project</DialogTitle>
                 <DialogDescription>Update the name and description for "{projectToEdit?.name}".</DialogDescription>
             </DialogHeader>
-            <form ref={editProjectFormRef} onSubmit={handleUpdateProject} className="space-y-4">
+            <form onSubmit={handleUpdateProject} className="space-y-4">
                 <Input name="name" defaultValue={projectToEdit?.name} placeholder="Project Name" required />
                 <Textarea name="description" defaultValue={projectToEdit?.description} placeholder="Project Description (optional)" />
                 <DialogFooter>
