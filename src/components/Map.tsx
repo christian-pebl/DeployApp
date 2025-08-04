@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions, Tooltip as LeafletTooltip } from 'leaflet';
+import React, { useEffect, useRef, useState } from 'react';
+import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions, Tooltip as LeafletTooltip, Marker } from 'leaflet';
 import type { Settings } from '@/hooks/use-settings';
 
 type Project = { id: string; name: string; description?: string; createdAt: any; };
@@ -50,6 +50,9 @@ interface MapProps {
     itemToEdit: Pin | Line | Area | null;
     onEditItem: (item: Pin | Line | Area | null) => void;
     activeProjectId: string | null;
+    editingGeometry: Line | Area | null;
+    onEditGeometry: (item: Line | Area | null) => void;
+    onUpdateGeometry: (itemId: string, newPath: {lat: number, lng: number}[]) => void;
 }
 
 // Coordinate and distance conversion helpers
@@ -116,7 +119,8 @@ const Map = ({
     pendingLine, onLineSave, onLineCancel,
     pendingArea, onAreaSave, onAreaCancel,
     onUpdatePin, onDeletePin, onUpdateLine, onDeleteLine, onUpdateArea, onDeleteArea, onToggleLabel, onToggleFill,
-    itemToEdit, onEditItem, activeProjectId
+    itemToEdit, onEditItem, activeProjectId,
+    editingGeometry, onEditGeometry, onUpdateGeometry
 }: MapProps) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const pinLayerRef = useRef<LayerGroup | null>(null);
@@ -129,6 +133,19 @@ const Map = ({
     const popupRef = useRef<Popup | null>(null);
     const previewAreaPointsRef = useRef<LayerGroup | null>(null);
     const distanceTooltipRef = useRef<LeafletTooltip | null>(null);
+    const editingLayerRef = useRef<LayerGroup | null>(null);
+
+    // Expose a method to save geometry via the mapRef
+    useEffect(() => {
+      if (mapRef.current) {
+        (mapRef.current as any).saveEditedGeometry = () => {
+          if (editingGeometry && editingLayerRef.current) {
+            const newPath = (editingLayerRef.current as any)._newPath;
+            onUpdateGeometry(editingGeometry.id, newPath);
+          }
+        };
+      }
+    }, [mapRef, editingGeometry, onUpdateGeometry]);
 
 
     const showEditPopup = (item: Pin | Line | Area) => {
@@ -238,6 +255,11 @@ const Map = ({
         if(isArea) {
             fillButtonHtml = `<button type="button" class="toggle-fill-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${fillVisible ? 'Hide' : 'Show'} Fill</button>`
         }
+        
+        let editShapeButtonHtml = '';
+        if (isLine || isArea) {
+            editShapeButtonHtml = `<button type="button" class="edit-shape-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Edit Shape</button>`;
+        }
 
         const content = `
             <form id="${formId}" class="flex flex-col gap-2">
@@ -250,6 +272,7 @@ const Map = ({
                     <div class="flex gap-2">
                         <button type="button" class="toggle-label-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${labelVisible ? 'Hide' : 'Show'} Label</button>
                         ${fillButtonHtml}
+                        ${editShapeButtonHtml}
                     </div>
                     <div class="flex gap-2">
                         <button type="button" class="delete-btn px-3 py-1 text-sm rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/80">Delete</button>
@@ -276,6 +299,7 @@ const Map = ({
             const toggleLabelButton = form?.querySelector('.toggle-label-btn');
             const toggleFillButton = form?.querySelector('.toggle-fill-btn');
             const calculateAreaButton = form?.querySelector('.calculate-area-btn');
+            const editShapeButton = form?.querySelector('.edit-shape-btn');
 
             form?.addEventListener('submit', (ev) => {
                 ev.preventDefault();
@@ -329,6 +353,11 @@ const Map = ({
                     : `${areaHectares.toFixed(4)} ha`;
                 areaResultEl.innerText = areaDisplay;
             });
+            
+            editShapeButton?.addEventListener('click', () => {
+                onEditGeometry(item as Line | Area);
+                map.closePopup();
+            });
 
             if (isArea) {
                 toggleFillButton?.addEventListener('click', () => {
@@ -371,6 +400,7 @@ const Map = ({
             lineLayerRef.current = L.layerGroup().addTo(map);
             areaLayerRef.current = L.layerGroup().addTo(map);
             previewAreaPointsRef.current = L.layerGroup().addTo(map);
+            editingLayerRef.current = L.layerGroup().addTo(map);
 
 
             map.on('click', onMapClick);
@@ -566,8 +596,8 @@ const Map = ({
                 previewLineRef.current.remove();
                 previewLineRef.current = null;
             }
-            if (distanceTooltipRef.current) {
-                distanceTooltipRef.current.remove();
+            if (distanceTooltipRef.current && map.hasLayer(distanceTooltipRef.current)) {
+                map.removeLayer(distanceTooltipRef.current);
                 distanceTooltipRef.current = null;
             }
         };
@@ -694,6 +724,60 @@ const Map = ({
             cleanupLayers();
         }
     }, [isDrawingArea, pendingAreaPath]);
+
+
+    useEffect(() => {
+        const map = mapRef.current;
+        const layer = editingLayerRef.current;
+        if (!map || !layer) return;
+
+        layer.clearLayers();
+
+        if (editingGeometry) {
+            let currentPath = editingGeometry.path.map(p => L.latLng(p.lat, p.lng));
+            const isArea = 'fillVisible' in editingGeometry;
+
+            const updateShape = () => {
+                const shapeLayer = layer.getLayers().find(l => l instanceof L.Polyline || l instanceof L.Polygon);
+                if (shapeLayer) {
+                    (shapeLayer as Polyline).setLatLngs(currentPath);
+                }
+            };
+            
+            // Store the path on the layer for the parent to retrieve
+            (layer as any)._newPath = currentPath.map(p => ({ lat: p.lat, lng: p.lng }));
+
+            const shape = isArea 
+                ? L.polygon(currentPath, { color: 'hsl(var(--primary))', weight: 3, dashArray: '5, 5' }).addTo(layer)
+                : L.polyline(currentPath, { color: 'hsl(var(--primary))', weight: 3, dashArray: '5, 5' }).addTo(layer);
+
+            const markers = currentPath.map((latlng, index) => {
+                const marker = L.circleMarker(latlng, {
+                    radius: 8,
+                    color: 'hsl(var(--primary-foreground))',
+                    fillColor: 'hsl(var(--primary))',
+                    fillOpacity: 1,
+                    weight: 2,
+                }).addTo(layer);
+
+                (marker as any)._index = index;
+                marker.on('drag', (e) => {
+                    const newLatLng = (e.target as Marker).getLatLng();
+                    currentPath[index] = newLatLng;
+                    updateShape();
+                     (layer as any)._newPath = currentPath.map(p => ({ lat: p.lat, lng: p.lng }));
+                });
+                
+                (marker as any).dragging.enable();
+                return marker;
+            });
+        }
+        
+        return () => {
+            layer.clearLayers();
+        }
+
+    }, [editingGeometry]);
 
 
     const showPopup = (latlng: LatLng, type: 'pin' | 'line' | 'area', path?: LatLng[]) => {
