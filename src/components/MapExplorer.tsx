@@ -6,6 +6,7 @@ import type { User } from 'firebase/auth';
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   writeBatch,
   query,
@@ -27,7 +28,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { importSharedProject } from '@/ai/flows/share-project';
 import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy, Share2, Download } from 'lucide-react';
 import {
   Tooltip,
@@ -68,6 +68,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import type { ProjectData, PinData, LineData, AreaData } from '@/ai/flows/share-project';
 
 
 const Map = dynamic(() => import('@/components/Map'), {
@@ -75,10 +76,10 @@ const Map = dynamic(() => import('@/components/Map'), {
   loading: () => <div className="w-full h-full bg-muted flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>,
 });
 
-type Project = { id: string; name: string; description?: string; createdAt: any; userId: string; };
-type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; projectId?: string; userId: string; };
-type Line = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; projectId?: string; userId: string; };
-type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; projectId?: string; userId: string; };
+type Project = ProjectData;
+type Pin = PinData;
+type Line = LineData;
+type Area = AreaData;
 
 type PendingAction = 'pin' | 'line' | 'area' | null;
 
@@ -198,7 +199,7 @@ export default function MapExplorer({ user }: { user: User }) {
     }
 
     const center = mapRef.current.getCenter();
-    setPendingAction(null);
+    setPendingAction(null); // Clear pending action immediately
 
     if (action === 'pin') {
         addLog(`Executing pending pin at: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
@@ -274,8 +275,8 @@ export default function MapExplorer({ user }: { user: User }) {
   
   const handleAddPin = () => {
     addLog('Add Pin action initiated.');
-    if (projects.length === 0) {
-        addLog('No projects found. Prompting to create first project.');
+    if (projects.length === 0 || !activeProjectId) {
+        addLog('No active project. Prompting to create/select project.');
         setPendingAction('pin');
         setIsAssignProjectDialogOpen(true);
         return;
@@ -289,8 +290,8 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handleDrawLine = () => {
     addLog('Draw Line action initiated.');
-    if (projects.length === 0) {
-        addLog('No projects found. Prompting to create first project.');
+    if (projects.length === 0 || !activeProjectId) {
+        addLog('No active project. Prompting to create/select project.');
         setPendingAction('line');
         setIsAssignProjectDialogOpen(true);
         return;
@@ -305,8 +306,8 @@ export default function MapExplorer({ user }: { user: User }) {
   
   const handleDrawArea = () => {
     addLog('Draw Area action initiated.');
-    if (projects.length === 0) {
-        addLog('No projects found. Prompting to create first project.');
+    if (projects.length === 0 || !activeProjectId) {
+        addLog('No active project. Prompting to create/select project.');
         setPendingAction('area');
         setIsAssignProjectDialogOpen(true);
         return;
@@ -363,7 +364,7 @@ export default function MapExplorer({ user }: { user: User }) {
       addLog(`[DATA] Pin data: ${JSON.stringify(newPinData)}`);
       const docRef = await addDoc(collection(db, "pins"), newPinData);
       addLog(`✅ [SUCCESS] Pin saved with ID: ${docRef.id}`);
-      const newPin = { ...newPinData, id: docRef.id, createdAt: new Date() };
+      const newPin = { ...newPinData, id: docRef.id, createdAt: new Date() } as Pin;
       setPins(prev => [...prev, newPin]);
       setPendingPin(null);
       toast({title: 'Pin Saved'});
@@ -386,7 +387,7 @@ export default function MapExplorer({ user }: { user: User }) {
         addLog(`[DATA] Line data: ${JSON.stringify(newLineData)}`);
         const docRef = await addDoc(collection(db, "lines"), newLineData);
         addLog(`✅ [SUCCESS] Line saved with ID: ${docRef.id}`);
-        const newLine = { ...newLineData, id: docRef.id, createdAt: new Date() };
+        const newLine = { ...newLineData, id: docRef.id, createdAt: new Date() } as Line;
         setLines(prev => [...prev, newLine]);
         setPendingLine(null);
         toast({title: 'Line Saved'});
@@ -409,7 +410,7 @@ export default function MapExplorer({ user }: { user: User }) {
       addLog(`[DATA] Area data: ${JSON.stringify(newAreaData)}`);
       const docRef = await addDoc(collection(db, "areas"), newAreaData);
       addLog(`✅ [SUCCESS] Area saved with ID: ${docRef.id}`);
-      const newArea = { ...newAreaData, id: docRef.id, createdAt: new Date() };
+      const newArea = { ...newAreaData, id: docRef.id, createdAt: new Date() } as Area;
       setAreas(prev => [...prev, newArea]);
       setPendingArea(null);
       toast({title: 'Area Saved'});
@@ -627,25 +628,10 @@ export default function MapExplorer({ user }: { user: User }) {
         createdAt: serverTimestamp(),
         userId: auth.currentUser?.uid,
     };
-
-    addLog(`[INIT] firebaseApp.name = ${firebaseApp.name}`);
-    addLog(`[INIT] firebaseApp.options.projectId = ${firebaseApp.options.projectId}`);
-    addLog(`[INIT] db.app.name = ${db.app.name}`);
-    addLog(`[INIT] Current user: ${auth.currentUser}`);
-    addLog(`[INIT] projectsRef.path = ${projectsRef.path}`);
-    addLog(`[PAYLOAD] Raw data: {name: "${newProjectName}", description: "${newProjectDescription}"}`);
-    addLog(`[PAYLOAD] Final write payload: ${JSON.stringify(payload)}`);
     
-    const persisted = await navigator.storage?.persisted();
-    addLog(`[PERSISTENCE] navigator.storage?.persisted() → ${persisted}`);
-
-    const writePromise = addDoc(projectsRef, payload);
-    addLog(`[PROMISE] addDoc() returned: ${writePromise}`);
-    addLog(`[NETWORK] navigator.onLine = ${navigator.onLine}`);
-
     try {
-      addLog("[AWAIT] About to await writePromise");
-      const docRef = await writePromise;
+      addLog("[AWAIT] About to await addDoc(projects)");
+      const docRef = await addDoc(projectsRef, payload);
       addLog(`✅ [SUCCESS] doc written, ID = ${docRef.id}`);
       
       const newProject = { ...payload, id: docRef.id, createdAt: new Date() } as Project;
@@ -662,8 +648,6 @@ export default function MapExplorer({ user }: { user: User }) {
     } catch (err: any) {
       addLog(`❌ [ERROR] addDoc failed: ${err.code} - ${err.message}`);
       toast({variant: 'destructive', title: 'Failed to create project', description: err.message});
-    } finally {
-      addLog("[COMPLETE] handleCreateNewProject exit");
     }
   };
   
@@ -761,7 +745,7 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const displayedAreas = useMemo(() => {
     if (selectedProjectIds.includes('all')) return areas;
-    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!p.projectId && selectedProjectIds.includes('unassigned')));
+    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!a.projectId && selectedProjectIds.includes('unassigned')));
   }, [areas, selectedProjectIds]);
   
   const handleProjectSelection = (id: string) => {
@@ -811,15 +795,15 @@ const handleGenerateShareCode = async (projectId: string) => {
   setIsGeneratingCode(true);
   addLog(`[SHARE_CLIENT] 1. Starting code generation for project ID: ${projectId}`);
   
-  const newShare = {
+  const newSharePayload = {
     projectId: projectId,
     originalOwnerId: user.uid,
     createdAt: serverTimestamp(),
   };
 
   try {
-    addLog(`[SHARE_CLIENT] 2. Attempting to write to 'shares' collection: ${JSON.stringify(newShare)}`);
-    const docRef = await addDoc(collection(db, 'shares'), newShare);
+    addLog(`[SHARE_CLIENT] 2. Attempting to write to 'shares' collection with payload: ${JSON.stringify(newSharePayload)}`);
+    const docRef = await addDoc(collection(db, 'shares'), newSharePayload);
     addLog(`[SHARE_CLIENT] 3. ✅ Successfully created share document with ID: ${docRef.id}`);
     setShareCode(docRef.id);
     setIsShareDialogOpen(true);
@@ -840,60 +824,87 @@ const handleImportProject = async (e: React.FormEvent) => {
   addLog(`[IMPORT_CLIENT] 1. Starting import for share code: ${importCode}`);
 
   try {
-    addLog(`[IMPORT_CLIENT] 2. Calling importSharedProject flow...`);
-    const { project, pins: importedPins, lines: importedLines, areas: importedAreas } = await importSharedProject({ shareCode: importCode });
-    addLog(`[IMPORT_CLIENT] 3. ✅ Flow returned successfully with project "${project.name}" and ${importedPins.length} pins, ${importedLines.length} lines, ${importedAreas.length} areas.`);
+    const shareRef = doc(db, 'shares', importCode);
+    addLog(`[IMPORT_CLIENT] 2. Fetching share document...`);
+    const shareSnap = await getDoc(shareRef);
 
-    addLog(`[IMPORT_CLIENT] 4. Creating batch write...`);
+    if (!shareSnap.exists()) {
+      addLog(`[IMPORT_CLIENT] ❌ Share code not found.`);
+      throw new Error('Invalid share code.');
+    }
+    const shareData = shareSnap.data();
+    const projectId = shareData.projectId;
+    addLog(`[IMPORT_CLIENT] 3. ✅ Share code found. Corresponds to project ID: ${projectId}`);
+
+    // Get project
+    addLog(`[IMPORT_CLIENT] 4. Fetching project document...`);
+    const projectRef = doc(db, 'projects', projectId);
+    const projectSnap = await getDoc(projectRef);
+    if (!projectSnap.exists()) {
+      addLog(`[IMPORT_CLIENT] ❌ Original project with ID ${projectId} not found.`);
+      throw new Error('Original project not found.');
+    }
+    const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
+    addLog(`[IMPORT_CLIENT] 5. ✅ Successfully fetched project: "${project.name}"`);
+
+    // Get associated objects
+    addLog(`[IMPORT_CLIENT] 6. Fetching associated data...`);
+    const pinsQuery = query(collection(db, 'pins'), where('projectId', '==', projectId));
+    const linesQuery = query(collection(db, 'lines'), where('projectId', '==', projectId));
+    const areasQuery = query(collection(db, 'areas'), where('projectId', '==', projectId));
+    
+    const [pinsSnapshot, linesSnapshot, areasSnapshot] = await Promise.all([
+        getDocs(pinsQuery),
+        getDocs(linesQuery),
+        getDocs(areasQuery),
+    ]);
+    
+    const importedPins = pinsSnapshot.docs.map(d => d.data() as Pin);
+    const importedLines = linesSnapshot.docs.map(d => d.data() as Line);
+    const importedAreas = areasSnapshot.docs.map(d => d.data() as Area);
+    addLog(`   - Found ${importedPins.length} pins, ${importedLines.length} lines, ${importedAreas.length} areas.`);
+
+    addLog(`[IMPORT_CLIENT] 7. Creating batch write...`);
     const batch = writeBatch(db);
 
-    // Create new project for current user
     const newProjectRef = doc(collection(db, 'projects'));
-    const newProjectData = {
+    batch.set(newProjectRef, {
       name: `Copy of ${project.name}`,
       description: project.description,
       userId: user.uid,
       createdAt: serverTimestamp(),
-    };
-    batch.set(newProjectRef, newProjectData);
+    });
     addLog(`   - Queued new project for creation.`);
 
-    // Create new pins
     importedPins.forEach(pin => {
-      const newPinRef = doc(collection(db, 'pins'));
       const { id, userId, ...rest } = pin;
-      batch.set(newPinRef, { ...rest, projectId: newProjectRef.id, userId: user.uid });
+      batch.set(doc(collection(db, 'pins')), { ...rest, projectId: newProjectRef.id, userId: user.uid });
     });
     addLog(`   - Queued ${importedPins.length} pins for creation.`);
     
-    // Create new lines
     importedLines.forEach(line => {
-      const newLineRef = doc(collection(db, 'lines'));
-       const { id, userId, ...rest } = line;
-      batch.set(newLineRef, { ...rest, projectId: newProjectRef.id, userId: user.uid });
+      const { id, userId, ...rest } = line;
+      batch.set(doc(collection(db, 'lines')), { ...rest, projectId: newProjectRef.id, userId: user.uid });
     });
-    addLog(`   - Queued ${importedLines.length} lines for creation.`);
+     addLog(`   - Queued ${importedLines.length} lines for creation.`);
 
-    // Create new areas
     importedAreas.forEach(area => {
-      const newAreaRef = doc(collection(db, 'areas'));
        const { id, userId, ...rest } = area;
-      batch.set(newAreaRef, { ...rest, projectId: newProjectRef.id, userId: user.uid });
+      batch.set(doc(collection(db, 'areas')), { ...rest, projectId: newProjectRef.id, userId: user.uid });
     });
     addLog(`   - Queued ${importedAreas.length} areas for creation.`);
 
-    addLog(`[IMPORT_CLIENT] 5. Committing batch write...`);
+    addLog(`[IMPORT_CLIENT] 8. Committing batch write...`);
     await batch.commit();
-    addLog(`[IMPORT_CLIENT] 6. ✅ Batch commit successful.`);
+    addLog(`[IMPORT_CLIENT] 9. ✅ Batch commit successful.`);
     
-    await loadData(); // Reload all data
-    addLog(`[IMPORT_CLIENT] 7. ✅ Data reloaded.`);
+    await loadData();
+    addLog(`[IMPORT_CLIENT] 10. ✅ Data reloaded.`);
     
     toast({ title: 'Project Imported', description: `Successfully imported "${project.name}".` });
     setIsImportProjectDialogOpen(false);
     setImportCode('');
-  } catch (error: any)
-{
+  } catch (error: any) {
     addLog(`[IMPORT_CLIENT] ❌ Import failed: ${error.message}`);
     toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
   } finally {
@@ -1347,7 +1358,13 @@ if (dataLoading) {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={isNewProjectDialogOpen} onOpenChange={setIsNewProjectDialogOpen}>
+      <Dialog open={isNewProjectDialogOpen} onOpenChange={(open) => {
+        if(!open) {
+          setNewProjectName('');
+          setNewProjectDescription('');
+        }
+        setIsNewProjectDialogOpen(open);
+      }}>
         <DialogContent className="z-[1003]">
             <DialogHeader>
                 <DialogTitle>Create New Project</DialogTitle>
@@ -1384,9 +1401,9 @@ if (dataLoading) {
       <Dialog open={isAssignProjectDialogOpen} onOpenChange={setIsAssignProjectDialogOpen}>
         <DialogContent className="z-[1003] sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Create Your First Project</DialogTitle>
+            <DialogTitle>No Active Project</DialogTitle>
             <DialogDescription>
-              To add items to the map, you need a project to hold them.
+              To add items to the map, you need to create a project first or set an existing one as active.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
