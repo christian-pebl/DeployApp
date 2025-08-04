@@ -27,7 +27,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy } from 'lucide-react';
+import { generateShareCode, importSharedProject } from '@/ai/flows/share-project';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy, Share2, Download } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -122,6 +123,12 @@ export default function MapExplorer({ user }: { user: User }) {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false);
+  const [isImportProjectDialogOpen, setIsImportProjectDialogOpen] = useState(false);
+  const [importCode, setImportCode] = useState('');
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [shareCode, setShareCode] = useState('');
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const router = useRouter();
   const { toast } = useToast();
@@ -630,7 +637,7 @@ export default function MapExplorer({ user }: { user: User }) {
       const docRef = await writePromise;
       addLog(`✅ [SUCCESS] doc written, ID = ${docRef.id}`);
       
-      const newProject = { ...payload, id: docRef.id, createdAt: new Date() };
+      const newProject = { ...payload, id: docRef.id, createdAt: new Date() } as Project;
       setProjects(prev => [...prev, newProject]);
       setActiveProjectId(docRef.id);
       setIsNewProjectDialogOpen(false);
@@ -789,6 +796,75 @@ const handleLogout = async () => {
     router.push('/login');
 };
 
+const handleGenerateShareCode = async (projectId: string) => {
+  setIsGeneratingCode(true);
+  try {
+    const result = await generateShareCode({ projectId, originalOwnerId: user.uid });
+    setShareCode(result.shareCode);
+    setIsShareDialogOpen(true);
+  } catch (error: any) {
+    toast({ variant: 'destructive', title: 'Could not generate share code', description: error.message });
+  } finally {
+    setIsGeneratingCode(false);
+  }
+};
+
+const handleImportProject = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!importCode) return;
+  setIsImporting(true);
+
+  try {
+    const { project, pins: importedPins, lines: importedLines, areas: importedAreas } = await importSharedProject({ shareCode: importCode });
+
+    const batch = writeBatch(db);
+
+    // Create new project for current user
+    const newProjectRef = doc(collection(db, 'projects'));
+    const newProjectData = {
+      name: `Copy of ${project.name}`,
+      description: project.description,
+      userId: user.uid,
+      createdAt: serverTimestamp(),
+    };
+    batch.set(newProjectRef, newProjectData);
+
+    // Create new pins
+    importedPins.forEach(pin => {
+      const newPinRef = doc(collection(db, 'pins'));
+      const { id, userId, ...rest } = pin;
+      batch.set(newPinRef, { ...rest, projectId: newProjectRef.id, userId: user.uid });
+    });
+    
+    // Create new lines
+    importedLines.forEach(line => {
+      const newLineRef = doc(collection(db, 'lines'));
+       const { id, userId, ...rest } = line;
+      batch.set(newLineRef, { ...rest, projectId: newProjectRef.id, userId: user.uid });
+    });
+
+    // Create new areas
+    importedAreas.forEach(area => {
+      const newAreaRef = doc(collection(db, 'areas'));
+       const { id, userId, ...rest } = area;
+      batch.set(newAreaRef, { ...rest, projectId: newProjectRef.id, userId: user.uid });
+    });
+
+    await batch.commit();
+    
+    await loadData(); // Reload all data
+    
+    toast({ title: 'Project Imported', description: `Successfully imported "${project.name}".` });
+    setIsImportProjectDialogOpen(false);
+    setImportCode('');
+  } catch (error: any) {
+    toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
+  } finally {
+    setIsImporting(false);
+  }
+};
+
+
 if (dataLoading) {
     return (
       <div className="w-full h-screen bg-background flex items-center justify-center">
@@ -933,6 +1009,9 @@ if (dataLoading) {
                             <Button variant="outline" size="sm" onClick={() => setIsNewProjectDialogOpen(true)}>
                                 <FolderPlus className="mr-2 h-4 w-4"/> New
                             </Button>
+                             <Button variant="outline" size="sm" onClick={() => setIsImportProjectDialogOpen(true)}>
+                                <Download className="mr-2 h-4 w-4"/> Import
+                            </Button>
                         </div>
                     </div>
                      <div className="border-t -mx-4 px-4 pt-4 mt-2">
@@ -975,6 +1054,14 @@ if (dataLoading) {
                                             </TooltipTrigger>
                                             <TooltipContent side="top"><p>Set Active</p></TooltipContent>
                                           </Tooltip>
+                                          <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleGenerateShareCode(project.id)} disabled={isGeneratingCode}>
+                                                        <Share2 className="h-4 w-4"/>
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top"><p>Share</p></TooltipContent>
+                                            </Tooltip>
                                           <Tooltip>
                                             <TooltipTrigger asChild>
                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setProjectToEdit(project) }}><Pencil className="h-4 w-4"/></Button>
@@ -1274,6 +1361,59 @@ if (dataLoading) {
               }}>
               <FolderPlus className="mr-2 h-4 w-4" /> Create Project
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+       <Dialog open={isImportProjectDialogOpen} onOpenChange={setIsImportProjectDialogOpen}>
+        <DialogContent className="z-[1003]">
+          <DialogHeader>
+            <DialogTitle>Import Shared Project</DialogTitle>
+            <DialogDescription>
+              Paste a share code below to import a project and all its objects.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleImportProject} className="space-y-4">
+            <Input
+              name="importCode"
+              placeholder="Enter share code..."
+              required
+              value={importCode}
+              onChange={(e) => setImportCode(e.target.value)}
+            />
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="secondary">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={isImporting}>
+                {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Import Project
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+        <DialogContent className="z-[1003]">
+          <DialogHeader>
+            <DialogTitle>Share Project</DialogTitle>
+            <DialogDescription>
+              Anyone with this code can import a copy of your project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2">
+            <Input value={shareCode} readOnly />
+            <Button size="icon" onClick={() => { navigator.clipboard.writeText(shareCode); toast({title: "Copied!"}); }}>
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button">Done</Button>
+            </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
