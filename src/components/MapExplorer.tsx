@@ -191,16 +191,26 @@ export default function MapExplorer({ user }: { user: User }) {
   const executePendingAction = () => {
     const action = pendingAction;
     addLog(`Executing pending action: ${action}`);
-    if (!action) return;
+    if (!action || !mapRef.current) {
+        if(action) addLog(`Action execution cancelled: map not ready.`);
+        setPendingAction(null);
+        return;
+    }
 
+    const center = mapRef.current.getCenter();
     setPendingAction(null);
 
     if (action === 'pin') {
-      handleAddPin();
+        addLog(`Executing pending pin at: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
+        setPendingPin(center);
     } else if (action === 'line') {
-      handleDrawLine();
+        addLog(`Executing pending line from: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
+        setLineStartPoint(center);
+        setIsDrawingLine(true);
     } else if (action === 'area') {
-      handleDrawArea();
+        addLog(`Executing pending area.`);
+        setIsDrawingArea(true);
+        setPendingAreaPath([]);
     }
   };
 
@@ -751,7 +761,7 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const displayedAreas = useMemo(() => {
     if (selectedProjectIds.includes('all')) return areas;
-    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!a.projectId && selectedProjectIds.includes('unassigned')));
+    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!p.projectId && selectedProjectIds.includes('unassigned')));
   }, [areas, selectedProjectIds]);
   
   const handleProjectSelection = (id: string) => {
@@ -814,10 +824,10 @@ const handleGenerateShareCode = async (projectId: string) => {
     setShareCode(docRef.id);
     setIsShareDialogOpen(true);
   } catch (error: any) {
-    addLog(`[SHARE_CLIENT] 3. ❌ Error writing to 'shares' collection: ${error.message}`);
+    addLog(`[SHARE_CLIENT] 4. ❌ Error generating share code: ${error.message}`);
     toast({ variant: 'destructive', title: 'Could not generate share code', description: error.message });
   } finally {
-    addLog(`[SHARE_CLIENT] 4. Finished code generation attempt.`);
+    addLog(`[SHARE_CLIENT] 5. Finished code generation attempt.`);
     setIsGeneratingCode(false);
   }
 };
