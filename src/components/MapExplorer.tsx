@@ -192,13 +192,13 @@ export default function MapExplorer({ user }: { user: User }) {
         setIsDrawingArea(true);
         setPendingAreaPath([]);
     }
-};
+  };
 
-useEffect(() => {
+  useEffect(() => {
     if (activeProjectId && pendingAction) {
         executePendingAction();
     }
-}, [activeProjectId, pendingAction]);
+  }, [activeProjectId, pendingAction]);
 
 
   const handleLocationFound = (latlng: LatLng) => {
@@ -249,22 +249,38 @@ useEffect(() => {
   const handleZoomOut = () => {
     mapRef.current?.zoomOut();
   };
-
+  
   const handleAddPin = () => {
-    if (mapRef.current) {
+    if (projects.length === 0) {
+        setPendingAction('pin');
+        setIsAssignProjectDialogOpen(true);
+    } else if (mapRef.current) {
         const center = mapRef.current.getCenter();
         setPendingPin(center);
     }
   };
 
   const handleDrawLine = () => {
-    if (mapRef.current) {
+    if (projects.length === 0) {
+        setPendingAction('line');
+        setIsAssignProjectDialogOpen(true);
+    } else if (mapRef.current) {
         const center = mapRef.current.getCenter();
         setLineStartPoint(center);
         setIsDrawingLine(true);
     }
   };
   
+  const handleDrawArea = () => {
+    if (projects.length === 0) {
+        setPendingAction('area');
+        setIsAssignProjectDialogOpen(true);
+    } else {
+        setIsDrawingArea(true);
+        setPendingAreaPath([]);
+    }
+  }
+
   const handleConfirmLine = () => {
     if (lineStartPoint && currentMapCenter) {
       setPendingLine({ path: [lineStartPoint, currentMapCenter] });
@@ -272,11 +288,6 @@ useEffect(() => {
       setLineStartPoint(null);
     }
   };
-
-  const handleDrawArea = () => {
-    setIsDrawingArea(true);
-    setPendingAreaPath([]);
-  }
   
   const handleAddAreaCorner = () => {
     if(currentMapCenter) {
@@ -309,8 +320,7 @@ useEffect(() => {
 
     try {
       const docRef = await addDoc(collection(db, "pins"), newPinData);
-      const docId = docRef.id;
-      setPins(prev => [...prev, { id: docId, ...newPinData }]);
+      setPins(prev => [...prev, { id: docRef.id, ...newPinData }]);
       setPendingPin(null);
     } catch(e) {
       console.error(e);
@@ -333,8 +343,7 @@ useEffect(() => {
     }
     try {
       const docRef = await addDoc(collection(db, "lines"), newLineData);
-      const docId = docRef.id;
-      setLines(prev => [...prev, { id: docId, ...newLineData }]);
+      setLines(prev => [...prev, { id: docRef.id, ...newLineData }]);
       setPendingLine(null);
     } catch (e) {
       console.error(e);
@@ -358,8 +367,7 @@ useEffect(() => {
     }
     try {
       const docRef = await addDoc(collection(db, "areas"), newAreaData);
-      const docId = docRef.id;
-      setAreas(prev => [...prev, { id: docId, ...newAreaData }]);
+      setAreas(prev => [...prev, { id: docRef.id, ...newAreaData }]);
       setPendingArea(null);
     } catch (e) {
       console.error(e);
@@ -369,7 +377,8 @@ useEffect(() => {
 
   const handleUpdatePin = async (id: string, label: string, notes: string, projectId?: string) => {
     const pinRef = doc(db, "pins", id);
-    const updatedData = { label, notes, projectId };
+    const updatedData: any = { label, notes };
+    if (projectId) updatedData.projectId = projectId;
     try {
       await updateDoc(pinRef, updatedData);
       setPins(prev => prev.map(p => p.id === id ? { ...p, ...updatedData } : p));
@@ -393,7 +402,8 @@ useEffect(() => {
   
   const handleUpdateLine = async (id: string, label: string, notes: string, projectId?: string) => {
     const lineRef = doc(db, "lines", id);
-    const updatedData = { label, notes, projectId };
+    const updatedData: any = { label, notes };
+    if (projectId) updatedData.projectId = projectId;
     try {
       await updateDoc(lineRef, updatedData);
       setLines(prev => prev.map(l => l.id === id ? { ...l, ...updatedData } : l));
@@ -417,7 +427,8 @@ useEffect(() => {
 
   const handleUpdateArea = async (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string) => {
     const areaRef = doc(db, "areas", id);
-    const updatedData = { label, notes, path, projectId };
+    const updatedData: any = { label, notes, path };
+    if (projectId) updatedData.projectId = projectId;
     try {
       await updateDoc(areaRef, updatedData);
       setAreas(prev => prev.map(a => a.id === id ? { ...a, ...updatedData } : a));
@@ -1125,24 +1136,11 @@ if (dataLoading) {
       <Dialog open={isAssignProjectDialogOpen} onOpenChange={setIsAssignProjectDialogOpen}>
         <DialogContent className="z-[1003]">
           <DialogHeader>
-            <DialogTitle>Assign to Project</DialogTitle>
-            <DialogDescription>Select a project to assign this new object to, or create a new one.</DialogDescription>
+            <DialogTitle>Create Your First Project</DialogTitle>
+            <DialogDescription>To add items to your map, you first need a project to organize them.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-4">
-            {projects.map(project => (
-              <Button
-                key={project.id}
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => {
-                  setActiveProjectId(project.id);
-                  setIsAssignProjectDialogOpen(false);
-                }}
-              >
-                {project.name}
-              </Button>
-            ))}
-            {projects.length === 0 && <p className="text-sm text-muted-foreground text-center">No projects exist yet.</p>}
+              <p className="text-sm text-muted-foreground">Click below to create a new project. You can add pins, lines, and areas to it afterward.</p>
           </div>
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => { setIsAssignProjectDialogOpen(false); setPendingAction(null); }}>Cancel</Button>
