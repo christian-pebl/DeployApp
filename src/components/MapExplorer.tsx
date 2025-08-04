@@ -301,10 +301,16 @@ useEffect(() => {
   };
 
   const handlePinSave = async (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => {
-    const newPinData = { lat, lng, label, labelVisible: true, notes, projectId: projectId ?? activeProjectId ?? undefined, userId: user.uid };
+    const newPinData: any = { lat, lng, label, labelVisible: true, notes, userId: user.uid };
+    const finalProjectId = projectId ?? activeProjectId;
+    if (finalProjectId) {
+        newPinData.projectId = finalProjectId;
+    }
+
     try {
       const docRef = await addDoc(collection(db, "pins"), newPinData);
-      setPins(prev => [...prev, { id: docRef.id, ...newPinData }]);
+      const docId = docRef.id;
+      setPins(prev => [...prev, { id: docId, ...newPinData }]);
       setPendingPin(null);
     } catch(e) {
       console.error(e);
@@ -314,17 +320,21 @@ useEffect(() => {
 
   const handleLineSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
     const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-    const newLineData = {
+    const newLineData: any = {
         path: pathData,
         label,
         labelVisible: true,
         notes,
-        projectId: projectId ?? activeProjectId ?? undefined,
         userId: user.uid,
     };
+    const finalProjectId = projectId ?? activeProjectId;
+    if (finalProjectId) {
+        newLineData.projectId = finalProjectId;
+    }
     try {
       const docRef = await addDoc(collection(db, "lines"), newLineData);
-      setLines(prev => [...prev, { id: docRef.id, ...newLineData }]);
+      const docId = docRef.id;
+      setLines(prev => [...prev, { id: docId, ...newLineData }]);
       setPendingLine(null);
     } catch (e) {
       console.error(e);
@@ -334,18 +344,22 @@ useEffect(() => {
   
   const handleAreaSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
     const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-    const newAreaData = {
+    const newAreaData: any = {
         path: pathData,
         label,
         labelVisible: true,
         fillVisible: true,
         notes,
-        projectId: projectId ?? activeProjectId ?? undefined,
         userId: user.uid,
     };
+    const finalProjectId = projectId ?? activeProjectId;
+    if (finalProjectId) {
+        newAreaData.projectId = finalProjectId;
+    }
     try {
       const docRef = await addDoc(collection(db, "areas"), newAreaData);
-      setAreas(prev => [...prev, { id: docRef.id, ...newAreaData }]);
+      const docId = docRef.id;
+      setAreas(prev => [...prev, { id: docId, ...newAreaData }]);
       setPendingArea(null);
     } catch (e) {
       console.error(e);
@@ -621,7 +635,7 @@ useEffect(() => {
 
   const displayedAreas = useMemo(() => {
     if (selectedProjectIds.includes('all')) return areas;
-    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!p.projectId && selectedProjectIds.includes('unassigned')));
+    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!a.projectId && selectedProjectIds.includes('unassigned')));
   }, [areas, selectedProjectIds]);
   
   const handleProjectSelection = (id: string) => {
@@ -1005,9 +1019,9 @@ if (dataLoading) {
                       <Tooltip>
                           <TooltipTrigger asChild>
                               <DropdownMenuTrigger asChild>
-                                  <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full shadow-lg">
-                                      <UserIcon className="h-6 w-6"/>
-                                  </Button>
+                                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full shadow-lg">
+                                  <UserIcon className="h-6 w-6"/>
+                                </Button>
                               </DropdownMenuTrigger>
                           </TooltipTrigger>
                           <TooltipContent><p>Account</p></TooltipContent>
