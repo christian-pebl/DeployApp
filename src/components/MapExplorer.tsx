@@ -369,7 +369,7 @@ export default function MapExplorer({ user }: { user: User }) {
       setPendingPin(null);
       toast({title: 'Pin Saved'});
     } catch(e: any) {
-      addLog(`❌ [ERROR] Error saving pin: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error saving pin: ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to save pin', description: e.message});
     }
   };
@@ -392,7 +392,7 @@ export default function MapExplorer({ user }: { user: User }) {
         setPendingLine(null);
         toast({title: 'Line Saved'});
       } catch (e: any) {
-        addLog(`❌ [ERROR] Error saving line: ${e.code} - ${e.message}`);
+        addLog(`❌ [ERROR] Error saving line: ${e.message}`);
         toast({variant: 'destructive', title: 'Failed to save line', description: e.message});
       }
   };
@@ -415,7 +415,7 @@ export default function MapExplorer({ user }: { user: User }) {
       setPendingArea(null);
       toast({title: 'Area Saved'});
     } catch (e: any) {
-      addLog(`❌ [ERROR] Error saving area: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error saving area: ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to save area', description: e.message});
     }
   };
@@ -435,7 +435,7 @@ export default function MapExplorer({ user }: { user: User }) {
       setItemToEdit(null);
       toast({title: 'Pin Updated'});
     } catch (e: any) {
-      addLog(`❌ [ERROR] Error updating pin: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error updating pin: ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to update pin', description: e.message});
     }
   };
@@ -449,7 +449,7 @@ export default function MapExplorer({ user }: { user: User }) {
       setItemToEdit(null);
       toast({title: 'Pin Deleted'});
     } catch(e: any) {
-      addLog(`❌ [ERROR] Error deleting pin: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error deleting pin: ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to delete pin', description: e.message});
     }
   };
@@ -469,7 +469,7 @@ export default function MapExplorer({ user }: { user: User }) {
       setItemToEdit(null);
       toast({title: 'Line Updated'});
     } catch(e: any) {
-      addLog(`❌ [ERROR] Error updating line: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error updating line: ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to update line', description: e.message});
     }
   };
@@ -483,7 +483,7 @@ export default function MapExplorer({ user }: { user: User }) {
       setItemToEdit(null);
       toast({title: 'Line Deleted'});
     } catch (e: any) {
-      addLog(`❌ [ERROR] Error deleting line: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error deleting line: ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to delete line', description: e.message});
     }
   };
@@ -503,7 +503,7 @@ export default function MapExplorer({ user }: { user: User }) {
       setItemToEdit(null);
       toast({title: 'Area Updated'});
     } catch (e: any) {
-      addLog(`❌ [ERROR] Error updating area: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error updating area: ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to update area', description: e.message});
     }
   };
@@ -517,7 +517,7 @@ export default function MapExplorer({ user }: { user: User }) {
       setItemToEdit(null);
       toast({title: 'Area Deleted'});
     } catch(e: any) {
-       addLog(`❌ [ERROR] Error deleting area: ${e.code} - ${e.message}`);
+       addLog(`❌ [ERROR] Error deleting area: ${e.message}`);
        toast({variant: 'destructive', title: 'Failed to delete area', description: e.message});
     }
   };
@@ -646,7 +646,7 @@ export default function MapExplorer({ user }: { user: User }) {
           executePendingAction();
       }
     } catch (err: any) {
-      addLog(`❌ [ERROR] addDoc failed: ${err.code} - ${err.message}`);
+      addLog(`❌ [ERROR] addDoc failed: ${err.message}`);
       toast({variant: 'destructive', title: 'Failed to create project', description: err.message});
     }
   };
@@ -672,7 +672,7 @@ export default function MapExplorer({ user }: { user: User }) {
       setProjectToEdit(null);
       toast({ title: "Project Updated", description: `"${name}" has been updated.` });
     } catch (e: any) {
-      addLog(`❌ [ERROR] Error updating project: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error updating project: ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to update project', description: e.message});
     }
   }
@@ -716,7 +716,7 @@ export default function MapExplorer({ user }: { user: User }) {
         toast({ title: "Project Deleted", description: `"${project.name}" and all its objects have been deleted.` });
 
       } catch (e: any) {
-        addLog(`❌ [ERROR] Error deleting project: ${e.code} - ${e.message}`);
+        addLog(`❌ [ERROR] Error deleting project: ${e.message}`);
         toast({variant: 'destructive', title: 'Failed to delete project', description: e.message});
       }
   }
@@ -745,7 +745,7 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const displayedAreas = useMemo(() => {
     if (selectedProjectIds.includes('all')) return areas;
-    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!p.projectId && selectedProjectIds.includes('unassigned')));
+    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!a.projectId && selectedProjectIds.includes('unassigned')));
   }, [areas, selectedProjectIds]);
   
   const handleProjectSelection = (id: string) => {
@@ -802,7 +802,7 @@ const handleGenerateShareCode = async (projectId: string) => {
   };
 
   try {
-    addLog(`[SHARE_CLIENT] 2. Attempting to write to 'shares' collection: ${JSON.stringify(newSharePayload)}`);
+    addLog(`[SHARE_CLIENT] 2. Attempting to write to 'shares' and 'shares_by_project' collections`);
     const batch = writeBatch(db);
     
     // Create the share document
