@@ -69,7 +69,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { ProjectData, PinData, LineData, AreaData, TagData } from '@/ai/flows/share-project';
-
+import { useSettings } from '@/hooks/use-settings';
 
 const Map = dynamic(() => import('@/components/Map'), {
   ssr: false,
@@ -136,6 +136,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState('#ff0000');
   const [tagToEdit, setTagToEdit] = useState<Tag | null>(null);
+  const { settings } = useSettings();
 
   const router = useRouter();
   const { toast } = useToast();
@@ -202,9 +203,9 @@ export default function MapExplorer({ user }: { user: User }) {
       setIsLocating(true);
   }, []);
 
-  const executePendingAction = () => {
+ const executePendingAction = () => {
     const action = pendingAction;
-    setPendingAction(null); 
+    setPendingAction(null);
     addLog(`Executing pending action: ${action}`);
     if (!action || !mapRef.current) {
         if(action) addLog(`Action execution cancelled: map not ready or action cleared.`);
@@ -364,7 +365,7 @@ export default function MapExplorer({ user }: { user: User }) {
         return;
     }
 
-    const newPinData: Omit<Pin, 'id' | 'createdAt'> = { 
+    const newPinData: Omit<Pin, 'id'| 'createdAt'> = { 
       lat, 
       lng, 
       label, 
@@ -430,7 +431,7 @@ export default function MapExplorer({ user }: { user: User }) {
       return;
     }
     const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-    const newAreaData: Omit<Area, 'id' | 'createdAt'> = { 
+    const newAreaData: Omit<Area, 'id'| 'createdAt'> = { 
       path: pathData, 
       label, 
       labelVisible: true, 
@@ -667,10 +668,9 @@ export default function MapExplorer({ user }: { user: User }) {
     
     const projectsRef = collection(db, 'projects');
     
-    const payload: Omit<Project, 'id'> = {
+    const payload: Omit<Project, 'id' | 'createdAt'> = {
         name: newProjectName,
         description: newProjectDescription,
-        createdAt: new Date().toISOString(),
         userId: auth.currentUser!.uid,
     };
     
@@ -679,7 +679,7 @@ export default function MapExplorer({ user }: { user: User }) {
       const docRef = await addDoc(projectsRef, { ...payload, createdAt: serverTimestamp() });
       addLog(`✅ [SUCCESS] doc written, ID = ${docRef.id}`);
       
-      const newProject = { ...payload, id: docRef.id } as Project;
+      const newProject = { ...payload, id: docRef.id, createdAt: new Date().toISOString() } as Project;
       setProjects(prev => [...prev, newProject]);
       setActiveProjectId(docRef.id);
       setIsNewProjectDialogOpen(false);
@@ -926,10 +926,14 @@ const handleGenerateShareCode = async (projectId: string) => {
   setIsGeneratingCode(true);
   addLog(`[SHARE_CLIENT] 1. Starting code generation for project ID: ${projectId}`);
   
-  const newSharePayload = {
+  const sharePayload = {
     projectId: projectId,
     originalOwnerId: user.uid,
     createdAt: serverTimestamp(),
+  };
+
+  const shareLookupPayload = {
+      createdAt: serverTimestamp(),
   };
 
   try {
@@ -938,12 +942,12 @@ const handleGenerateShareCode = async (projectId: string) => {
     
     // Create the share document
     const shareRef = doc(collection(db, 'shares'));
-    batch.set(shareRef, newSharePayload);
+    batch.set(shareRef, sharePayload);
     addLog(`   - Queued write to /shares/${shareRef.id}`);
     
     // Create the lookup document for security rules
     const shareLookupRef = doc(db, 'shares_by_project', projectId);
-    batch.set(shareLookupRef, { createdAt: serverTimestamp() });
+    batch.set(shareLookupRef, shareLookupPayload);
     addLog(`   - Queued write to /shares_by_project/${projectId}`);
     
     await batch.commit();
@@ -1075,7 +1079,7 @@ const handleImportProject = async (e: React.FormEvent) => {
 };
 
 
-if (dataLoading) {
+if (dataLoading || !settings) {
     return (
       <div className="w-full h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -1099,6 +1103,7 @@ if (dataLoading) {
               areas={displayedAreas}
               projects={projects}
               tags={tags}
+              settings={settings}
               currentLocation={currentLocation}
               onLocationFound={handleLocationFound}
               onLocationError={handleLocationError}
@@ -1172,7 +1177,7 @@ if (dataLoading) {
                     <Tooltip>
                         <TooltipTrigger asChild>
                              <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawArea}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6">
+                                <svg width="24" height="24" viewBox="0 0 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6">
                                     <path d="M2.57141 6.28571L8.2857 2.57143L20.5714 8.28571L14.8571 21.4286L2.57141 15.7143L2.57141 6.28571Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
                                 </svg>
                             </Button>
@@ -1242,7 +1247,7 @@ if (dataLoading) {
                                 All Projects Visible
                             </label>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => {if (activeProjectId) { setIsManageTagsDialogOpen(true); } else { toast({ variant: 'destructive', title: 'No Active Project', description: 'Please select an active project to manage its tags.'})}}} disabled={!activeProjectId}>
+                        <Button variant="outline" size="sm" onClick={() => {if (activeProjectId) { setIsManageTagsDialogOpen(true); } else { toast({ variant: 'destructive', title: 'No Active Project', description: 'Please select an active project to manage its tags.'})}}}>
                             <Tag className="mr-2 h-4 w-4"/> Manage Tags
                         </Button>
                     </div>
@@ -1453,6 +1458,7 @@ if (dataLoading) {
                                 <Settings className="mr-2 h-4 w-4" />
                                 <span>Settings</span>
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={handleLogout}>
                                 <LogOut className="mr-2 h-4 w-4" />
                                 <span>Log out</span>

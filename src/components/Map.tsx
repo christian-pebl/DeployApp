@@ -2,8 +2,9 @@
 
 import React, { useEffect, useRef } from 'react';
 import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions } from 'leaflet';
+import type { Settings } from '@/hooks/use-settings';
 
-type Project = { id: string; name: string; description?: string; createdAt: string; };
+type Project = { id: string; name: string; description?: string; createdAt: any; };
 type Tag = { id: string; name: string; color: string; projectId: string; };
 type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; projectId?: string; tagIds?: string[]; };
 type Line = { id:string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; projectId?: string; tagIds?: string[]; };
@@ -19,6 +20,7 @@ interface MapProps {
     areas: Area[];
     projects: Project[];
     tags: Tag[];
+    settings: Settings;
     currentLocation: LatLng | null;
     onLocationFound: (latlng: LatLng) => void;
     onLocationError: (error: any) => void;
@@ -49,6 +51,19 @@ interface MapProps {
     onEditItem: (item: Pin | Line | Area | null) => void;
     activeProjectId: string | null;
 }
+
+// Coordinate and distance conversion helpers
+const toFeet = (meters: number) => meters * 3.28084;
+
+const toDMS = (deg: number, isLat: boolean) => {
+  const absolute = Math.abs(deg);
+  const degrees = Math.floor(absolute);
+  const minutesNotTruncated = (absolute - degrees) * 60;
+  const minutes = Math.floor(minutesNotTruncated);
+  const seconds = Math.floor((minutesNotTruncated - minutes) * 60);
+  const direction = deg >= 0 ? (isLat ? 'N' : 'E') : (isLat ? 'S' : 'W');
+  return `${degrees}° ${minutes}' ${seconds}" ${direction}`;
+};
 
 
 const createCustomIcon = (color: string) => {
@@ -94,7 +109,7 @@ function calculatePolygonArea(path: { lat: number; lng: number }[]): number {
 
 
 const Map = ({ 
-    mapRef, center, zoom, pins, lines, areas, projects, tags, currentLocation, 
+    mapRef, center, zoom, pins, lines, areas, projects, tags, settings, currentLocation, 
     onLocationFound, onLocationError, onMove, isDrawingLine, lineStartPoint,
     isDrawingArea, onMapClick, pendingAreaPath,
     pendingPin, onPinSave, onPinCancel,
@@ -142,16 +157,21 @@ const Map = ({
         
         let coordsHtml = '';
         if (isPin) {
-            coordsHtml = `<p class="text-xs text-muted-foreground">Lat: ${item.lat.toFixed(4)}, Lng: ${item.lng.toFixed(4)}</p>`;
+            const latD = settings.coordFormat === 'dms' ? toDMS(item.lat, true) : item.lat.toFixed(6);
+            const lngD = settings.coordFormat === 'dms' ? toDMS(item.lng, false) : item.lng.toFixed(6);
+            coordsHtml = `<p class="text-xs text-muted-foreground">Lat: ${latD}<br/>Lng: ${lngD}</p>`;
         } else if ('path' in item) {
             if (isArea) {
-                const pointsHtml = item.path.map((p, i) => `
-                    <div class="flex items-center gap-2">
-                        <span class="font-semibold w-8">P${i+1}:</span>
-                        <input type="number" step="0.0001" name="lat-${i}" value="${p.lat.toFixed(4)}" class="p-1 border rounded-md text-xs bg-background text-foreground border-border w-24" />
-                        <input type="number" step="0.0001" name="lng-${i}" value="${p.lng.toFixed(4)}" class="p-1 border rounded-md text-xs bg-background text-foreground border-border w-24" />
-                    </div>
-                `).join('');
+                const pointsHtml = item.path.map((p, i) => {
+                    const latD = settings.coordFormat === 'dms' ? toDMS(p.lat, true) : p.lat.toFixed(4);
+                    const lngD = settings.coordFormat === 'dms' ? toDMS(p.lng, false) : p.lng.toFixed(4);
+                     return `
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold w-8">P${i+1}:</span>
+                            <div class="text-xs">Lat: ${latD}, Lng: ${lngD}</div>
+                        </div>
+                    `
+                }).join('');
                 
                 coordsHtml = `<div class="text-xs text-muted-foreground space-y-1 max-h-32 overflow-y-auto pr-2">
                     ${pointsHtml}
@@ -165,12 +185,20 @@ const Map = ({
             } else { // isLine
                 const startPoint = L.latLng(item.path[0].lat, item.path[0].lng);
                 const endPoint = L.latLng(item.path[item.path.length - 1].lat, item.path[item.path.length - 1].lng);
-                const distance = startPoint.distanceTo(endPoint);
+                const distanceMeters = startPoint.distanceTo(endPoint);
+                const distance = settings.units === 'imperial' ? toFeet(distanceMeters) : distanceMeters;
+                const unitLabel = settings.units === 'imperial' ? 'feet' : 'meters';
+
+                const startLatD = settings.coordFormat === 'dms' ? toDMS(item.path[0].lat, true) : item.path[0].lat.toFixed(4);
+                const startLngD = settings.coordFormat === 'dms' ? toDMS(item.path[0].lng, false) : item.path[0].lng.toFixed(4);
+                const endLatD = settings.coordFormat === 'dms' ? toDMS(item.path[item.path.length - 1].lat, true) : item.path[item.path.length - 1].lat.toFixed(4);
+                const endLngD = settings.coordFormat === 'dms' ? toDMS(item.path[item.path.length - 1].lng, false) : item.path[item.path.length - 1].lng.toFixed(4);
+
 
                 coordsHtml = `<div class="text-xs text-muted-foreground space-y-1">
-                    <p>Start: ${item.path[0].lat.toFixed(4)}, ${item.path[0].lng.toFixed(4)}</p>
-                    <p>End: ${item.path[item.path.length - 1].lat.toFixed(4)}, ${item.path[item.path.length - 1].lng.toFixed(4)}</p>
-                    <p class="font-semibold">Distance: ${distance.toFixed(2)} meters</p>
+                    <p>Start: ${startLatD}, ${startLngD}</p>
+                    <p>End: ${endLatD}, ${endLngD}</p>
+                    <p class="font-semibold">Distance: ${distance.toFixed(2)} ${unitLabel}</p>
                 </div>`;
             }
         }
@@ -254,7 +282,7 @@ const Map = ({
                 const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
                 const projectIdInput = formElements.namedItem('projectId') as HTMLSelectElement;
                 
-                const selectedTagIds = Array.from(formElements.namedItem('tagIds') as RadioNodeList)
+                const selectedTagIds = Array.from(formElements.namedItem('tagIds') as RadioNodeList | null ?? [])
                     .filter(i => (i as HTMLInputElement).checked)
                     .map(i => (i as HTMLInputElement).value);
 
@@ -263,10 +291,7 @@ const Map = ({
                 if (isPin) {
                     onUpdatePin(item.id, labelInput.value, notesInput.value, projectId, selectedTagIds);
                 } else if (isArea) {
-                    const newPath = (item as Area).path.map((_, i) => ({
-                        lat: parseFloat((formElements.namedItem(`lat-${i}`) as HTMLInputElement).value),
-                        lng: parseFloat((formElements.namedItem(`lng-${i}`) as HTMLInputElement).value),
-                    }));
+                    const newPath = (item as Area).path; // Path editing not supported in this simplified view
                     onUpdateArea(item.id, labelInput.value, notesInput.value, newPath, projectId, selectedTagIds);
                 } else {
                     onUpdateLine(item.id, labelInput.value, notesInput.value, projectId, selectedTagIds);
@@ -295,14 +320,12 @@ const Map = ({
                 const areaResultEl = document.getElementById('area-result');
                 if (!areaResultEl) return;
                 
-                const formElements = (form as HTMLFormElement).elements;
-                const currentPath = (item as Area).path.map((_, i) => ({
-                    lat: parseFloat((formElements.namedItem(`lat-${i}`) as HTMLInputElement).value),
-                    lng: parseFloat((formElements.namedItem(`lng-${i}`) as HTMLInputElement).value),
-                }));
-                
-                const areaHectares = calculatePolygonArea(currentPath);
-                areaResultEl.innerText = `${areaHectares.toFixed(4)} ha`;
+                const areaHectares = calculatePolygonArea((item as Area).path);
+                const areaAcres = areaHectares * 2.47105;
+                const areaDisplay = settings.units === 'imperial' 
+                    ? `${areaAcres.toFixed(4)} acres`
+                    : `${areaHectares.toFixed(4)} ha`;
+                areaResultEl.innerText = areaDisplay;
             });
 
             if (isArea) {
@@ -320,7 +343,7 @@ const Map = ({
         } else if (!itemToEdit && mapRef.current && popupRef.current && popupRef.current.isOpen()) {
             mapRef.current.closePopup(popupRef.current);
         }
-    }, [itemToEdit, projects, tags])
+    }, [itemToEdit, projects, tags, settings])
 
     useEffect(() => {
         if (typeof window.L === 'undefined') return;
@@ -723,7 +746,7 @@ const Map = ({
             }
             popupRef.current?.on('remove', cleanup);
         }
-    }, [pendingPin]);
+    }, [pendingPin, tags, activeProjectId]);
 
     useEffect(() => {
         if (pendingLine && mapRef.current) {
@@ -733,7 +756,7 @@ const Map = ({
             );
             showPopup(midPoint, 'line', pendingLine.path);
         }
-    }, [pendingLine]);
+    }, [pendingLine, tags, activeProjectId]);
     
     useEffect(() => {
         if (pendingArea && mapRef.current) {
@@ -741,7 +764,7 @@ const Map = ({
              const center = polygon.getBounds().getCenter();
              showPopup(center, 'area', pendingArea.path);
         }
-    }, [pendingArea]);
+    }, [pendingArea, tags, activeProjectId]);
 
 
     return <div ref={mapContainerRef} className="h-full w-full z-0" />;
