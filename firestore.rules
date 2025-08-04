@@ -2,12 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check ownership
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // Users can only access their own data objects
     match /projects/{projectId} {
       allow read, write: if isOwner(resource.data.userId);
     }
@@ -21,16 +19,9 @@ service cloud.firestore {
       allow read, write: if isOwner(resource.data.userId);
     }
 
-    // Rules for the 'shares' collection
     match /shares/{shareId} {
-      // Any authenticated user can read a share document (to import it)
       allow read: if request.auth != null;
-
-      // A user can only create a share document if they set themselves
-      // as the original owner.
       allow create: if request.auth.uid == request.resource.data.originalOwnerId;
-
-      // Nobody can update or delete share documents.
       allow update, delete: if false;
     }
   }
