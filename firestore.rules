@@ -1,36 +1,31 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
+    
+    // Helper function to check ownership
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
-
+    
+    // Projects can be created by any authenticated user for themselves.
+    // They can only be read, updated, or deleted by their owner.
     match /projects/{projectId} {
       allow read: if isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId);
       allow update, delete: if isOwner(resource.data.userId);
     }
-
-    match /pins/{pinId} {
+    
+    // Pins, Lines, and Areas can be created by any authenticated user for themselves.
+    // They can only be read, updated, or deleted by their owner.
+    match /{collection}/{docId} {
       allow read: if isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId);
       allow update, delete: if isOwner(resource.data.userId);
     }
 
-    match /lines/{lineId} {
-      allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId);
-      allow update, delete: if isOwner(resource.data.userId);
-    }
-
-    match /areas/{areaId} {
-      allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId);
-      allow update, delete: if isOwner(resource.data.userId);
-    }
-
+    // Share documents can be read by any authenticated user.
+    // They can only be created by the owner of the original project.
+    // They cannot be updated or deleted.
     match /shares/{shareId} {
       allow read: if request.auth != null;
       allow create: if isOwner(request.resource.data.originalOwnerId);

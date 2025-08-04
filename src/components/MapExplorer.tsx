@@ -1346,22 +1346,22 @@ if (dataLoading) {
 
       <Dialog open={isAssignProjectDialogOpen} onOpenChange={setIsAssignProjectDialogOpen}>
         <DialogContent className="z-[1003] sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Create Project</DialogTitle>
-            <DialogDescription>
-              To save items, first create a project to organize them.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { setIsAssignProjectDialogOpen(false); setPendingAction(null); }}>Cancel</Button>
-            <Button
-              onClick={() => {
-                setIsAssignProjectDialogOpen(false);
-                setIsNewProjectDialogOpen(true);
-              }}>
-              <FolderPlus className="mr-2 h-4 w-4" /> Create Project
-            </Button>
-          </DialogFooter>
+            <DialogHeader>
+                <DialogTitle>Create Project</DialogTitle>
+                <DialogDescription>
+                    To save items, you must first create a project.
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => { setIsAssignProjectDialogOpen(false); setPendingAction(null); }}>Cancel</Button>
+                <Button
+                    onClick={() => {
+                        setIsAssignProjectDialogOpen(false);
+                        setIsNewProjectDialogOpen(true);
+                    }}>
+                    <FolderPlus className="mr-2 h-4 w-4" /> Create Project
+                </Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
 
