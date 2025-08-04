@@ -14,8 +14,10 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  setLogLevel,
+  setDoc,
 } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { db, auth, app as firebaseApp } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -403,7 +405,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleUpdatePin = async (id: string, label: string, notes: string, projectId?: string) => {
     const pinRef = doc(db, "pins", id);
     const updatedData: any = { label, notes };
-    if (projectId) {
+    if (projectId || projectId === '') {
       updatedData.projectId = projectId;
     }
     
@@ -437,7 +439,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleUpdateLine = async (id: string, label: string, notes: string, projectId?: string) => {
     const lineRef = doc(db, "lines", id);
     const updatedData: any = { label, notes };
-    if (projectId) {
+     if (projectId || projectId === '') {
       updatedData.projectId = projectId;
     }
 
@@ -471,7 +473,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleUpdateArea = async (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string) => {
     const areaRef = doc(db, "areas", id);
     const updatedData: any = { label, notes, path };
-    if (projectId) {
+    if (projectId || projectId === '') {
       updatedData.projectId = projectId;
     }
 
@@ -602,26 +604,31 @@ export default function MapExplorer({ user }: { user: User }) {
         description: newProjectDescription,
     };
     
-    addLog(`[INIT] db instance: ${db}`);
-    addLog(`[INIT] Current user: ${auth.currentUser?.uid}`);
-    addLog(`[INIT] Target collection ref: ${collection(db, "projects")}`);
-    addLog(`[PAYLOAD] Raw data argument: ${JSON.stringify(data)}`);
-    
+    setLogLevel('debug');
+    addLog("[INIT] firebaseApp.name =" + firebaseApp.name);
+    addLog("[INIT] firebaseApp.options.projectId =" + firebaseApp.options.projectId);
+    addLog("[INIT] db.app.name =" + db.app.name);
+    addLog("[INIT] Current user:" + auth.currentUser);
+    const projectsRef = collection(db, 'projects');
+    addLog("[INIT] projectsRef.path =" + projectsRef.path);
+    addLog("[PAYLOAD] raw data:" + JSON.stringify(data));
     const payload = {
         ...data,
         createdAt: serverTimestamp(),
         userId: auth.currentUser?.uid,
     };
-    addLog(`[PAYLOAD] Final write payload: ${JSON.stringify(payload)}`);
-    
-    const writePromise = addDoc(collection(db, "projects"), payload);
-    addLog(`[PROMISE] addDoc() returned: ${writePromise}`);
-    addLog(`[NETWORK] navigator.onLine = ${navigator.onLine}`);
+    addLog("[PAYLOAD] final payload:" + JSON.stringify(payload));
+    const persisted = await navigator.storage?.persisted();
+    addLog("[PERSISTENCE] navigator.storage?.persisted() →" + persisted);
+
+    const writePromise = addDoc(projectsRef, payload);
+    addLog("[PROMISE] addDoc() returned:" + writePromise);
+    addLog("[NETWORK] navigator.onLine =" + navigator.onLine);
 
     try {
-      addLog("[AWAIT] About to await writePromise …");
+      addLog("[AWAIT] about to await writePromise");
       const docRef = await writePromise;
-      addLog(`✅ [SUCCESS] Document created with ID: ${docRef.id}`);
+      addLog(`✅ [SUCCESS] doc written, ID = ${docRef.id}`);
       
       const newProject = { ...payload, id: docRef.id, createdAt: new Date() };
       setProjects(prev => [...prev, newProject]);
@@ -638,7 +645,7 @@ export default function MapExplorer({ user }: { user: User }) {
       addLog(`❌ [ERROR] addDoc failed: ${err.code} - ${err.message}`);
       toast({variant: 'destructive', title: 'Failed to create project', description: err.message});
     } finally {
-        addLog("[COMPLETE] handleCreateNewProject() finished");
+      addLog("[COMPLETE] handleCreateNewProject exit");
     }
   };
   
