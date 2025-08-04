@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -6,44 +7,39 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // This function checks if a project has been shared.
-    // It queries the 'shares' collection to see if any document
-    // exists that points to the given projectId.
     function isProjectShared(projectId) {
       return exists(/databases/$(database)/documents/shares_by_project/$(projectId));
     }
 
-    // Projects can be read by their owner OR if they have been shared.
-    // They can only be written to by their owner.
     match /projects/{projectId} {
       allow read: if isOwner(resource.data.userId) || isProjectShared(projectId);
-      allow write: if isOwner(request.resource.data.userId);
+      allow create, update: if isOwner(request.resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
     }
 
-    // Pins, Lines, and Areas follow the same logic as their parent project.
     match /pins/{pinId} {
       allow read: if isOwner(resource.data.userId) || isProjectShared(resource.data.projectId);
-      allow write: if isOwner(request.resource.data.userId);
+      allow create, update: if isOwner(request.resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
     }
 
     match /lines/{lineId} {
       allow read: if isOwner(resource.data.userId) || isProjectShared(resource.data.projectId);
-      allow write: if isOwner(request.resource.data.userId);
+      allow create, update: if isOwner(request.resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
     }
 
     match /areas/{areaId} {
       allow read: if isOwner(resource.data.userId) || isProjectShared(resource.data.projectId);
-      allow write: if isOwner(request.resource.data.userId);
+      allow create, update: if isOwner(request.resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
     }
     
-    // This is a new collection used for the lookup function above.
-    // It is written to when a share is created.
     match /shares_by_project/{projectId} {
-       allow read: if true; // Anyone can check for existence
+       allow read: if true;
        allow write: if isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.userId);
     }
 
-    // Original shares collection for generating codes.
     match /shares/{shareId} {
       allow read: if request.auth != null;
       allow create: if isOwner(get(/databases/$(database)/documents/projects/$(request.resource.data.projectId)).data.userId);
