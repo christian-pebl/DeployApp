@@ -1001,33 +1001,39 @@ if (dataLoading) {
                     <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching} className="h-9 w-9">
                         {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                     </Button>
-                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-9 w-9 bg-muted hover:bg-muted/80">
-                                <UserIcon className="h-5 w-5"/>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56" align="end">
-                            <DropdownMenuLabel className="font-normal">
-                                <div className="flex flex-col space-y-1">
-                                    <p className="text-sm font-medium leading-none">My Account</p>
-                                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-                                </div>
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => router.push('/settings')}>
-                                <Settings className="mr-2 h-4 w-4" />
-                                <span>Settings</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={handleLogout}>
-                                <LogOut className="mr-2 h-4 w-4" />
-                                <span>Log out</span>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                 </div>
               <TooltipProvider>
                 <div className="flex gap-2 justify-end">
+                  <DropdownMenu>
+                      <Tooltip>
+                          <TooltipTrigger asChild>
+                              <DropdownMenuTrigger asChild>
+                                  <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg">
+                                      <UserIcon className="h-6 w-6"/>
+                                  </Button>
+                              </DropdownMenuTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Account</p></TooltipContent>
+                      </Tooltip>
+                      <DropdownMenuContent className="w-56" align="end">
+                          <DropdownMenuLabel className="font-normal">
+                              <div className="flex flex-col space-y-1">
+                                  <p className="text-sm font-medium leading-none">My Account</p>
+                                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                              </div>
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => router.push('/settings')}>
+                              <Settings className="mr-2 h-4 w-4" />
+                              <span>Settings</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleLogout}>
+                              <LogOut className="mr-2 h-4 w-4" />
+                              <span>Log out</span>
+                          </DropdownMenuItem>
+                      </DropdownMenuContent>
+                  </DropdownMenu>
+
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button 
