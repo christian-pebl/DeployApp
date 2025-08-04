@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -119,6 +119,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const [isAssignProjectDialogOpen, setIsAssignProjectDialogOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [dataLoading, setDataLoading] = useState(true);
+  const [isLogDialogOpen, setIsLogDialogOpen] = useState(false);
 
   const router = useRouter();
   const { toast } = useToast();
@@ -171,7 +172,7 @@ export default function MapExplorer({ user }: { user: User }) {
     };
 
     loadData();
-  }, [user, toast]);
+  }, [user]);
   
   useEffect(() => {
       addLog('Attempting to get user location.');
@@ -242,13 +243,13 @@ export default function MapExplorer({ user }: { user: User }) {
   };
   
   const handleShowLog = () => {
-    const logContent = log.join('\n');
-    toast({
-        title: "Event Log",
-        description: <pre className="text-xs whitespace-pre-wrap max-h-60 overflow-y-auto">{logContent}</pre>,
-        duration: 20000,
-    });
+    setIsLogDialogOpen(true);
   }
+  
+  const handleCopyLog = () => {
+    navigator.clipboard.writeText(log.join('\n'));
+    toast({ title: 'Log Copied', description: 'The event log has been copied to your clipboard.' });
+  };
 
   const handleZoomIn = () => {
     addLog('Zoom in.');
@@ -337,8 +338,10 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handlePinSave = async (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => {
     const finalProjectId = projectId ?? activeProjectId;
-    const newPinData: Omit<Pin, 'id'> = { lat, lng, label, labelVisible: true, notes, userId: user.uid, projectId: finalProjectId ?? undefined };
-    if (!finalProjectId) delete newPinData.projectId;
+    const newPinData: any = { lat, lng, label, labelVisible: true, notes, userId: user.uid };
+    if (finalProjectId) {
+      newPinData.projectId = finalProjectId;
+    }
     
     addLog(`Attempting to save pin: "${label}" with data: ${JSON.stringify(newPinData)}`);
     
@@ -355,30 +358,34 @@ export default function MapExplorer({ user }: { user: User }) {
   };
 
   const handleLineSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
-    const finalProjectId = projectId ?? activeProjectId;
-    const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-    const newLineData: Omit<Line, 'id'> = { path: pathData, label, labelVisible: true, notes, userId: user.uid, projectId: finalProjectId ?? undefined };
-    if (!finalProjectId) delete newLineData.projectId;
+      const finalProjectId = projectId ?? activeProjectId;
+      const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
+      const newLineData: any = { path: pathData, label, labelVisible: true, notes, userId: user.uid };
+      if (finalProjectId) {
+        newLineData.projectId = finalProjectId;
+      }
 
-    addLog(`Attempting to save line: "${label}" with data: ${JSON.stringify(newLineData)}`);
+      addLog(`Attempting to save line: "${label}" with data: ${JSON.stringify(newLineData)}`);
 
-    try {
-      const docRef = await addDoc(collection(db, "lines"), newLineData);
-      setLines(prev => [...prev, { id: docRef.id, ...newLineData }]);
-      setPendingLine(null);
-      addLog(`✅ Line saved successfully with ID: ${docRef.id}`);
-      toast({title: 'Line Saved'});
-    } catch (e: any) {
-      addLog(`❌ Error saving line: ${e.code} - ${e.message}`);
-      toast({variant: 'destructive', title: 'Failed to save line', description: e.message});
-    }
+      try {
+        const docRef = await addDoc(collection(db, "lines"), newLineData);
+        setLines(prev => [...prev, { id: docRef.id, ...newLineData }]);
+        setPendingLine(null);
+        addLog(`✅ Line saved successfully with ID: ${docRef.id}`);
+        toast({title: 'Line Saved'});
+      } catch (e: any) {
+        addLog(`❌ Error saving line: ${e.code} - ${e.message}`);
+        toast({variant: 'destructive', title: 'Failed to save line', description: e.message});
+      }
   };
   
   const handleAreaSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
     const finalProjectId = projectId ?? activeProjectId;
     const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-    const newAreaData: Omit<Area, 'id'> = { path: pathData, label, labelVisible: true, fillVisible: true, notes, userId: user.uid, projectId: finalProjectId ?? undefined };
-    if (!finalProjectId) delete newAreaData.projectId;
+    const newAreaData: any = { path: pathData, label, labelVisible: true, fillVisible: true, notes, userId: user.uid };
+    if (finalProjectId) {
+      newAreaData.projectId = finalProjectId;
+    }
     
     addLog(`Attempting to save area: "${label}" with data: ${JSON.stringify(newAreaData)}`);
 
@@ -398,12 +405,16 @@ export default function MapExplorer({ user }: { user: User }) {
     addLog(`Attempting to update pin ID: ${id}`);
     const pinRef = doc(db, "pins", id);
     const updatedData: any = { label, notes };
-    if (projectId) updatedData.projectId = projectId; else delete updatedData.projectId;
+    if (projectId) {
+      updatedData.projectId = projectId;
+    } else {
+      updatedData.projectId = null; // Or use delete operator if you want to remove it
+    }
     
     addLog(`Updating pin with data: ${JSON.stringify(updatedData)}`);
     try {
       await updateDoc(pinRef, updatedData);
-      setPins(prev => prev.map(p => p.id === id ? { ...p, ...updatedData } : p));
+      setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes, projectId: projectId } : p));
       setItemToEdit(null);
       addLog(`✅ Successfully updated pin ID: ${id}`);
       toast({title: 'Pin Updated'});
@@ -431,12 +442,16 @@ export default function MapExplorer({ user }: { user: User }) {
     addLog(`Attempting to update line ID: ${id}`);
     const lineRef = doc(db, "lines", id);
     const updatedData: any = { label, notes };
-    if (projectId) updatedData.projectId = projectId; else delete updatedData.projectId;
+     if (projectId) {
+      updatedData.projectId = projectId;
+    } else {
+      updatedData.projectId = null;
+    }
 
     addLog(`Updating line with data: ${JSON.stringify(updatedData)}`);
     try {
       await updateDoc(lineRef, updatedData);
-      setLines(prev => prev.map(l => l.id === id ? { ...l, ...updatedData } : l));
+      setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes, projectId: projectId } : l));
       setItemToEdit(null);
       addLog(`✅ Successfully updated line ID: ${id}`);
       toast({title: 'Line Updated'});
@@ -464,12 +479,16 @@ export default function MapExplorer({ user }: { user: User }) {
     addLog(`Attempting to update area ID: ${id}`);
     const areaRef = doc(db, "areas", id);
     const updatedData: any = { label, notes, path };
-    if (projectId) updatedData.projectId = projectId; else delete updatedData.projectId;
+    if (projectId) {
+      updatedData.projectId = projectId;
+    } else {
+      updatedData.projectId = null;
+    }
 
     addLog(`Updating area with data: ${JSON.stringify(updatedData)}`);
     try {
       await updateDoc(areaRef, updatedData);
-      setAreas(prev => prev.map(a => a.id === id ? { ...a, ...updatedData } : a));
+      setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path, projectId: projectId } : a));
       setItemToEdit(null);
       addLog(`✅ Successfully updated area ID: ${id}`);
       toast({title: 'Area Updated'});
@@ -692,7 +711,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const unassignedObjectCount = useMemo(() => {
     return pins.filter(p => !p.projectId).length +
            lines.filter(l => !l.projectId).length +
-           areas.filter(a => !l.projectId).length;
+           areas.filter(a => !a.projectId).length;
   }, [pins, lines, areas]);
 
   const displayedPins = useMemo(() => {
@@ -1094,7 +1113,7 @@ if (dataLoading) {
                       <Tooltip>
                           <TooltipTrigger asChild>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full shadow-lg bg-card/90">
+                                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full shadow-lg bg-card/90">
                                   <UserIcon className="h-6 w-6"/>
                                 </Button>
                               </DropdownMenuTrigger>
@@ -1162,6 +1181,30 @@ if (dataLoading) {
             </div>
         </div>
       </main>
+      
+      <Dialog open={isLogDialogOpen} onOpenChange={setIsLogDialogOpen}>
+        <DialogContent className="max-w-2xl h-3/4 flex flex-col z-[1003]">
+          <DialogHeader>
+            <DialogTitle>Event Log</DialogTitle>
+            <DialogDescription>
+              Recent events from the application, useful for debugging.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 relative">
+            <ScrollArea className="h-full absolute w-full">
+              <pre className="text-xs p-4 bg-muted rounded-md">{log.join('\n')}</pre>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={handleCopyLog}>
+              <Copy className="mr-2 h-4 w-4" /> Copy Log
+            </Button>
+            <DialogClose asChild>
+              <Button type="button">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <Dialog open={isNewProjectDialogOpen} onOpenChange={setIsNewProjectDialogOpen}>
         <DialogContent className="z-[1003]">
