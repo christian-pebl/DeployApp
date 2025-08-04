@@ -70,6 +70,7 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { ProjectData, PinData, LineData, AreaData, TagData } from '@/ai/flows/share-project';
 import { useSettings } from '@/hooks/use-settings';
+import { useMapView } from '@/hooks/use-map-view';
 
 const Map = dynamic(() => import('@/components/Map'), {
   ssr: false,
@@ -93,10 +94,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
-  const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
-    center: [48.8584, 2.2945],
-    zoom: 13,
-  });
+  const { view, setView } = useMapView(user.uid);
   const [isLocating, setIsLocating] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<LatLng | null>(null);
 
@@ -203,30 +201,34 @@ export default function MapExplorer({ user }: { user: User }) {
       setIsLocating(true);
   }, []);
 
- const executePendingAction = () => {
+  const executePendingAction = () => {
     const action = pendingAction;
-    setPendingAction(null);
+    setPendingAction(null); // Clear the action immediately
     addLog(`Executing pending action: ${action}`);
+
     if (!action || !mapRef.current) {
         if(action) addLog(`Action execution cancelled: map not ready or action cleared.`);
         return;
     }
-
+    
+    // The project has been created, so we can now directly execute the action
+    // without re-running the checks in the original handlers.
     const center = mapRef.current.getCenter();
     
     if (action === 'pin') {
-        addLog(`Executing pending pin at: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
+        addLog(`Directly setting pending pin at: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
         setPendingPin(center);
     } else if (action === 'line') {
-        addLog(`Executing pending line from: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
+        addLog(`Directly setting line start point at: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
         setLineStartPoint(center);
         setIsDrawingLine(true);
     } else if (action === 'area') {
-        addLog(`Executing pending area.`);
+        addLog(`Directly starting area drawing mode.`);
         setIsDrawingArea(true);
         setPendingAreaPath([]);
     }
   };
+
 
   const handleLocationFound = (latlng: LatLng) => {
     setCurrentLocation(latlng);
@@ -1079,7 +1081,7 @@ const handleImportProject = async (e: React.FormEvent) => {
 };
 
 
-if (dataLoading || !settings) {
+if (dataLoading || !settings || !view) {
     return (
       <div className="w-full h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -1107,7 +1109,10 @@ if (dataLoading || !settings) {
               currentLocation={currentLocation}
               onLocationFound={handleLocationFound}
               onLocationError={handleLocationError}
-              onMove={(center) => setCurrentMapCenter(center)}
+              onMove={(center, zoom) => {
+                setCurrentMapCenter(center);
+                setView({ center, zoom });
+              }}
               isDrawingLine={isDrawingLine}
               lineStartPoint={lineStartPoint}
               isDrawingArea={isDrawingArea}

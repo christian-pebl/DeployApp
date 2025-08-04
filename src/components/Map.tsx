@@ -24,7 +24,7 @@ interface MapProps {
     currentLocation: LatLng | null;
     onLocationFound: (latlng: LatLng) => void;
     onLocationError: (error: any) => void;
-    onMove: (center: LatLng) => void;
+    onMove: (center: LatLng, zoom: number) => void;
     isDrawingLine: boolean;
     lineStartPoint: LatLng | null;
     isDrawingArea: boolean;
@@ -373,9 +373,9 @@ const Map = ({
 
             map.on('click', onMapClick);
             
-            map.on('move', () => {
+            map.on('moveend', () => {
                 if (mapRef.current) {
-                    onMove(mapRef.current.getCenter());
+                    onMove(mapRef.current.getCenter(), mapRef.current.getZoom());
                 }
             });
 
@@ -394,7 +394,7 @@ const Map = ({
     }, []); 
 
     useEffect(() => {
-        if (mapRef.current) {
+        if (mapRef.current && (mapRef.current.getZoom() !== zoom || JSON.stringify(mapRef.current.getCenter()) !== JSON.stringify(center))) {
             mapRef.current.setView(center, zoom, { animate: true, pan: { duration: 1 } });
         }
     }, [center, zoom]);
