@@ -30,6 +30,13 @@ import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
 import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy, Share2, Download, Tag } from 'lucide-react';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -121,6 +128,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(['all']);
 
   const [isAssignProjectDialogOpen, setIsAssignProjectDialogOpen] = useState(false);
+  const [assignProjectDialogSelection, setAssignProjectDialogSelection] = useState<string>('');
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false);
@@ -211,8 +219,6 @@ export default function MapExplorer({ user }: { user: User }) {
         return;
     }
     
-    // The project has been created, so we can now directly execute the action
-    // without re-running the checks in the original handlers.
     const center = mapRef.current.getCenter();
     
     if (action === 'pin') {
@@ -286,6 +292,7 @@ export default function MapExplorer({ user }: { user: User }) {
     if (!activeProjectId) {
         addLog('No active project. Prompting to create/select project.');
         setPendingAction('pin');
+        setAssignProjectDialogSelection(projects[0]?.id || '');
         setIsAssignProjectDialogOpen(true);
         return;
     }
@@ -301,6 +308,7 @@ export default function MapExplorer({ user }: { user: User }) {
     if (!activeProjectId) {
         addLog('No active project. Prompting to create/select project.');
         setPendingAction('line');
+        setAssignProjectDialogSelection(projects[0]?.id || '');
         setIsAssignProjectDialogOpen(true);
         return;
     }
@@ -317,6 +325,7 @@ export default function MapExplorer({ user }: { user: User }) {
     if (!activeProjectId) {
         addLog('No active project. Prompting to create/select project.');
         setPendingAction('area');
+        setAssignProjectDialogSelection(projects[0]?.id || '');
         setIsAssignProjectDialogOpen(true);
         return;
     }
@@ -1252,7 +1261,7 @@ if (dataLoading || !settings || !view) {
                                 All Projects Visible
                             </label>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => {if (activeProjectId) { setIsManageTagsDialogOpen(true); } else { toast({ variant: 'destructive', title: 'No Active Project', description: 'Please select an active project to manage its tags.'})}}}>
+                        <Button variant="outline" size="sm" onClick={() => {if (activeProjectId) { setIsManageTagsDialogOpen(true); } else { toast({ variant: 'destructive', title: 'No Active Project', description: 'Please select an active project to manage its tags.'})}}} disabled={!activeProjectId}>
                             <Tag className="mr-2 h-4 w-4"/> Manage Tags
                         </Button>
                     </div>
@@ -1580,24 +1589,49 @@ if (dataLoading || !settings || !view) {
       </Dialog>
 
       <Dialog open={isAssignProjectDialogOpen} onOpenChange={setIsAssignProjectDialogOpen}>
-        <DialogContent className="z-[1003] sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>No Active Project</DialogTitle>
-            <DialogDescription>
-              To add items to the map, you need to create a project first or set an existing one as active.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { setIsAssignProjectDialogOpen(false); setPendingAction(null); }}>Cancel</Button>
-            <Button
-              onClick={() => {
-                setIsAssignProjectDialogOpen(false);
-                setIsNewProjectDialogOpen(true);
-              }}>
-              <FolderPlus className="mr-2 h-4 w-4" /> Create Project
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+          <DialogContent className="z-[1003] sm:max-w-[425px]">
+              <DialogHeader>
+                  <DialogTitle>Select a Project</DialogTitle>
+                  <DialogDescription>
+                      To add items to the map, select an active project or create a new one.
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                  <Select onValueChange={setAssignProjectDialogSelection} defaultValue={assignProjectDialogSelection}>
+                      <SelectTrigger>
+                          <SelectValue placeholder="Select a project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          {projects.map(p => (
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                  <Button
+                      onClick={() => {
+                          if (assignProjectDialogSelection) {
+                              setActiveProjectId(assignProjectDialogSelection);
+                              setIsAssignProjectDialogOpen(false);
+                              executePendingAction();
+                          } else {
+                              toast({variant: 'destructive', title: 'No project selected'});
+                          }
+                      }}
+                      disabled={!assignProjectDialogSelection}
+                  >
+                      Set Active &amp; Continue
+                  </Button>
+                  <Separator/>
+                   <Button
+                      variant="outline"
+                      onClick={() => {
+                          setIsAssignProjectDialogOpen(false);
+                          setIsNewProjectDialogOpen(true);
+                      }}>
+                      <FolderPlus className="mr-2 h-4 w-4" /> Create New Project
+                  </Button>
+              </div>
+          </DialogContent>
       </Dialog>
       
       <Dialog open={isManageTagsDialogOpen} onOpenChange={setIsManageTagsDialogOpen}>
