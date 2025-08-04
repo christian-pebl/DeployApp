@@ -171,25 +171,26 @@ export default function MapExplorer({ user }: { user: User }) {
   }, []);
 
   const executePendingAction = () => {
-    if (!pendingAction) return;
+    const action = pendingAction;
+    if (!action) return;
 
-    if (pendingAction === 'pin') {
+    setPendingAction(null);
+
+    if (action === 'pin') {
         if (mapRef.current) {
             const center = mapRef.current.getCenter();
             setPendingPin(center);
         }
-    } else if (pendingAction === 'line') {
+    } else if (action === 'line') {
         if (mapRef.current) {
             const center = mapRef.current.getCenter();
             setLineStartPoint(center);
             setIsDrawingLine(true);
         }
-    } else if (pendingAction === 'area') {
+    } else if (action === 'area') {
         setIsDrawingArea(true);
         setPendingAreaPath([]);
     }
-
-    setPendingAction(null);
 };
 
 useEffect(() => {
@@ -539,7 +540,8 @@ useEffect(() => {
         };
         try {
           const docRef = await addDoc(collection(db, "projects"), newProjectData);
-          setProjects(prev => [...prev, { id: docRef.id, ...newProjectData }]);
+          const newProject = { id: docRef.id, ...newProjectData };
+          setProjects(prev => [...prev, newProject]);
           setActiveProjectId(docRef.id);
           setIsNewProjectDialogOpen(false);
           toast({ title: "Project Created", description: `"${name}" has been created and set as active.` });
