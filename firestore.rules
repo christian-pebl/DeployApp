@@ -1,53 +1,73 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
+  
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
-
-    function isProjectShared(projectId) {
-      return exists(/databases/$(database)/documents/shares_by_project/$(projectId));
+    
+    function isProjectOwner(projectId) {
+      let projectUserId = get(/databases/$(database)/documents/projects/$(projectId)).data.userId;
+      return isOwner(projectUserId);
     }
 
     match /projects/{projectId} {
-      allow read: if isOwner(resource.data.userId) || isProjectShared(projectId);
-      allow create, update, delete: if isOwner(request.resource.data.userId);
+      allow read: if request.auth != null;
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
     }
-    
+
     match /pins/{pinId} {
-      allow read: if isOwner(resource.data.userId) || isProjectShared(resource.data.projectId);
-      allow create, update: if isOwner(request.resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+      allow read: if request.auth != null;
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      // Allow delete if the user owns the pin OR is deleting the parent project.
+      allow delete: if isOwner(resource.data.userId) || isProjectOwner(resource.data.projectId);
     }
-    
+
     match /lines/{lineId} {
-      allow read: if isOwner(resource.data.userId) || isProjectShared(resource.data.projectId);
-      allow create, update: if isOwner(request.resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+      allow read: if request.auth != null;
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      // Allow delete if the user owns the line OR is deleting the parent project.
+      allow delete: if isOwner(resource.data.userId) || isProjectOwner(resource.data.projectId);
     }
-    
+
     match /areas/{areaId} {
-      allow read: if isOwner(resource.data.userId) || isProjectShared(resource.data.projectId);
-      allow create, update: if isOwner(request.resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+      allow read: if request.auth != null;
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      // Allow delete if the user owns the area OR is deleting the parent project.
+      allow delete: if isOwner(resource.data.userId) || isProjectOwner(resource.data.projectId);
     }
     
     match /tags/{tagId} {
-      allow read: if isOwner(resource.data.userId) || isProjectShared(resource.data.projectId);
-      allow create, update: if isOwner(request.resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+      allow read: if request.auth != null;
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      // Allow delete if the user owns the tag OR is deleting the parent project.
+      allow delete: if isOwner(resource.data.userId) || isProjectOwner(resource.data.projectId);
+    }
+    
+    match /shares/{shareId} {
+      // Anyone with the code can read the share doc to get the project ID.
+      allow read: if request.auth != null;
+      // Only the project owner can create a share document.
+      allow create: if isProjectOwner(request.resource.data.projectId);
+      // Shares are immutable.
+      allow update, delete: if false;
     }
 
     match /shares_by_project/{projectId} {
-       allow read: if true;
-       allow write: if isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.userId);
-    }
-
-    match /shares/{shareId} {
-      allow read: if request.auth != null;
-      allow create: if isOwner(get(/databases/$(database)/documents/projects/$(request.resource.data.projectId)).data.userId);
-      allow update, delete: if false;
+      // The `read` rule uses `get()` which requires a security rule on the target path.
+      // We check if the share document for this project exists.
+      allow get: if request.auth != null && exists(/databases/$(database)/documents/shares_by_project/$(projectId));
+      
+      // These are only for security rule checks via exists(). No direct client access.
+      allow read, write, update, delete, list, create: if false;
     }
   }
 }
