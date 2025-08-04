@@ -110,6 +110,9 @@ export default function MapExplorer({ user }: { user: User }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(['all']);
 
@@ -122,7 +125,6 @@ export default function MapExplorer({ user }: { user: User }) {
   
   const initialLocationFound = useRef(false);
   const mapRef = useRef<LeafletMap | null>(null);
-  const newProjectFormRef = useRef<HTMLFormElement>(null);
   const editProjectFormRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -525,16 +527,10 @@ useEffect(() => {
 
   const handleCreateNewProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    const form = newProjectFormRef.current;
-    if (!form) return;
-    const formData = new FormData(form);
-    const name = formData.get('name') as string;
-    const description = formData.get('description') as string;
-    
-    if (name) {
+    if (newProjectName) {
         const newProjectData = {
-            name,
-            description,
+            name: newProjectName,
+            description: newProjectDescription,
             createdAt: serverTimestamp(),
             userId: user.uid,
         };
@@ -544,7 +540,9 @@ useEffect(() => {
           setProjects(prev => [...prev, newProject]);
           setActiveProjectId(docRef.id);
           setIsNewProjectDialogOpen(false);
-          toast({ title: "Project Created", description: `"${name}" has been created and set as active.` });
+          setNewProjectName('');
+          setNewProjectDescription('');
+          toast({ title: "Project Created", description: `"${newProjectName}" has been created and set as active.` });
           if (pendingAction) {
             executePendingAction();
           }
@@ -1098,9 +1096,9 @@ if (dataLoading) {
                 <DialogTitle>Create New Project</DialogTitle>
                 <DialogDescription>Enter a name and optional description for your new project.</DialogDescription>
             </DialogHeader>
-            <form ref={newProjectFormRef} onSubmit={handleCreateNewProject} className="space-y-4">
-                <Input name="name" placeholder="Project Name" required />
-                <Textarea name="description" placeholder="Project Description (optional)" />
+            <form onSubmit={handleCreateNewProject} className="space-y-4">
+                <Input name="name" placeholder="Project Name" required value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} />
+                <Textarea name="description" placeholder="Project Description (optional)" value={newProjectDescription} onChange={(e) => setNewProjectDescription(e.target.value)} />
                 <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
                     <Button type="submit">Create Project</Button>
