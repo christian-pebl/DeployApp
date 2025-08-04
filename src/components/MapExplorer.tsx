@@ -1014,14 +1014,13 @@ if (dataLoading) {
                 </div>
             )}
 
-            <div className="absolute top-4 right-4 z-[1000] flex items-start gap-2">
+            <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end gap-2">
               <TooltipProvider>
-                <div className="flex gap-2">
                   <DropdownMenu>
                       <Tooltip>
                           <TooltipTrigger asChild>
                               <DropdownMenuTrigger asChild>
-                                  <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg">
+                                  <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full shadow-lg">
                                       <UserIcon className="h-6 w-6"/>
                                   </Button>
                               </DropdownMenuTrigger>
@@ -1065,7 +1064,6 @@ if (dataLoading) {
                       <TooltipContent side="left"><p>Zoom Out</p></TooltipContent>
                     </Tooltip>
                   </div>
-                </div>
               </TooltipProvider>
             </div>
 
