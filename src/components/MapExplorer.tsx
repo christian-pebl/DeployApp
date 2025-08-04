@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy, Share2, Download } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy, Share2, Download, Tag } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -77,9 +77,10 @@ const Map = dynamic(() => import('@/components/Map'), {
 });
 
 type Project = ProjectData;
-type Pin = PinData;
-type Line = LineData;
-type Area = AreaData;
+type Pin = PinData & { tagIds?: string[] };
+type Line = LineData & { tagIds?: string[] };
+type Area = AreaData & { tagIds?: string[] };
+type Tag = { id: string, name: string, color: string, projectId: string, userId: string };
 
 type PendingAction = 'pin' | 'line' | 'area' | null;
 
@@ -91,6 +92,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const [pins, setPins] = useState<Pin[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [view, setView] = useState<{ center: LatLngExpression; zoom: number }>({
     center: [48.8584, 2.2945],
     zoom: 13,
@@ -130,6 +132,10 @@ export default function MapExplorer({ user }: { user: User }) {
   const [shareCode, setShareCode] = useState('');
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isManageTagsDialogOpen, setIsManageTagsDialogOpen] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#ff0000');
+  const [tagToEdit, setTagToEdit] = useState<Tag | null>(null);
 
   const router = useRouter();
   const { toast } = useToast();
@@ -170,6 +176,13 @@ export default function MapExplorer({ user }: { user: User }) {
           const loadedAreas = areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area));
           setAreas(loadedAreas);
           addLog(`Loaded ${loadedAreas.length} areas.`);
+          
+          const tagsQuery = query(collection(db, "tags"), where("userId", "==", user.uid));
+          const tagsSnapshot = await getDocs(tagsQuery);
+          const loadedTags = tagsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tag));
+          setTags(loadedTags);
+          addLog(`Loaded ${loadedTags.length} tags.`);
+
 
       } catch (error: any) {
           addLog(`❌ Error loading data: ${error.message}`);
@@ -354,7 +367,7 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handlePinSave = async (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => {
     const finalProjectId = projectId ?? activeProjectId;
-    const newPinData: any = { lat, lng, label, labelVisible: true, notes, userId: user.uid, createdAt: serverTimestamp() };
+    const newPinData: any = { lat, lng, label, labelVisible: true, notes, userId: user.uid, createdAt: serverTimestamp(), tagIds: [] };
     if (finalProjectId) {
       newPinData.projectId = finalProjectId;
     }
@@ -377,7 +390,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleLineSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
       const finalProjectId = projectId ?? activeProjectId;
       const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-      const newLineData: any = { path: pathData, label, labelVisible: true, notes, userId: user.uid, createdAt: serverTimestamp() };
+      const newLineData: any = { path: pathData, label, labelVisible: true, notes, userId: user.uid, createdAt: serverTimestamp(), tagIds: [] };
       if (finalProjectId) {
         newLineData.projectId = finalProjectId;
       }
@@ -400,7 +413,7 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleAreaSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
     const finalProjectId = projectId ?? activeProjectId;
     const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-    const newAreaData: any = { path: pathData, label, labelVisible: true, fillVisible: true, notes, userId: user.uid, createdAt: serverTimestamp() };
+    const newAreaData: any = { path: pathData, label, labelVisible: true, fillVisible: true, notes, userId: user.uid, createdAt: serverTimestamp(), tagIds: [] };
     if (finalProjectId) {
       newAreaData.projectId = finalProjectId;
     }
@@ -420,18 +433,21 @@ export default function MapExplorer({ user }: { user: User }) {
     }
   };
 
-  const handleUpdatePin = async (id: string, label: string, notes: string, projectId?: string) => {
+  const handleUpdatePin = async (id: string, label: string, notes: string, projectId?: string, tagIds?: string[]) => {
     const pinRef = doc(db, "pins", id);
     const updatedData: any = { label, notes };
     if (projectId || projectId === '') {
       updatedData.projectId = projectId;
+    }
+    if (tagIds) {
+      updatedData.tagIds = tagIds;
     }
     
     addLog(`[AWAIT] About to await updateDoc(pins) for ID: ${id}`);
     try {
       await updateDoc(pinRef, updatedData);
       addLog(`✅ [SUCCESS] Pin updated for ID: ${id}`);
-      setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes, projectId: projectId } : p));
+      setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes, projectId: projectId, tagIds } : p));
       setItemToEdit(null);
       toast({title: 'Pin Updated'});
     } catch (e: any) {
@@ -454,18 +470,21 @@ export default function MapExplorer({ user }: { user: User }) {
     }
   };
   
-  const handleUpdateLine = async (id: string, label: string, notes: string, projectId?: string) => {
+  const handleUpdateLine = async (id: string, label: string, notes: string, projectId?: string, tagIds?: string[]) => {
     const lineRef = doc(db, "lines", id);
     const updatedData: any = { label, notes };
      if (projectId || projectId === '') {
       updatedData.projectId = projectId;
+    }
+    if (tagIds) {
+      updatedData.tagIds = tagIds;
     }
 
     addLog(`[AWAIT] About to await updateDoc(lines) for ID: ${id}`);
     try {
       await updateDoc(lineRef, updatedData);
       addLog(`✅ [SUCCESS] Line updated for ID: ${id}`);
-      setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes, projectId: projectId } : l));
+      setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes, projectId: projectId, tagIds } : l));
       setItemToEdit(null);
       toast({title: 'Line Updated'});
     } catch(e: any) {
@@ -488,18 +507,21 @@ export default function MapExplorer({ user }: { user: User }) {
     }
   };
 
-  const handleUpdateArea = async (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string) => {
+  const handleUpdateArea = async (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string, tagIds?: string[]) => {
     const areaRef = doc(db, "areas", id);
     const updatedData: any = { label, notes, path };
     if (projectId || projectId === '') {
       updatedData.projectId = projectId;
+    }
+    if (tagIds) {
+      updatedData.tagIds = tagIds;
     }
 
     addLog(`[AWAIT] About to await updateDoc(areas) for ID: ${id}`);
     try {
       await updateDoc(areaRef, updatedData);
       addLog(`✅ [SUCCESS] Area updated for ID: ${id}`);
-      setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path, projectId: projectId } : a));
+      setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path, projectId: projectId, tagIds } : a));
       setItemToEdit(null);
       toast({title: 'Area Updated'});
     } catch (e: any) {
@@ -643,7 +665,7 @@ export default function MapExplorer({ user }: { user: User }) {
       toast({ title: "Project Created", description: `"${newProjectName}" has been created and set as active.` });
 
       if (pendingAction) {
-          executePendingAction();
+        executePendingAction();
       }
     } catch (err: any) {
       addLog(`❌ [ERROR] addDoc failed: ${err.message}`);
@@ -699,6 +721,10 @@ export default function MapExplorer({ user }: { user: User }) {
         const associatedAreas = areas.filter(a => a.projectId === projectId);
         associatedAreas.forEach(a => batch.delete(doc(db, "areas", a.id)));
         addLog(` - Marked ${associatedAreas.length} areas for deletion.`);
+        
+        const associatedTags = tags.filter(t => t.projectId === projectId);
+        associatedTags.forEach(t => batch.delete(doc(db, "tags", t.id)));
+        addLog(` - Marked ${associatedTags.length} tags for deletion.`);
 
         await batch.commit();
         addLog(`✅ [SUCCESS] Batch commit successful.`);
@@ -707,6 +733,7 @@ export default function MapExplorer({ user }: { user: User }) {
         setPins(prev => prev.filter(p => p.projectId !== projectId));
         setLines(prev => prev.filter(l => l.projectId !== projectId));
         setAreas(prev => prev.filter(a => a.projectId !== projectId));
+        setTags(prev => prev.filter(t => t.projectId !== projectId));
         
         if (activeProjectId === projectId) {
             setActiveProjectId(null);
@@ -720,6 +747,87 @@ export default function MapExplorer({ user }: { user: User }) {
         toast({variant: 'destructive', title: 'Failed to delete project', description: e.message});
       }
   }
+  
+  const handleCreateTag = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTagName || !activeProjectId) return;
+
+    const payload = {
+        name: newTagName,
+        color: newTagColor,
+        projectId: activeProjectId,
+        userId: user.uid,
+    };
+    
+    try {
+      const docRef = await addDoc(collection(db, "tags"), payload);
+      const newTag = { ...payload, id: docRef.id } as Tag;
+      setTags(prev => [...prev, newTag]);
+      setNewTagName('');
+      setNewTagColor('#ff0000');
+      toast({ title: "Tag Created" });
+    } catch(e: any) {
+      toast({ variant: 'destructive', title: 'Failed to create tag' });
+    }
+  }
+  
+  const handleUpdateTag = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tagToEdit) return;
+
+    const name = (e.currentTarget.elements.namedItem('name') as HTMLInputElement).value;
+    const color = (e.currentTarget.elements.namedItem('color') as HTMLInputElement).value;
+
+    const tagRef = doc(db, "tags", tagToEdit.id);
+    try {
+      await updateDoc(tagRef, { name, color });
+      setTags(tags.map(t => t.id === tagToEdit.id ? { ...t, name, color } : t));
+      setTagToEdit(null);
+      toast({ title: "Tag Updated" });
+    } catch (e: any) {
+       toast({ variant: 'destructive', title: 'Failed to update tag' });
+    }
+  };
+  
+  const handleDeleteTag = async (tagId: string) => {
+    try {
+        const batch = writeBatch(db);
+        
+        // Delete the tag itself
+        batch.delete(doc(db, "tags", tagId));
+
+        // Remove the tagId from all objects in the same project
+        const projectId = tags.find(t => t.id === tagId)?.projectId;
+        if(projectId) {
+            const projectPins = pins.filter(p => p.projectId === projectId && p.tagIds?.includes(tagId));
+            projectPins.forEach(p => {
+                const newTagIds = p.tagIds?.filter(id => id !== tagId);
+                batch.update(doc(db, "pins", p.id), { tagIds: newTagIds });
+            });
+
+            const projectLines = lines.filter(l => l.projectId === projectId && l.tagIds?.includes(tagId));
+            projectLines.forEach(l => {
+                const newTagIds = l.tagIds?.filter(id => id !== tagId);
+                batch.update(doc(db, "lines", l.id), { tagIds: newTagIds });
+            });
+
+            const projectAreas = areas.filter(a => a.projectId === projectId && a.tagIds?.includes(tagId));
+            projectAreas.forEach(a => {
+                const newTagIds = a.tagIds?.filter(id => id !== tagId);
+                batch.update(doc(db, "areas", a.id), { tagIds: newTagIds });
+            });
+        }
+        
+        await batch.commit();
+
+        setTags(prev => prev.filter(t => t.id !== tagId));
+        await loadData(); // Reload data to get updated objects
+        toast({ title: "Tag Deleted" });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Failed to delete tag' });
+    }
+  };
+
 
   const getObjectCountForProject = (projectId: string) => {
       return pins.filter(p => p.projectId === projectId).length +
@@ -867,17 +975,20 @@ const handleImportProject = async (e: React.FormEvent) => {
     const pinsQuery = query(collection(db, 'pins'), where('projectId', '==', projectId));
     const linesQuery = query(collection(db, 'lines'), where('projectId', '==', projectId));
     const areasQuery = query(collection(db, 'areas'), where('projectId', '==', projectId));
+    const tagsQuery = query(collection(db, 'tags'), where('projectId', '==', projectId));
     
-    const [pinsSnapshot, linesSnapshot, areasSnapshot] = await Promise.all([
+    const [pinsSnapshot, linesSnapshot, areasSnapshot, tagsSnapshot] = await Promise.all([
         getDocs(pinsQuery),
         getDocs(linesQuery),
         getDocs(areasQuery),
+        getDocs(tagsQuery),
     ]);
     
     const importedPins = pinsSnapshot.docs.map(d => d.data() as Pin);
     const importedLines = linesSnapshot.docs.map(d => d.data() as Line);
     const importedAreas = areasSnapshot.docs.map(d => d.data() as Area);
-    addLog(`   - Found ${importedPins.length} pins, ${importedLines.length} lines, ${importedAreas.length} areas.`);
+    const importedTags = tagsSnapshot.docs.map(d => d.data() as Tag);
+    addLog(`   - Found ${importedPins.length} pins, ${importedLines.length} lines, ${importedAreas.length} areas, ${importedTags.length} tags.`);
 
     addLog(`[IMPORT_CLIENT] 8. Creating batch write for import...`);
     const batch = writeBatch(db);
@@ -891,21 +1002,34 @@ const handleImportProject = async (e: React.FormEvent) => {
     });
     addLog(`   - Queued new project for creation with ID: ${newProjectRef.id}`);
 
+    const newTagIdMap = new Map<string, string>();
+    
+    importedTags.forEach(tag => {
+      const { id, userId, ...rest } = tag;
+      const newTagRef = doc(collection(db, 'tags'));
+      newTagIdMap.set(id, newTagRef.id);
+      batch.set(newTagRef, { ...rest, projectId: newProjectRef.id, userId: user.uid });
+    });
+    addLog(`   - Queued ${importedTags.length} tags for creation.`);
+
     importedPins.forEach(pin => {
       const { id, userId, ...rest } = pin;
-      batch.set(doc(collection(db, 'pins')), { ...rest, projectId: newProjectRef.id, userId: user.uid });
+      const newTagIds = pin.tagIds?.map(oldId => newTagIdMap.get(oldId)).filter(Boolean) as string[];
+      batch.set(doc(collection(db, 'pins')), { ...rest, projectId: newProjectRef.id, userId: user.uid, tagIds: newTagIds || [] });
     });
     addLog(`   - Queued ${importedPins.length} pins for creation.`);
     
     importedLines.forEach(line => {
       const { id, userId, ...rest } = line;
-      batch.set(doc(collection(db, 'lines')), { ...rest, projectId: newProjectRef.id, userId: user.uid });
+      const newTagIds = line.tagIds?.map(oldId => newTagIdMap.get(oldId)).filter(Boolean) as string[];
+      batch.set(doc(collection(db, 'lines')), { ...rest, projectId: newProjectRef.id, userId: user.uid, tagIds: newTagIds || [] });
     });
      addLog(`   - Queued ${importedLines.length} lines for creation.`);
 
     importedAreas.forEach(area => {
        const { id, userId, ...rest } = area;
-      batch.set(doc(collection(db, 'areas')), { ...rest, projectId: newProjectRef.id, userId: user.uid });
+       const newTagIds = area.tagIds?.map(oldId => newTagIdMap.get(oldId)).filter(Boolean) as string[];
+      batch.set(doc(collection(db, 'areas')), { ...rest, projectId: newProjectRef.id, userId: user.uid, tagIds: newTagIds || [] });
     });
     addLog(`   - Queued ${importedAreas.length} areas for creation.`);
 
@@ -936,6 +1060,8 @@ if (dataLoading) {
     );
 }
 
+  const activeProjectTags = tags.filter(t => t.projectId === activeProjectId);
+
   return (
     <div className="h-screen w-screen flex bg-background font-body relative overflow-hidden">
        
@@ -949,6 +1075,7 @@ if (dataLoading) {
               lines={displayedLines}
               areas={displayedAreas}
               projects={projects}
+              tags={tags}
               currentLocation={currentLocation}
               onLocationFound={handleLocationFound}
               onLocationError={handleLocationError}
@@ -1077,7 +1204,7 @@ if (dataLoading) {
                             </Button>
                         </div>
                     </div>
-                     <div className="border-t -mx-4 px-4 pt-4 mt-2">
+                     <div className="flex justify-between items-center border-t -mx-4 px-4 pt-4 mt-2">
                         <div className="flex items-center space-x-2">
                             <Checkbox 
                                 id="toggle-all-visibility" 
@@ -1091,6 +1218,9 @@ if (dataLoading) {
                                 All Projects Visible
                             </label>
                         </div>
+                        <Button variant="outline" size="sm" disabled={!activeProjectId} onClick={() => setIsManageTagsDialogOpen(true)}>
+                            <Tag className="mr-2 h-4 w-4"/> Manage Tags
+                        </Button>
                     </div>
                     <ScrollArea className="h-32 -mx-4 px-4">
                         <ul className="space-y-2 pt-2">
@@ -1337,7 +1467,7 @@ if (dataLoading) {
                           onClick={handleShowLog}
                           className="h-12 w-12 rounded-full shadow-lg bg-card"
                       >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
                       </Button>
                   </TooltipTrigger>
                   <TooltipContent side="left">
@@ -1432,6 +1562,55 @@ if (dataLoading) {
             </Button>
           </DialogFooter>
         </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isManageTagsDialogOpen} onOpenChange={setIsManageTagsDialogOpen}>
+          <DialogContent className="z-[1004] max-w-md">
+              <DialogHeader>
+                  <DialogTitle>Manage Tags for "{projects.find(p => p.id === activeProjectId)?.name}"</DialogTitle>
+                  <DialogDescription>Create, edit, or delete tags for this project.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                  <form onSubmit={handleCreateTag} className="flex items-end gap-2">
+                      <div className="flex-1">
+                          <label htmlFor="new-tag-name" className="text-sm font-medium">New Tag</label>
+                          <Input id="new-tag-name" value={newTagName} onChange={e => setNewTagName(e.target.value)} placeholder="Tag name" required/>
+                      </div>
+                      <div>
+                          <label htmlFor="new-tag-color" className="text-sm font-medium">Color</label>
+                          <Input id="new-tag-color" type="color" value={newTagColor} onChange={e => setNewTagColor(e.target.value)} className="p-1 h-10"/>
+                      </div>
+                      <Button type="submit">Add</Button>
+                  </form>
+                  <Separator/>
+                  <ScrollArea className="h-64">
+                      <div className="space-y-2 pr-4">
+                          {activeProjectTags.map(tag => (
+                            tagToEdit?.id === tag.id ? (
+                               <form key={tag.id} onSubmit={handleUpdateTag} className="flex items-end gap-2 p-2 border rounded-lg">
+                                  <Input name="name" defaultValue={tag.name} className="h-9"/>
+                                  <Input name="color" type="color" defaultValue={tag.color} className="p-1 h-9"/>
+                                  <Button type="submit" size="sm">Save</Button>
+                                  <Button type="button" variant="ghost" size="sm" onClick={() => setTagToEdit(null)}>Cancel</Button>
+                               </form>
+                            ) : (
+                              <div key={tag.id} className="flex items-center justify-between p-2 rounded-md border bg-card">
+                                  <div className="flex items-center gap-2">
+                                      <div className="w-4 h-4 rounded-full" style={{backgroundColor: tag.color}}/>
+                                      <span className="font-medium">{tag.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTagToEdit(tag)}><Pencil className="h-4 w-4"/></Button>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteTag(tag.id)}><Trash2 className="h-4 w-4"/></Button>
+                                  </div>
+                              </div>
+                            )
+                          ))}
+                           {activeProjectTags.length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No tags created yet.</p>}
+                      </div>
+                  </ScrollArea>
+              </div>
+          </DialogContent>
       </Dialog>
 
        <Dialog open={isImportProjectDialogOpen} onOpenChange={setIsImportProjectDialogOpen}>

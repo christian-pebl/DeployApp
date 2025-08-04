@@ -8,7 +8,7 @@ import { getAnalytics, isSupported } from "firebase/analytics";
 const firebaseConfig = {
   "projectId": "map-explorer-yl700",
   "appId": "1:543799482543:web:cc17073468a2f24af49c5a",
-  "storageBucket": "map-explorer-yl700.firebasestorage.app",
+  "storageBucket": "map-explorer-yl700.appspot.com",
   "apiKey": "AIzaSyCPIRZLKaEzw202KRcFFA2e61XqOwdo91k",
   "authDomain": "map-explorer-yl700.firebaseapp.com",
   "measurementId": "G-5G9387RE47",

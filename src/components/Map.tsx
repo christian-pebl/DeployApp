@@ -4,9 +4,10 @@ import React, { useEffect, useRef } from 'react';
 import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions } from 'leaflet';
 
 type Project = { id: string; name: string; description?: string; createdAt: string; };
-type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; projectId?: string; };
-type Line = { id:string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; projectId?: string; };
-type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; projectId?: string; };
+type Tag = { id: string; name: string; color: string; projectId: string; };
+type Pin = { id: string; lat: number; lng: number; label: string; labelVisible?: boolean; notes?: string; projectId?: string; tagIds?: string[]; };
+type Line = { id:string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; projectId?: string; tagIds?: string[]; };
+type Area = { id: string; path: { lat: number; lng: number }[]; label: string; labelVisible?: boolean; notes?: string; fillVisible?: boolean; projectId?: string; tagIds?: string[]; };
 
 
 interface MapProps {
@@ -17,6 +18,7 @@ interface MapProps {
     lines: Line[];
     areas: Area[];
     projects: Project[];
+    tags: Tag[];
     currentLocation: LatLng | null;
     onLocationFound: (latlng: LatLng) => void;
     onLocationError: (error: any) => void;
@@ -35,11 +37,11 @@ interface MapProps {
     pendingArea: { path: LatLng[] } | null;
     onAreaSave: (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => void;
     onAreaCancel: () => void;
-    onUpdatePin: (id: string, label: string, notes: string, projectId?: string) => void;
+    onUpdatePin: (id: string, label: string, notes: string, projectId?: string, tagIds?: string[]) => void;
     onDeletePin: (id: string) => void;
-    onUpdateLine: (id: string, label: string, notes: string, projectId?: string) => void;
+    onUpdateLine: (id: string, label: string, notes: string, projectId?: string, tagIds?: string[]) => void;
     onDeleteLine: (id: string) => void;
-    onUpdateArea: (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string) => void;
+    onUpdateArea: (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string, tagIds?: string[]) => void;
     onDeleteArea: (id: string) => void;
     onToggleLabel: (id: string, type: 'pin' | 'line' | 'area') => void;
     onToggleFill: (id: string) => void;
@@ -91,7 +93,7 @@ function calculatePolygonArea(path: { lat: number; lng: number }[]): number {
 
 
 const Map = ({ 
-    mapRef, center, zoom, pins, lines, areas, projects, currentLocation, 
+    mapRef, center, zoom, pins, lines, areas, projects, tags, currentLocation, 
     onLocationFound, onLocationError, onMove, isDrawingLine, lineStartPoint,
     isDrawingArea, onMapClick, pendingAreaPath,
     pendingPin, onPinSave, onPinCancel,
@@ -182,6 +184,21 @@ const Map = ({
                 </select>
             </div>
         `;
+        
+        const availableTags = tags.filter(t => t.projectId === item.projectId);
+        const tagsHtml = availableTags.length > 0 ? `
+            <div class="pt-2">
+                 <label class="text-xs font-medium text-muted-foreground">Tags</label>
+                 <div class="flex flex-wrap gap-2 pt-1">
+                    ${availableTags.map(tag => `
+                        <div class="flex items-center gap-1.5">
+                           <input type="checkbox" id="tag-${tag.id}" name="tagIds" value="${tag.id}" ${item.tagIds?.includes(tag.id) ? 'checked' : ''} class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
+                           <label for="tag-${tag.id}" class="text-sm" style="color: ${tag.color};">${tag.name}</label>
+                        </div>
+                    `).join('')}
+                 </div>
+            </div>
+        ` : '';
 
         const labelVisible = item.labelVisible !== false;
         const fillVisible = isArea ? (item as Area).fillVisible !== false : false;
@@ -197,6 +214,7 @@ const Map = ({
                 <textarea name="notes" placeholder="Add notes..." class="p-2 border rounded-md text-sm bg-background text-foreground border-border min-h-[60px]">${item.notes || ''}</textarea>
                 ${coordsHtml}
                 ${projectSelectorHtml}
+                ${tagsHtml}
                 <div class="flex justify-between items-center gap-2 flex-wrap pt-2">
                     <div class="flex gap-2">
                         <button type="button" class="toggle-label-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">${labelVisible ? 'Hide' : 'Show'} Label</button>
@@ -235,18 +253,22 @@ const Map = ({
                 const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
                 const projectIdInput = formElements.namedItem('projectId') as HTMLSelectElement;
                 
+                const selectedTagIds = Array.from(formElements.namedItem('tagIds') as RadioNodeList)
+                    .filter(i => (i as HTMLInputElement).checked)
+                    .map(i => (i as HTMLInputElement).value);
+
                 const projectId = projectIdInput.value || undefined;
 
                 if (isPin) {
-                    onUpdatePin(item.id, labelInput.value, notesInput.value, projectId);
+                    onUpdatePin(item.id, labelInput.value, notesInput.value, projectId, selectedTagIds);
                 } else if (isArea) {
                     const newPath = (item as Area).path.map((_, i) => ({
                         lat: parseFloat((formElements.namedItem(`lat-${i}`) as HTMLInputElement).value),
                         lng: parseFloat((formElements.namedItem(`lng-${i}`) as HTMLInputElement).value),
                     }));
-                    onUpdateArea(item.id, labelInput.value, notesInput.value, newPath, projectId);
+                    onUpdateArea(item.id, labelInput.value, notesInput.value, newPath, projectId, selectedTagIds);
                 } else {
-                    onUpdateLine(item.id, labelInput.value, notesInput.value, projectId);
+                    onUpdateLine(item.id, labelInput.value, notesInput.value, projectId, selectedTagIds);
                 }
                 map.closePopup();
             });
@@ -297,7 +319,7 @@ const Map = ({
         } else if (!itemToEdit && mapRef.current && popupRef.current && popupRef.current.isOpen()) {
             mapRef.current.closePopup(popupRef.current);
         }
-    }, [itemToEdit, projects])
+    }, [itemToEdit, projects, tags])
 
     useEffect(() => {
         if (typeof window.L === 'undefined') return;
@@ -358,10 +380,15 @@ const Map = ({
         if (pinLayerRef.current && typeof window.L !== 'undefined') {
             const layer = pinLayerRef.current;
             layer.clearLayers();
-            const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent');
-            const markerIcon = createCustomIcon(`hsl(${accentColor})`);
+            const defaultAccentColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--accent')})`;
 
             pins.forEach(pin => {
+                const firstTagId = pin.tagIds?.[0];
+                const tag = tags.find(t => t.id === firstTagId);
+                const color = tag ? tag.color : defaultAccentColor;
+
+                const markerIcon = createCustomIcon(color);
+
                 const marker = L.marker([pin.lat, pin.lng], { icon: markerIcon }).addTo(layer);
                 if (pin.labelVisible !== false) {
                     marker.bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' });
@@ -372,20 +399,24 @@ const Map = ({
                 });
             });
         }
-    }, [pins, onEditItem]);
+    }, [pins, onEditItem, tags]);
 
     useEffect(() => {
         if (lineLayerRef.current && typeof window.L !== 'undefined') {
             const layer = lineLayerRef.current;
             layer.clearLayers();
-            const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
+            const defaultPrimaryColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--primary')})`;
 
             lines.forEach(line => {
                 const latlngs = line.path.map(p => [p.lat, p.lng] as LatLngExpression);
                 if (latlngs.length < 2) return;
 
+                const firstTagId = line.tagIds?.[0];
+                const tag = tags.find(t => t.id === firstTagId);
+                const color = tag ? tag.color : defaultPrimaryColor;
+
                 const polyline = L.polyline(latlngs, {
-                    color: `hsl(${primaryColor})`,
+                    color: color,
                     weight: 4,
                     opacity: 0.8
                 }).addTo(layer);
@@ -404,33 +435,29 @@ const Map = ({
                 });
             });
         }
-    }, [lines, onEditItem]);
+    }, [lines, onEditItem, tags]);
 
     useEffect(() => {
         if (areaLayerRef.current && typeof window.L !== 'undefined' && mapRef.current) {
             const layer = areaLayerRef.current;
             layer.clearLayers();
-            const secondaryFgColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary-foreground');
-            const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary');
-    
-            const cornerMarkerOptions: CircleMarkerOptions = {
-                radius: 6,
-                fillColor: `hsl(${secondaryColor})`,
-                color: `hsl(${secondaryFgColor})`,
-                weight: 2,
-                fillOpacity: 1
-            };
+            const defaultSecondaryFgColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--secondary-foreground')})`;
+            const defaultSecondaryColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--secondary')})`;
     
             areas.forEach(area => {
                 const latlngs = area.path.map(p => L.latLng(p.lat, p.lng));
                 if (latlngs.length < 2) return;
+
+                const firstTagId = area.tagIds?.[0];
+                const tag = tags.find(t => t.id === firstTagId);
+                const color = tag ? tag.color : defaultSecondaryFgColor;
     
                 const fillOpacity = area.fillVisible !== false ? 0.2 : 0.0;
     
                 const polygon = L.polygon(latlngs, {
-                    color: `hsl(${secondaryFgColor})`,
+                    color: color,
                     weight: 2,
-                    fillColor: `hsl(${secondaryFgColor})`,
+                    fillColor: color,
                     fillOpacity: fillOpacity
                 }).addTo(layer);
     
@@ -439,6 +466,14 @@ const Map = ({
                     onEditItem(area);
                 });
     
+                 const cornerMarkerOptions: CircleMarkerOptions = {
+                    radius: 6,
+                    fillColor: tag ? tag.color : defaultSecondaryColor,
+                    color: tag ? tag.color : defaultSecondaryFgColor,
+                    weight: 2,
+                    fillOpacity: 1
+                };
+
                 latlngs.forEach(latlng => {
                     const marker = L.circleMarker(latlng, cornerMarkerOptions).addTo(layer);
                     marker.on('click', (e) => {
@@ -457,7 +492,7 @@ const Map = ({
                 }
             });
         }
-    }, [areas, onEditItem]);
+    }, [areas, onEditItem, tags]);
 
 
     useEffect(() => {

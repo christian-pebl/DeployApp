@@ -6,9 +6,6 @@
 
 import { z } from 'genkit';
 
-// Note: The import logic has been moved to the client in MapExplorer.tsx.
-// This file is now only for schema definitions.
-
 export const ProjectDataSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -27,6 +24,7 @@ export const PinDataSchema = z.object({
   labelVisible: z.boolean().optional(),
   projectId: z.string().optional(),
   userId: z.string(),
+  tagIds: z.array(z.string()).optional(),
 });
 export type PinData = z.infer<typeof PinDataSchema>;
 
@@ -38,6 +36,7 @@ export const LineDataSchema = z.object({
   labelVisible: z.boolean().optional(),
   projectId: z.string().optional(),
   userId: z.string(),
+  tagIds: z.array(z.string()).optional(),
 });
 export type LineData = z.infer<typeof LineDataSchema>;
 
@@ -50,13 +49,15 @@ export const AreaDataSchema = z.object({
   fillVisible: z.boolean().optional(),
   projectId: z.string().optional(),
   userId: z.string(),
+  tagIds: z.array(z.string()).optional(),
 });
 export type AreaData = z.infer<typeof AreaDataSchema>;
 
-export const ImportProjectOutputSchema = z.object({
-  project: ProjectDataSchema,
-  pins: z.array(PinDataSchema),
-  lines: z.array(LineDataSchema),
-  areas: z.array(AreaDataSchema),
+export const TagDataSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string(),
+  projectId: z.string(),
+  userId: z.string(),
 });
-export type ImportProjectOutput = z.infer<typeof ImportProjectOutputSchema>;
+export type TagData = z.infer<typeof TagDataSchema>;
