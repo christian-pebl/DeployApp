@@ -68,7 +68,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import type { ProjectData, PinData, LineData, AreaData } from '@/ai/flows/share-project';
+import type { ProjectData, PinData, LineData, AreaData, TagData } from '@/ai/flows/share-project';
 
 
 const Map = dynamic(() => import('@/components/Map'), {
@@ -77,10 +77,10 @@ const Map = dynamic(() => import('@/components/Map'), {
 });
 
 type Project = ProjectData;
-type Pin = PinData & { tagIds?: string[] };
-type Line = LineData & { tagIds?: string[] };
-type Area = AreaData & { tagIds?: string[] };
-type Tag = { id: string, name: string, color: string, projectId: string, userId: string };
+type Pin = PinData;
+type Line = LineData;
+type Area = AreaData;
+type Tag = TagData;
 
 type PendingAction = 'pin' | 'line' | 'area' | null;
 
@@ -367,17 +367,20 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handlePinSave = async (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => {
     const finalProjectId = projectId ?? activeProjectId;
-    const newPinData: any = { lat, lng, label, labelVisible: true, notes, userId: user.uid, createdAt: serverTimestamp(), tagIds: [] };
-    if (finalProjectId) {
-      newPinData.projectId = finalProjectId;
+    if (!finalProjectId) {
+        addLog(`❌ [ERROR] Pin save failed: No project ID provided or active.`);
+        toast({variant: 'destructive', title: 'Cannot save pin', description: 'No active project selected.'});
+        return;
     }
+
+    const newPinData: Omit<Pin, 'id' | 'createdAt'> = { lat, lng, label, labelVisible: true, notes, userId: user.uid, projectId: finalProjectId, tagIds: [] };
     
     addLog(`[AWAIT] About to await addDoc(pins)`);
     try {
       addLog(`[DATA] Pin data: ${JSON.stringify(newPinData)}`);
-      const docRef = await addDoc(collection(db, "pins"), newPinData);
+      const docRef = await addDoc(collection(db, "pins"), { ...newPinData, createdAt: serverTimestamp() });
       addLog(`✅ [SUCCESS] Pin saved with ID: ${docRef.id}`);
-      const newPin = { ...newPinData, id: docRef.id, createdAt: new Date() } as Pin;
+      const newPin = { ...newPinData, id: docRef.id, createdAt: new Date().toISOString() } as Pin;
       setPins(prev => [...prev, newPin]);
       setPendingPin(null);
       toast({title: 'Pin Saved'});
@@ -389,18 +392,21 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handleLineSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
       const finalProjectId = projectId ?? activeProjectId;
-      const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-      const newLineData: any = { path: pathData, label, labelVisible: true, notes, userId: user.uid, createdAt: serverTimestamp(), tagIds: [] };
-      if (finalProjectId) {
-        newLineData.projectId = finalProjectId;
+      if (!finalProjectId) {
+        addLog(`❌ [ERROR] Line save failed: No project ID provided or active.`);
+        toast({variant: 'destructive', title: 'Cannot save line', description: 'No active project selected.'});
+        return;
       }
+
+      const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
+      const newLineData: Omit<Line, 'id' | 'createdAt'> = { path: pathData, label, labelVisible: true, notes, userId: user.uid, projectId: finalProjectId, tagIds: [] };
 
       addLog(`[AWAIT] About to await addDoc(lines)`);
       try {
         addLog(`[DATA] Line data: ${JSON.stringify(newLineData)}`);
-        const docRef = await addDoc(collection(db, "lines"), newLineData);
+        const docRef = await addDoc(collection(db, "lines"), { ...newLineData, createdAt: serverTimestamp() });
         addLog(`✅ [SUCCESS] Line saved with ID: ${docRef.id}`);
-        const newLine = { ...newLineData, id: docRef.id, createdAt: new Date() } as Line;
+        const newLine = { ...newLineData, id: docRef.id, createdAt: new Date().toISOString() } as Line;
         setLines(prev => [...prev, newLine]);
         setPendingLine(null);
         toast({title: 'Line Saved'});
@@ -412,18 +418,20 @@ export default function MapExplorer({ user }: { user: User }) {
   
   const handleAreaSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
     const finalProjectId = projectId ?? activeProjectId;
-    const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-    const newAreaData: any = { path: pathData, label, labelVisible: true, fillVisible: true, notes, userId: user.uid, createdAt: serverTimestamp(), tagIds: [] };
-    if (finalProjectId) {
-      newAreaData.projectId = finalProjectId;
+    if (!finalProjectId) {
+      addLog(`❌ [ERROR] Area save failed: No project ID provided or active.`);
+      toast({variant: 'destructive', title: 'Cannot save area', description: 'No active project selected.'});
+      return;
     }
+    const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
+    const newAreaData: Omit<Area, 'id' | 'createdAt'> = { path: pathData, label, labelVisible: true, fillVisible: true, notes, userId: user.uid, projectId: finalProjectId, tagIds: [] };
     
     addLog(`[AWAIT] About to await addDoc(areas)`);
     try {
       addLog(`[DATA] Area data: ${JSON.stringify(newAreaData)}`);
-      const docRef = await addDoc(collection(db, "areas"), newAreaData);
+      const docRef = await addDoc(collection(db, "areas"), { ...newAreaData, createdAt: serverTimestamp() });
       addLog(`✅ [SUCCESS] Area saved with ID: ${docRef.id}`);
-      const newArea = { ...newAreaData, id: docRef.id, createdAt: new Date() } as Area;
+      const newArea = { ...newAreaData, id: docRef.id, createdAt: new Date().toISOString() } as Area;
       setAreas(prev => [...prev, newArea]);
       setPendingArea(null);
       toast({title: 'Area Saved'});
@@ -644,19 +652,19 @@ export default function MapExplorer({ user }: { user: User }) {
     
     const projectsRef = collection(db, 'projects');
     
-    const payload = {
+    const payload: Omit<Project, 'id'> = {
         name: newProjectName,
         description: newProjectDescription,
-        createdAt: serverTimestamp(),
-        userId: auth.currentUser?.uid,
+        createdAt: new Date().toISOString(),
+        userId: auth.currentUser!.uid,
     };
     
     try {
       addLog("[AWAIT] About to await addDoc(projects)");
-      const docRef = await addDoc(projectsRef, payload);
+      const docRef = await addDoc(projectsRef, { ...payload, createdAt: serverTimestamp() });
       addLog(`✅ [SUCCESS] doc written, ID = ${docRef.id}`);
       
-      const newProject = { ...payload, id: docRef.id, createdAt: new Date() } as Project;
+      const newProject = { ...payload, id: docRef.id } as Project;
       setProjects(prev => [...prev, newProject]);
       setActiveProjectId(docRef.id);
       setIsNewProjectDialogOpen(false);
@@ -752,7 +760,7 @@ export default function MapExplorer({ user }: { user: User }) {
     e.preventDefault();
     if (!newTagName || !activeProjectId) return;
 
-    const payload = {
+    const payload: Omit<Tag, 'id'> = {
         name: newTagName,
         color: newTagColor,
         projectId: activeProjectId,
@@ -761,7 +769,7 @@ export default function MapExplorer({ user }: { user: User }) {
     
     try {
       const docRef = await addDoc(collection(db, "tags"), payload);
-      const newTag = { ...payload, id: docRef.id } as Tag;
+      const newTag = { ...payload, id: docRef.id };
       setTags(prev => [...prev, newTag]);
       setNewTagName('');
       setNewTagColor('#ff0000');
@@ -964,7 +972,7 @@ const handleImportProject = async (e: React.FormEvent) => {
     const projectRef = doc(db, 'projects', projectId);
     const projectSnap = await getDoc(projectRef);
     if (!projectSnap.exists()) {
-      addLog(`[IMPORT_CLIENT] ❌ Original project with ID ${projectId} not found.`);
+      addLog(`[IMPORT_CLIENT] ❌ Original project with ID ${projectId} not found. It may have been deleted by the owner.`);
       throw new Error('Original project not found. It may have been deleted by the owner.');
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
@@ -984,10 +992,10 @@ const handleImportProject = async (e: React.FormEvent) => {
         getDocs(tagsQuery),
     ]);
     
-    const importedPins = pinsSnapshot.docs.map(d => d.data() as Pin);
-    const importedLines = linesSnapshot.docs.map(d => d.data() as Line);
-    const importedAreas = areasSnapshot.docs.map(d => d.data() as Area);
-    const importedTags = tagsSnapshot.docs.map(d => d.data() as Tag);
+    const importedPins = pinsSnapshot.docs.map(d => ({id: d.id, ...d.data()}) as Pin);
+    const importedLines = linesSnapshot.docs.map(d => ({id: d.id, ...d.data()}) as Line);
+    const importedAreas = areasSnapshot.docs.map(d => ({id: d.id, ...d.data()}) as Area);
+    const importedTags = tagsSnapshot.docs.map(d => ({id: d.id, ...d.data()}) as Tag);
     addLog(`   - Found ${importedPins.length} pins, ${importedLines.length} lines, ${importedAreas.length} areas, ${importedTags.length} tags.`);
 
     addLog(`[IMPORT_CLIENT] 8. Creating batch write for import...`);
@@ -1013,23 +1021,23 @@ const handleImportProject = async (e: React.FormEvent) => {
     addLog(`   - Queued ${importedTags.length} tags for creation.`);
 
     importedPins.forEach(pin => {
-      const { id, userId, ...rest } = pin;
+      const { id, userId, createdAt, ...rest } = pin;
       const newTagIds = pin.tagIds?.map(oldId => newTagIdMap.get(oldId)).filter(Boolean) as string[];
-      batch.set(doc(collection(db, 'pins')), { ...rest, projectId: newProjectRef.id, userId: user.uid, tagIds: newTagIds || [] });
+      batch.set(doc(collection(db, 'pins')), { ...rest, projectId: newProjectRef.id, userId: user.uid, tagIds: newTagIds || [], createdAt: serverTimestamp() });
     });
     addLog(`   - Queued ${importedPins.length} pins for creation.`);
     
     importedLines.forEach(line => {
-      const { id, userId, ...rest } = line;
+      const { id, userId, createdAt, ...rest } = line;
       const newTagIds = line.tagIds?.map(oldId => newTagIdMap.get(oldId)).filter(Boolean) as string[];
-      batch.set(doc(collection(db, 'lines')), { ...rest, projectId: newProjectRef.id, userId: user.uid, tagIds: newTagIds || [] });
+      batch.set(doc(collection(db, 'lines')), { ...rest, projectId: newProjectRef.id, userId: user.uid, tagIds: newTagIds || [], createdAt: serverTimestamp() });
     });
      addLog(`   - Queued ${importedLines.length} lines for creation.`);
 
     importedAreas.forEach(area => {
-       const { id, userId, ...rest } = area;
+       const { id, userId, createdAt, ...rest } = area;
        const newTagIds = area.tagIds?.map(oldId => newTagIdMap.get(oldId)).filter(Boolean) as string[];
-      batch.set(doc(collection(db, 'areas')), { ...rest, projectId: newProjectRef.id, userId: user.uid, tagIds: newTagIds || [] });
+      batch.set(doc(collection(db, 'areas')), { ...rest, projectId: newProjectRef.id, userId: user.uid, tagIds: newTagIds || [], createdAt: serverTimestamp() });
     });
     addLog(`   - Queued ${importedAreas.length} areas for creation.`);
 
@@ -1218,7 +1226,7 @@ if (dataLoading) {
                                 All Projects Visible
                             </label>
                         </div>
-                        <Button variant="outline" size="sm" disabled={!activeProjectId} onClick={() => setIsManageTagsDialogOpen(true)}>
+                        <Button variant="outline" size="sm" onClick={() => {if (activeProjectId) { setIsManageTagsDialogOpen(true); } else { toast({ variant: 'destructive', title: 'No Active Project', description: 'Please select an active project to manage its tags.'})}}} >
                             <Tag className="mr-2 h-4 w-4"/> Manage Tags
                         </Button>
                     </div>
