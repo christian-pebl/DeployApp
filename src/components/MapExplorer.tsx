@@ -735,6 +735,19 @@ if (dataLoading) {
             </div>
 
             <div className="absolute top-4 left-4 z-[1001] flex flex-col gap-2">
+                <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
+                  <Input
+                      type="text"
+                      placeholder="Search address or label..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                  />
+                  <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching} className="h-9 w-9 flex-shrink-0">
+                      {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                </div>
                  <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -774,6 +787,22 @@ if (dataLoading) {
                         </TooltipTrigger>
                         <TooltipContent><p>List Objects</p></TooltipContent>
                     </Tooltip>
+                     <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="default" 
+                            size="icon" 
+                            className="h-12 w-12 rounded-full shadow-lg"
+                            onClick={handleLocateMe}
+                            disabled={isLocating && !currentLocation}
+                          >
+                            {isLocating && !currentLocation ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Center on Me</p>
+                        </TooltipContent>
+                      </Tooltip>
                 </TooltipProvider>
             </div>
 
@@ -986,19 +1015,6 @@ if (dataLoading) {
             )}
 
             <div className="absolute top-4 right-4 z-[1000] flex items-start gap-2">
-              <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
-                  <Input
-                      type="text"
-                      placeholder="Search address or label..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
-                  />
-                  <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching} className="h-9 w-9 flex-shrink-0">
-                      {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                  </Button>
-              </div>
               <TooltipProvider>
                 <div className="flex gap-2">
                   <DropdownMenu>
@@ -1030,23 +1046,6 @@ if (dataLoading) {
                           </DropdownMenuItem>
                       </DropdownMenuContent>
                   </DropdownMenu>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="default" 
-                        size="icon" 
-                        className="h-12 w-12 rounded-full shadow-lg"
-                        onClick={handleLocateMe}
-                        disabled={isLocating && !currentLocation}
-                      >
-                        {isLocating && !currentLocation ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Center on Me</p>
-                    </TooltipContent>
-                  </Tooltip>
 
                   <div className="flex flex-col gap-1 bg-background rounded-full shadow-lg border p-1">
                      <Tooltip>
