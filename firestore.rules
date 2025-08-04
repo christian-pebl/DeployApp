@@ -1,73 +1,42 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
   
+    // Helper function to check ownership
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-    
-    function isProjectOwner(projectId) {
-      let projectUserId = get(/databases/$(database)/documents/projects/$(projectId)).data.userId;
-      return isOwner(projectUserId);
+      return request.auth.uid == userId;
     }
 
+    // Helper function to check if a project has been shared
+    function isShared(projectId) {
+      return exists(/databases/$(database)/documents/shares_by_project/$(projectId));
+    }
+
+    // Projects can be read if owned or if shared. Can be written if owned.
     match /projects/{projectId} {
-      allow read: if request.auth != null;
-      allow create: if isOwner(request.resource.data.userId);
-      allow update: if isOwner(resource.data.userId);
+      allow read: if isOwner(resource.data.userId) || isShared(projectId);
+      allow write: if isOwner(request.resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
 
-    match /pins/{pinId} {
-      allow read: if request.auth != null;
-      allow create: if isOwner(request.resource.data.userId);
-      allow update: if isOwner(resource.data.userId);
-      // Allow delete if the user owns the pin OR is deleting the parent project.
-      allow delete: if isOwner(resource.data.userId) || isProjectOwner(resource.data.projectId);
-    }
-
-    match /lines/{lineId} {
-      allow read: if request.auth != null;
-      allow create: if isOwner(request.resource.data.userId);
-      allow update: if isOwner(resource.data.userId);
-      // Allow delete if the user owns the line OR is deleting the parent project.
-      allow delete: if isOwner(resource.data.userId) || isProjectOwner(resource.data.projectId);
-    }
-
-    match /areas/{areaId} {
-      allow read: if request.auth != null;
-      allow create: if isOwner(request.resource.data.userId);
-      allow update: if isOwner(resource.data.userId);
-      // Allow delete if the user owns the area OR is deleting the parent project.
-      allow delete: if isOwner(resource.data.userId) || isProjectOwner(resource.data.projectId);
+    // Pins, Lines, Areas, and Tags can be read if the user owns the project
+    // or if the project has been shared. They can be written if the user owns them.
+    match /{collection}/{docId} {
+      allow read: if isOwner(resource.data.userId) || isShared(resource.data.projectId);
+      allow write: if isOwner(request.resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
     }
     
-    match /tags/{tagId} {
-      allow read: if request.auth != null;
-      allow create: if isOwner(request.resource.data.userId);
-      allow update: if isOwner(resource.data.userId);
-      // Allow delete if the user owns the tag OR is deleting the parent project.
-      allow delete: if isOwner(resource.data.userId) || isProjectOwner(resource.data.projectId);
-    }
-    
+    // Any authenticated user can create or read a share document
     match /shares/{shareId} {
-      // Anyone with the code can read the share doc to get the project ID.
-      allow read: if request.auth != null;
-      // Only the project owner can create a share document.
-      allow create: if isProjectOwner(request.resource.data.projectId);
-      // Shares are immutable.
-      allow update, delete: if false;
+        allow read, create: if request.auth != null;
     }
-
+    
+    // Allow the creation of a lookup document when a project is shared.
+    // This is used by the security rules to check if a project is shared.
     match /shares_by_project/{projectId} {
-      // The `read` rule uses `get()` which requires a security rule on the target path.
-      // We check if the share document for this project exists.
-      allow get: if request.auth != null && exists(/databases/$(database)/documents/shares_by_project/$(projectId));
-      
-      // These are only for security rule checks via exists(). No direct client access.
-      allow read, write, update, delete, list, create: if false;
+        allow create: if request.auth != null;
     }
   }
 }
