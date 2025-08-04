@@ -95,7 +95,7 @@ export const generateShareCodeFlow = ai.defineFlow(
     outputSchema: GenerateShareCodeOutputSchema,
   },
   async (input) => {
-    logger.info('[SHARE_FLOW] Received request with input:', input);
+    logger.info('[SHARE_FLOW] 3. Received request with input:', input);
     const sharesRef = collection(db, 'shares');
     const newShare = {
       projectId: input.projectId,
@@ -105,7 +105,7 @@ export const generateShareCodeFlow = ai.defineFlow(
     logger.info('[SHARE_FLOW] Attempting to write to shares collection:', newShare);
     try {
       const docRef = await addDoc(sharesRef, newShare);
-      logger.info('[SHARE_FLOW] ✅ Successfully created share document with ID:', docRef.id);
+      logger.info('✅ [SHARE_FLOW] Successfully created share document with ID:', docRef.id);
       return { shareCode: docRef.id };
     } catch (error: any) {
       logger.error('❌ [SHARE_FLOW] Error writing to shares collection:', error);

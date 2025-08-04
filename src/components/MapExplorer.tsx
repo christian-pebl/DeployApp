@@ -348,17 +348,17 @@ export default function MapExplorer({ user }: { user: User }) {
       newPinData.projectId = finalProjectId;
     }
     
-    addLog(`Entering try block for addDoc(pins)`);
+    addLog(`[AWAIT] About to await addDoc(pins)`);
     try {
-      addLog(`Saving pin data: ${JSON.stringify(newPinData)}`);
+      addLog(`[DATA] Pin data: ${JSON.stringify(newPinData)}`);
       const docRef = await addDoc(collection(db, "pins"), newPinData);
-      addLog(`✅ Firestore addDoc(pins) successful. New ID: ${docRef.id}`);
+      addLog(`✅ [SUCCESS] Pin saved with ID: ${docRef.id}`);
       const newPin = { ...newPinData, id: docRef.id, createdAt: new Date() };
       setPins(prev => [...prev, newPin]);
       setPendingPin(null);
       toast({title: 'Pin Saved'});
     } catch(e: any) {
-      addLog(`❌ Error saving pin: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error saving pin: ${e.code} - ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to save pin', description: e.message});
     }
   };
@@ -371,17 +371,17 @@ export default function MapExplorer({ user }: { user: User }) {
         newLineData.projectId = finalProjectId;
       }
 
-      addLog(`Entering try block for addDoc(lines)`);
+      addLog(`[AWAIT] About to await addDoc(lines)`);
       try {
-        addLog(`Saving line data: ${JSON.stringify(newLineData)}`);
+        addLog(`[DATA] Line data: ${JSON.stringify(newLineData)}`);
         const docRef = await addDoc(collection(db, "lines"), newLineData);
-        addLog(`✅ Firestore addDoc(lines) successful. New ID: ${docRef.id}`);
+        addLog(`✅ [SUCCESS] Line saved with ID: ${docRef.id}`);
         const newLine = { ...newLineData, id: docRef.id, createdAt: new Date() };
         setLines(prev => [...prev, newLine]);
         setPendingLine(null);
         toast({title: 'Line Saved'});
       } catch (e: any) {
-        addLog(`❌ Error saving line: ${e.code} - ${e.message}`);
+        addLog(`❌ [ERROR] Error saving line: ${e.code} - ${e.message}`);
         toast({variant: 'destructive', title: 'Failed to save line', description: e.message});
       }
   };
@@ -394,17 +394,17 @@ export default function MapExplorer({ user }: { user: User }) {
       newAreaData.projectId = finalProjectId;
     }
     
-    addLog(`Entering try block for addDoc(areas)`);
+    addLog(`[AWAIT] About to await addDoc(areas)`);
     try {
-      addLog(`Saving area data: ${JSON.stringify(newAreaData)}`);
+      addLog(`[DATA] Area data: ${JSON.stringify(newAreaData)}`);
       const docRef = await addDoc(collection(db, "areas"), newAreaData);
-      addLog(`✅ Firestore addDoc(areas) successful. New ID: ${docRef.id}`);
+      addLog(`✅ [SUCCESS] Area saved with ID: ${docRef.id}`);
       const newArea = { ...newAreaData, id: docRef.id, createdAt: new Date() };
       setAreas(prev => [...prev, newArea]);
       setPendingArea(null);
       toast({title: 'Area Saved'});
     } catch (e: any) {
-      addLog(`❌ Error saving area: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error saving area: ${e.code} - ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to save area', description: e.message});
     }
   };
@@ -416,29 +416,29 @@ export default function MapExplorer({ user }: { user: User }) {
       updatedData.projectId = projectId;
     }
     
-    addLog(`Entering try block for updateDoc(pins) ID: ${id}`);
+    addLog(`[AWAIT] About to await updateDoc(pins) for ID: ${id}`);
     try {
       await updateDoc(pinRef, updatedData);
-      addLog(`✅ Firestore updateDoc(pins) successful for ID: ${id}`);
+      addLog(`✅ [SUCCESS] Pin updated for ID: ${id}`);
       setPins(prev => prev.map(p => p.id === id ? { ...p, label, notes, projectId: projectId } : p));
       setItemToEdit(null);
       toast({title: 'Pin Updated'});
     } catch (e: any) {
-      addLog(`❌ Error updating pin: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error updating pin: ${e.code} - ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to update pin', description: e.message});
     }
   };
 
   const handleDeletePin = async (id: string) => {
-    addLog(`Entering try block for deleteDoc(pins) ID: ${id}`);
+    addLog(`[AWAIT] About to await deleteDoc(pins) for ID: ${id}`);
     try {
       await deleteDoc(doc(db, "pins", id));
-      addLog(`✅ Firestore deleteDoc(pins) successful for ID: ${id}`);
+      addLog(`✅ [SUCCESS] Pin deleted for ID: ${id}`);
       setPins(prev => prev.filter(p => p.id !== id));
       setItemToEdit(null);
       toast({title: 'Pin Deleted'});
     } catch(e: any) {
-      addLog(`❌ Error deleting pin: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error deleting pin: ${e.code} - ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to delete pin', description: e.message});
     }
   };
@@ -450,29 +450,29 @@ export default function MapExplorer({ user }: { user: User }) {
       updatedData.projectId = projectId;
     }
 
-    addLog(`Entering try block for updateDoc(lines) ID: ${id}`);
+    addLog(`[AWAIT] About to await updateDoc(lines) for ID: ${id}`);
     try {
       await updateDoc(lineRef, updatedData);
-      addLog(`✅ Firestore updateDoc(lines) successful for ID: ${id}`);
+      addLog(`✅ [SUCCESS] Line updated for ID: ${id}`);
       setLines(prev => prev.map(l => l.id === id ? { ...l, label, notes, projectId: projectId } : l));
       setItemToEdit(null);
       toast({title: 'Line Updated'});
     } catch(e: any) {
-      addLog(`❌ Error updating line: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error updating line: ${e.code} - ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to update line', description: e.message});
     }
   };
   
   const handleDeleteLine = async (id: string) => {
-    addLog(`Entering try block for deleteDoc(lines) ID: ${id}`);
+    addLog(`[AWAIT] About to await deleteDoc(lines) for ID: ${id}`);
     try {
       await deleteDoc(doc(db, "lines", id));
-      addLog(`✅ Firestore deleteDoc(lines) successful for ID: ${id}`);
+      addLog(`✅ [SUCCESS] Line deleted for ID: ${id}`);
       setLines(prev => prev.filter(l => l.id !== id));
       setItemToEdit(null);
       toast({title: 'Line Deleted'});
     } catch (e: any) {
-      addLog(`❌ Error deleting line: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error deleting line: ${e.code} - ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to delete line', description: e.message});
     }
   };
@@ -484,29 +484,29 @@ export default function MapExplorer({ user }: { user: User }) {
       updatedData.projectId = projectId;
     }
 
-    addLog(`Entering try block for updateDoc(areas) ID: ${id}`);
+    addLog(`[AWAIT] About to await updateDoc(areas) for ID: ${id}`);
     try {
       await updateDoc(areaRef, updatedData);
-      addLog(`✅ Firestore updateDoc(areas) successful for ID: ${id}`);
+      addLog(`✅ [SUCCESS] Area updated for ID: ${id}`);
       setAreas(prev => prev.map(a => a.id === id ? { ...a, label, notes, path, projectId: projectId } : a));
       setItemToEdit(null);
       toast({title: 'Area Updated'});
     } catch (e: any) {
-      addLog(`❌ Error updating area: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error updating area: ${e.code} - ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to update area', description: e.message});
     }
   };
 
   const handleDeleteArea = async (id: string) => {
-    addLog(`Entering try block for deleteDoc(areas) ID: ${id}`);
+    addLog(`[AWAIT] About to await deleteDoc(areas) for ID: ${id}`);
     try {
       await deleteDoc(doc(db, "areas", id));
-      addLog(`✅ Firestore deleteDoc(areas) successful for ID: ${id}`);
+      addLog(`✅ [SUCCESS] Area deleted for ID: ${id}`);
       setAreas(prev => prev.filter(a => a.id !== id));
       setItemToEdit(null);
       toast({title: 'Area Deleted'});
     } catch(e: any) {
-       addLog(`❌ Error deleting area: ${e.code} - ${e.message}`);
+       addLog(`❌ [ERROR] Error deleting area: ${e.code} - ${e.message}`);
        toast({variant: 'destructive', title: 'Failed to delete area', description: e.message});
     }
   };
@@ -609,36 +609,32 @@ export default function MapExplorer({ user }: { user: User }) {
     
     setLogLevel('debug');
     
-    addLog("[INIT] firebaseApp.name =" + firebaseApp.name);
-    addLog("[INIT] firebaseApp.options.projectId =" + firebaseApp.options.projectId);
-    addLog("[INIT] db.app.name =" + db.app.name);
-    addLog("[INIT] Current user:" + auth.currentUser);
-    
     const projectsRef = collection(db, 'projects');
-    addLog("[INIT] projectsRef.path =" + projectsRef.path);
-    
-    const data = {
-        name: newProjectName,
-        description: newProjectDescription,
-    };
-    addLog("[PAYLOAD] raw data:" + JSON.stringify(data));
     
     const payload = {
-        ...data,
+        name: newProjectName,
+        description: newProjectDescription,
         createdAt: serverTimestamp(),
         userId: auth.currentUser?.uid,
     };
-    addLog("[PAYLOAD] final payload:" + JSON.stringify(payload));
+
+    addLog(`[INIT] firebaseApp.name = ${firebaseApp.name}`);
+    addLog(`[INIT] firebaseApp.options.projectId = ${firebaseApp.options.projectId}`);
+    addLog(`[INIT] db.app.name = ${db.app.name}`);
+    addLog(`[INIT] Current user: ${auth.currentUser}`);
+    addLog(`[INIT] projectsRef.path = ${projectsRef.path}`);
+    addLog(`[PAYLOAD] Raw data: {name: "${newProjectName}", description: "${newProjectDescription}"}`);
+    addLog(`[PAYLOAD] Final write payload: ${JSON.stringify(payload)}`);
     
     const persisted = await navigator.storage?.persisted();
-    addLog("[PERSISTENCE] navigator.storage?.persisted() →" + persisted);
+    addLog(`[PERSISTENCE] navigator.storage?.persisted() → ${persisted}`);
 
     const writePromise = addDoc(projectsRef, payload);
-    addLog("[PROMISE] addDoc() returned:" + writePromise);
-    addLog("[NETWORK] navigator.onLine =" + navigator.onLine);
+    addLog(`[PROMISE] addDoc() returned: ${writePromise}`);
+    addLog(`[NETWORK] navigator.onLine = ${navigator.onLine}`);
 
     try {
-      addLog("[AWAIT] about to await writePromise");
+      addLog("[AWAIT] About to await writePromise");
       const docRef = await writePromise;
       addLog(`✅ [SUCCESS] doc written, ID = ${docRef.id}`);
       
@@ -674,15 +670,15 @@ export default function MapExplorer({ user }: { user: User }) {
     }
     
     const projectRef = doc(db, "projects", projectToEdit.id);
-    addLog(`Entering try block for updateDoc(projects) ID: ${projectToEdit.id}`);
+    addLog(`[AWAIT] About to await updateDoc(projects) for ID: ${projectToEdit.id}`);
     try {
       await updateDoc(projectRef, { name, description });
-      addLog(`✅ Firestore updateDoc(projects) successful for ID: ${projectToEdit.id}`);
+      addLog(`✅ [SUCCESS] Project updated for ID: ${projectToEdit.id}`);
       setProjects(projects.map(p => p.id === projectToEdit.id ? { ...p, name, description } : p));
       setProjectToEdit(null);
       toast({ title: "Project Updated", description: `"${name}" has been updated.` });
     } catch (e: any) {
-      addLog(`❌ Error updating project: ${e.code} - ${e.message}`);
+      addLog(`❌ [ERROR] Error updating project: ${e.code} - ${e.message}`);
       toast({variant: 'destructive', title: 'Failed to update project', description: e.message});
     }
   }
@@ -691,7 +687,7 @@ export default function MapExplorer({ user }: { user: User }) {
       const project = projects.find(p => p.id === projectId);
       if(!project) return;
       
-      addLog(`Entering try block for batch delete on project ID: ${projectId}`);
+      addLog(`[AWAIT] About to await batch commit for project deletion, ID: ${projectId}`);
       try {
         const batch = writeBatch(db);
         
@@ -711,7 +707,7 @@ export default function MapExplorer({ user }: { user: User }) {
         addLog(` - Marked ${associatedAreas.length} areas for deletion.`);
 
         await batch.commit();
-        addLog(`✅ Firestore batch commit successful.`);
+        addLog(`✅ [SUCCESS] Batch commit successful.`);
 
         setProjects(prev => prev.filter(p => p.id !== projectId));
         setPins(prev => prev.filter(p => p.projectId !== projectId));
@@ -726,7 +722,7 @@ export default function MapExplorer({ user }: { user: User }) {
         toast({ title: "Project Deleted", description: `"${project.name}" and all its objects have been deleted.` });
 
       } catch (e: any) {
-        addLog(`❌ Error deleting project: ${e.code} - ${e.message}`);
+        addLog(`❌ [ERROR] Error deleting project: ${e.code} - ${e.message}`);
         toast({variant: 'destructive', title: 'Failed to delete project', description: e.message});
       }
   }
@@ -804,19 +800,20 @@ const handleLogout = async () => {
 const handleGenerateShareCode = async (projectId: string) => {
   setIsGeneratingCode(true);
   const payload = { projectId, originalOwnerId: user.uid };
-  addLog(`[SHARE] Starting code generation for payload: ${JSON.stringify(payload)}`);
+  addLog(`[SHARE_CLIENT] 1. Starting code generation for payload: ${JSON.stringify(payload)}`);
 
   try {
+    addLog(`[SHARE_CLIENT] 2. Calling generateShareCode flow...`);
     const result = await generateShareCode(payload);
-    addLog(`[SHARE] Flow returned: ${JSON.stringify(result)}`);
+    addLog(`[SHARE_CLIENT] 4. Flow returned successfully: ${JSON.stringify(result)}`);
     setShareCode(result.shareCode);
     setIsShareDialogOpen(true);
   } catch (error: any) {
-    addLog(`❌ [SHARE] Error generating share code: ${error.message}`);
+    addLog(`❌ [SHARE_CLIENT] 4. Error generating share code: ${error.message}`);
     toast({ variant: 'destructive', title: 'Could not generate share code', description: error.message });
   } finally {
     setIsGeneratingCode(false);
-    addLog(`[SHARE] Finished code generation attempt.`);
+    addLog(`[SHARE_CLIENT] 5. Finished code generation attempt.`);
   }
 };
 
@@ -1361,7 +1358,7 @@ if (dataLoading) {
           <DialogHeader>
             <DialogTitle>Create a Project First</DialogTitle>
             <DialogDescription>
-              To save map items like pins, lines, or areas, you need to have a project to contain them.
+              To add items to your map, you need to create a project first.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
