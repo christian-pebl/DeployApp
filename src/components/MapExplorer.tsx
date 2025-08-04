@@ -334,12 +334,12 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handlePinSave = async (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => {
     const finalProjectId = projectId ?? activeProjectId;
-    const newPinData: any = { lat, lng, label, labelVisible: true, notes, userId: user.uid };
+    const newPinData: any = { lat, lng, label, labelVisible: true, notes, userId: user.uid, createdAt: serverTimestamp() };
     if (finalProjectId) {
       newPinData.projectId = finalProjectId;
     }
     
-    addLog(`Attempting to save pin: "${label}" with data: ${JSON.stringify(newPinData)}`);
+    addLog(`Attempting to save pin: "${label}"`);
     addLog('Entering try block for addDoc(pins)');
     try {
       const docRef = await addDoc(collection(db, "pins"), newPinData);
@@ -357,12 +357,12 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleLineSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
       const finalProjectId = projectId ?? activeProjectId;
       const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-      const newLineData: any = { path: pathData, label, labelVisible: true, notes, userId: user.uid };
+      const newLineData: any = { path: pathData, label, labelVisible: true, notes, userId: user.uid, createdAt: serverTimestamp() };
       if (finalProjectId) {
         newLineData.projectId = finalProjectId;
       }
 
-      addLog(`Attempting to save line: "${label}" with data: ${JSON.stringify(newLineData)}`);
+      addLog(`Attempting to save line: "${label}"`);
       addLog('Entering try block for addDoc(lines)');
       try {
         const docRef = await addDoc(collection(db, "lines"), newLineData);
@@ -380,12 +380,12 @@ export default function MapExplorer({ user }: { user: User }) {
   const handleAreaSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
     const finalProjectId = projectId ?? activeProjectId;
     const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-    const newAreaData: any = { path: pathData, label, labelVisible: true, fillVisible: true, notes, userId: user.uid };
+    const newAreaData: any = { path: pathData, label, labelVisible: true, fillVisible: true, notes, userId: user.uid, createdAt: serverTimestamp() };
     if (finalProjectId) {
       newAreaData.projectId = finalProjectId;
     }
     
-    addLog(`Attempting to save area: "${label}" with data: ${JSON.stringify(newAreaData)}`);
+    addLog(`Attempting to save area: "${label}"`);
     addLog('Entering try block for addDoc(areas)');
     try {
       const docRef = await addDoc(collection(db, "areas"), newAreaData);
@@ -410,7 +410,7 @@ export default function MapExplorer({ user }: { user: User }) {
       updatedData.projectId = null;
     }
     
-    addLog(`Updating pin with data: ${JSON.stringify(updatedData)}`);
+    addLog(`Updating pin with data...`);
     addLog('Entering try block for updateDoc(pins)');
     try {
       await updateDoc(pinRef, updatedData);
@@ -449,7 +449,7 @@ export default function MapExplorer({ user }: { user: User }) {
       updatedData.projectId = null;
     }
 
-    addLog(`Updating line with data: ${JSON.stringify(updatedData)}`);
+    addLog(`Updating line with data...`);
     addLog('Entering try block for updateDoc(lines)');
     try {
       await updateDoc(lineRef, updatedData);
@@ -488,7 +488,7 @@ export default function MapExplorer({ user }: { user: User }) {
       updatedData.projectId = null;
     }
 
-    addLog(`Updating area with data: ${JSON.stringify(updatedData)}`);
+    addLog(`Updating area with data...`);
     addLog('Entering try block for updateDoc(areas)');
     try {
       await updateDoc(areaRef, updatedData);
@@ -620,7 +620,7 @@ export default function MapExplorer({ user }: { user: User }) {
         createdAt: serverTimestamp(),
         userId: user.uid,
     };
-    addLog(`Saving project data to Firestore: ${JSON.stringify(newProjectData)}`);
+    addLog(`Saving project data to Firestore...`);
     addLog('Entering try block for addDoc(projects)');
     try {
       const docRef = await addDoc(collection(db, "projects"), newProjectData);
@@ -722,8 +722,8 @@ export default function MapExplorer({ user }: { user: User }) {
   
   const unassignedObjectCount = useMemo(() => {
     return pins.filter(p => !p.projectId).length +
-           lines.filter(l => !p.projectId).length +
-           areas.filter(a => !p.projectId).length;
+           lines.filter(l => !l.projectId).length +
+           areas.filter(a => !a.projectId).length;
   }, [pins, lines, areas]);
 
   const displayedPins = useMemo(() => {
@@ -1125,7 +1125,7 @@ if (dataLoading) {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full shadow-lg bg-card/90">
+                                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full shadow-lg bg-card/90">
                                     <UserIcon className="h-6 w-6"/>
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -1253,22 +1253,21 @@ if (dataLoading) {
       </Dialog>
 
       <Dialog open={isAssignProjectDialogOpen} onOpenChange={setIsAssignProjectDialogOpen}>
-        <DialogContent className="z-[1003]">
+        <DialogContent className="z-[1003] sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Create Your First Project</DialogTitle>
-            <DialogDescription>To add items to your map, you first need a project to organize them.</DialogDescription>
+            <DialogTitle>Create First Project</DialogTitle>
+            <DialogDescription>
+              A project is needed before you can add items to the map.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-4">
-              <p className="text-sm text-muted-foreground">Click below to create a new project. You can add pins, lines, and areas to it afterward.</p>
-          </div>
           <DialogFooter>
-            <Button type="button" variant="secondary" onClick={() => { setIsAssignProjectDialogOpen(false); setPendingAction(null); }}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => { setIsAssignProjectDialogOpen(false); setPendingAction(null); }}>Cancel</Button>
             <Button
               onClick={() => {
                 setIsAssignProjectDialogOpen(false);
                 setIsNewProjectDialogOpen(true);
               }}>
-              <FolderPlus className="mr-2 h-4 w-4" /> Create New Project
+              <FolderPlus className="mr-2 h-4 w-4" /> Create Project
             </Button>
           </DialogFooter>
         </DialogContent>
