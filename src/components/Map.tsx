@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions } from 'leaflet';
+import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions, Tooltip as LeafletTooltip } from 'leaflet';
 import type { Settings } from '@/hooks/use-settings';
 
 type Project = { id: string; name: string; description?: string; createdAt: any; };
@@ -128,6 +128,8 @@ const Map = ({
     const currentLocationMarkerRef = useRef<CircleMarker | null>(null);
     const popupRef = useRef<Popup | null>(null);
     const previewAreaPointsRef = useRef<LayerGroup | null>(null);
+    const distanceTooltipRef = useRef<LeafletTooltip | null>(null);
+
 
     const showEditPopup = (item: Pin | Line | Area) => {
         const map = mapRef.current;
@@ -177,7 +179,7 @@ const Map = ({
                     ${pointsHtml}
                 </div>
                 <div class="flex items-center gap-2 pt-2">
-                    <button type="button" class="calculate-area-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Calculate Area (ha)</button>
+                    <button type="button" class="calculate-area-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Calculate Area</button>
                     <p id="area-result" class="text-sm font-semibold"></p>
                 </div>
                 `;
@@ -415,7 +417,11 @@ const Map = ({
 
                 const marker = L.marker([pin.lat, pin.lng], { icon: markerIcon }).addTo(layer);
                 if (pin.labelVisible !== false) {
-                    marker.bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold' });
+                     marker.bindTooltip(pin.label, { permanent: true, direction: 'top', offset: [0, -36], className: 'font-sans font-bold', interactive: true })
+                        .on('click', (e) => {
+                            L.DomEvent.stopPropagation(e);
+                            onEditItem(pin);
+                        });
                 }
                 marker.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
@@ -451,6 +457,10 @@ const Map = ({
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-primary-foreground bg-primary/80 border-0',
+                        interactive: true,
+                    }).on('click', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        onEditItem(line);
                     }).openTooltip();
                 }
                 polyline.on('click', (e) => {
@@ -512,6 +522,10 @@ const Map = ({
                         permanent: true,
                         direction: 'center',
                         className: 'font-sans font-bold text-secondary-foreground bg-secondary/80 border-0',
+                        interactive: true,
+                    }).on('click', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        onEditItem(area);
                     }).openTooltip(center);
                 }
             });
@@ -546,35 +560,67 @@ const Map = ({
     useEffect(() => {
         const map = mapRef.current;
         if (map && isDrawingLine && lineStartPoint) {
-            const updatePreviewLine = () => {
-                const center = map.getCenter();
+            const updatePreviewLine = (e?: LeafletMouseEvent) => {
+                const targetPoint = e ? e.latlng : map.getCenter();
                 if (previewLineRef.current) {
-                    previewLineRef.current.setLatLngs([lineStartPoint, center]);
+                    previewLineRef.current.setLatLngs([lineStartPoint, targetPoint]);
                 } else {
-                    previewLineRef.current = L.polyline([lineStartPoint, center], {
+                    previewLineRef.current = L.polyline([lineStartPoint, targetPoint], {
                         color: 'hsl(var(--primary))',
                         weight: 4,
                         opacity: 0.8,
                         dashArray: '5, 10',
                     }).addTo(map);
                 }
+
+                const distanceMeters = lineStartPoint.distanceTo(targetPoint);
+                const distance = settings.units === 'imperial' ? toFeet(distanceMeters) : distanceMeters;
+                const unitLabel = settings.units === 'imperial' ? 'feet' : 'meters';
+                const tooltipContent = `${distance.toFixed(2)} ${unitLabel}`;
+
+                if (distanceTooltipRef.current) {
+                    distanceTooltipRef.current.setLatLng(targetPoint).setContent(tooltipContent);
+                } else {
+                    distanceTooltipRef.current = L.tooltip({
+                        permanent: true,
+                        direction: 'right',
+                        offset: [10, 0],
+                        className: 'distance-tooltip'
+                    })
+                    .setLatLng(targetPoint)
+                    .setContent(tooltipContent)
+                    .addTo(map);
+                }
             };
             
-            map.on('move', updatePreviewLine);
+            map.on('mousemove', updatePreviewLine);
+            map.on('move', () => updatePreviewLine());
             updatePreviewLine(); // Initial draw
 
             return () => {
-                map.off('move', updatePreviewLine);
+                map.off('mousemove', updatePreviewLine);
+                map.off('move', () => updatePreviewLine());
+
                 if (previewLineRef.current) {
                     previewLineRef.current.remove();
                     previewLineRef.current = null;
                 }
+                 if (distanceTooltipRef.current) {
+                    distanceTooltipRef.current.remove();
+                    distanceTooltipRef.current = null;
+                }
             };
-        } else if (previewLineRef.current) {
-            previewLineRef.current.remove();
-            previewLineRef.current = null;
+        } else if (previewLineRef.current || distanceTooltipRef.current) {
+             if (previewLineRef.current) {
+                previewLineRef.current.remove();
+                previewLineRef.current = null;
+            }
+            if (distanceTooltipRef.current) {
+                distanceTooltipRef.current.remove();
+                distanceTooltipRef.current = null;
+            }
         }
-    }, [isDrawingLine, lineStartPoint]);
+    }, [isDrawingLine, lineStartPoint, settings]);
     
     useEffect(() => {
         const map = mapRef.current;
@@ -605,7 +651,7 @@ const Map = ({
                 fillOpacity: 1
             };
 
-            const updatePreview = () => {
+            const updatePreview = (e?: LeafletMouseEvent) => {
                 cleanupLayers();
                 
                 if (previewAreaPointsRef.current) {
@@ -625,8 +671,8 @@ const Map = ({
     
                 const lastPoint = pendingAreaPath[pendingAreaPath.length - 1];
                 if (lastPoint) {
-                    const center = map.getCenter();
-                    const linePath = [lastPoint, center];
+                    const targetPoint = e ? e.latlng : map.getCenter();
+                    const linePath = [lastPoint, targetPoint];
                     previewAreaLineRef.current = L.polyline(linePath, {
                         color: `hsl(${secondaryFgColor})`,
                         weight: 2,
@@ -635,11 +681,13 @@ const Map = ({
                 }
             };
     
-            map.on('move', updatePreview);
+            map.on('mousemove', updatePreview);
+            map.on('move', () => updatePreview());
             updatePreview();
     
             return () => {
-                map.off('move', updatePreview);
+                map.off('mousemove', updatePreview);
+                map.off('move', () => updatePreview());
                 cleanupLayers();
             };
         } else {

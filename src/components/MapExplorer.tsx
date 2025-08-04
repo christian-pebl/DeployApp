@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy, Share2, Download, Tag } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy, Share2, Download, Tag, CornerUpLeft } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -349,6 +349,25 @@ export default function MapExplorer({ user }: { user: User }) {
       setPendingAreaPath(prev => [...prev, currentMapCenter]);
     }
   }
+
+  const handleUndoAreaPoint = () => {
+    if (pendingAreaPath.length > 0) {
+      addLog('Removing last area point.');
+      setPendingAreaPath(prev => prev.slice(0, -1));
+    }
+  };
+
+  const handleCancelDrawing = () => {
+    addLog('Cancelling drawing operation.');
+    if(isDrawingLine) {
+        setIsDrawingLine(false);
+        setLineStartPoint(null);
+    }
+    if(isDrawingArea) {
+        setIsDrawingArea(false);
+        setPendingAreaPath([]);
+    }
+  };
 
   const handleConfirmArea = () => {
     if(pendingAreaPath.length < 3) {
@@ -1419,33 +1438,52 @@ if (dataLoading || !settings || !view) {
                 </TooltipProvider>
               </Card>
             )}
-            
-            {isDrawingLine && (
-                <Button 
-                    className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
-                    onClick={handleConfirmLine}
-                >
-                    <Check className="mr-2 h-5 w-5" /> Confirm Line
-                </Button>
-            )}
 
-            {isDrawingArea && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2">
-                    <Button 
-                        className="h-12 rounded-md shadow-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                        onClick={handleAddAreaCorner}
-                    >
-                        <Plus className="mr-2 h-5 w-5" /> Add Corner
-                    </Button>
-                    <Button 
-                        className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
-                        onClick={handleConfirmArea}
-                        disabled={pendingAreaPath.length < 3}
-                    >
-                        <Check className="mr-2 h-5 w-5" /> Finish Area
-                    </Button>
-                </div>
-            )}
+            {(isDrawingLine || isDrawingArea) && (
+                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2">
+                     <Button 
+                         className="h-12 rounded-md shadow-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                         onClick={handleCancelDrawing}
+                     >
+                         <X className="mr-2 h-5 w-5" /> Cancel
+                     </Button>
+
+                     {isDrawingLine && (
+                         <Button 
+                             className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
+                             onClick={handleConfirmLine}
+                         >
+                             <Check className="mr-2 h-5 w-5" /> Confirm Line
+                         </Button>
+                     )}
+
+                     {isDrawingArea && (
+                         <>
+                            <Button
+                                 className="h-12 rounded-md shadow-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                                 onClick={handleUndoAreaPoint}
+                                 disabled={pendingAreaPath.length === 0}
+                            >
+                                <CornerUpLeft className="mr-2 h-5 w-5"/> Undo Point
+                            </Button>
+                             <Button 
+                                 className="h-12 rounded-md shadow-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                                 onClick={handleAddAreaCorner}
+                             >
+                                 <Plus className="mr-2 h-5 w-5" /> Add Corner
+                             </Button>
+                             <Button 
+                                 className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
+                                 onClick={handleConfirmArea}
+                                 disabled={pendingAreaPath.length < 3}
+                             >
+                                 <Check className="mr-2 h-5 w-5" /> Finish Area
+                             </Button>
+                         </>
+                     )}
+                 </div>
+             )}
+
 
             <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end gap-2">
                  <TooltipProvider>
@@ -1511,7 +1549,7 @@ if (dataLoading || !settings || !view) {
                           onClick={handleShowLog}
                           className="h-12 w-12 rounded-full shadow-lg bg-card"
                       >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
                       </Button>
                   </TooltipTrigger>
                   <TooltipContent side="left">
