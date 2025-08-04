@@ -801,7 +801,6 @@ const handleGenerateShareCode = async (projectId: string) => {
   setIsGeneratingCode(true);
   addLog(`[SHARE_CLIENT] 1. Starting code generation for project ID: ${projectId}`);
   
-  const sharesRef = collection(db, 'shares');
   const newShare = {
     projectId: projectId,
     originalOwnerId: user.uid,
@@ -809,13 +808,13 @@ const handleGenerateShareCode = async (projectId: string) => {
   };
 
   try {
-    addLog(`[SHARE_CLIENT] 2. Attempting to write to shares collection: ${JSON.stringify(newShare)}`);
-    const docRef = await addDoc(sharesRef, newShare);
+    addLog(`[SHARE_CLIENT] 2. Attempting to write to 'shares' collection: ${JSON.stringify(newShare)}`);
+    const docRef = await addDoc(collection(db, 'shares'), newShare);
     addLog(`[SHARE_CLIENT] 3. ✅ Successfully created share document with ID: ${docRef.id}`);
     setShareCode(docRef.id);
     setIsShareDialogOpen(true);
   } catch (error: any) {
-    addLog(`[SHARE_CLIENT] 3. ❌ Error writing to shares collection: ${error.message}`);
+    addLog(`[SHARE_CLIENT] 3. ❌ Error writing to 'shares' collection: ${error.message}`);
     toast({ variant: 'destructive', title: 'Could not generate share code', description: error.message });
   } finally {
     addLog(`[SHARE_CLIENT] 4. Finished code generation attempt.`);
@@ -828,10 +827,14 @@ const handleImportProject = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!importCode) return;
   setIsImporting(true);
+  addLog(`[IMPORT_CLIENT] 1. Starting import for share code: ${importCode}`);
 
   try {
+    addLog(`[IMPORT_CLIENT] 2. Calling importSharedProject flow...`);
     const { project, pins: importedPins, lines: importedLines, areas: importedAreas } = await importSharedProject({ shareCode: importCode });
+    addLog(`[IMPORT_CLIENT] 3. ✅ Flow returned successfully with project "${project.name}" and ${importedPins.length} pins, ${importedLines.length} lines, ${importedAreas.length} areas.`);
 
+    addLog(`[IMPORT_CLIENT] 4. Creating batch write...`);
     const batch = writeBatch(db);
 
     // Create new project for current user
@@ -843,6 +846,7 @@ const handleImportProject = async (e: React.FormEvent) => {
       createdAt: serverTimestamp(),
     };
     batch.set(newProjectRef, newProjectData);
+    addLog(`   - Queued new project for creation.`);
 
     // Create new pins
     importedPins.forEach(pin => {
@@ -850,6 +854,7 @@ const handleImportProject = async (e: React.FormEvent) => {
       const { id, userId, ...rest } = pin;
       batch.set(newPinRef, { ...rest, projectId: newProjectRef.id, userId: user.uid });
     });
+    addLog(`   - Queued ${importedPins.length} pins for creation.`);
     
     // Create new lines
     importedLines.forEach(line => {
@@ -857,6 +862,7 @@ const handleImportProject = async (e: React.FormEvent) => {
        const { id, userId, ...rest } = line;
       batch.set(newLineRef, { ...rest, projectId: newProjectRef.id, userId: user.uid });
     });
+    addLog(`   - Queued ${importedLines.length} lines for creation.`);
 
     // Create new areas
     importedAreas.forEach(area => {
@@ -864,15 +870,21 @@ const handleImportProject = async (e: React.FormEvent) => {
        const { id, userId, ...rest } = area;
       batch.set(newAreaRef, { ...rest, projectId: newProjectRef.id, userId: user.uid });
     });
+    addLog(`   - Queued ${importedAreas.length} areas for creation.`);
 
+    addLog(`[IMPORT_CLIENT] 5. Committing batch write...`);
     await batch.commit();
+    addLog(`[IMPORT_CLIENT] 6. ✅ Batch commit successful.`);
     
     await loadData(); // Reload all data
+    addLog(`[IMPORT_CLIENT] 7. ✅ Data reloaded.`);
     
     toast({ title: 'Project Imported', description: `Successfully imported "${project.name}".` });
     setIsImportProjectDialogOpen(false);
     setImportCode('');
-  } catch (error: any) {
+  } catch (error: any)
+{
+    addLog(`[IMPORT_CLIENT] ❌ Import failed: ${error.message}`);
     toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
   } finally {
     setIsImporting(false);
