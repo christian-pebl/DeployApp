@@ -639,7 +639,7 @@ useEffect(() => {
 
   const displayedAreas = useMemo(() => {
     if (selectedProjectIds.includes('all')) return areas;
-    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!a.projectId && selectedProjectIds.includes('unassigned')));
+    return areas.filter(a => (a.projectId && selectedProjectIds.includes(a.projectId)) || (!p.projectId && selectedProjectIds.includes('unassigned')));
   }, [areas, selectedProjectIds]);
   
   const handleProjectSelection = (id: string) => {
@@ -1003,7 +1003,7 @@ if (dataLoading) {
                     </Button>
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-9 w-9">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 bg-muted hover:bg-muted/80">
                                 <UserIcon className="h-5 w-5"/>
                             </Button>
                         </DropdownMenuTrigger>
