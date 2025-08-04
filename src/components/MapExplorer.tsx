@@ -132,45 +132,45 @@ export default function MapExplorer({ user }: { user: User }) {
     setLog(prev => [`${new Date().toLocaleTimeString()}: ${entry}`, ...prev]);
   };
 
+  const loadData = async () => {
+      if (!user) return;
+      addLog(`Loading data for user: ${user.uid}`);
+      setDataLoading(true);
+      try {
+          const projectsQuery = query(collection(db, "projects"), where("userId", "==", user.uid));
+          const projectsSnapshot = await getDocs(projectsQuery);
+          const loadedProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+          setProjects(loadedProjects);
+          addLog(`Loaded ${loadedProjects.length} projects.`);
+
+          const pinsQuery = query(collection(db, "pins"), where("userId", "==", user.uid));
+          const pinsSnapshot = await getDocs(pinsQuery);
+          const loadedPins = pinsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pin));
+          setPins(loadedPins);
+          addLog(`Loaded ${loadedPins.length} pins.`);
+
+          const linesQuery = query(collection(db, "lines"), where("userId", "==", user.uid));
+          const linesSnapshot = await getDocs(linesQuery);
+          const loadedLines = linesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Line));
+          setLines(loadedLines);
+          addLog(`Loaded ${loadedLines.length} lines.`);
+
+          const areasQuery = query(collection(db, "areas"), where("userId", "==", user.uid));
+          const areasSnapshot = await getDocs(areasQuery);
+          const loadedAreas = areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area));
+          setAreas(loadedAreas);
+          addLog(`Loaded ${loadedAreas.length} areas.`);
+
+      } catch (error: any) {
+          addLog(`❌ Error loading data: ${error.message}`);
+          toast({ variant: 'destructive', title: "Error loading data", description: "Could not load map data from the server."});
+      } finally {
+          setDataLoading(false);
+          addLog("Finished loading all data.");
+      }
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-        if (!user) return;
-        addLog(`Loading data for user: ${user.uid}`);
-        setDataLoading(true);
-        try {
-            const projectsQuery = query(collection(db, "projects"), where("userId", "==", user.uid));
-            const projectsSnapshot = await getDocs(projectsQuery);
-            const loadedProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-            setProjects(loadedProjects);
-            addLog(`Loaded ${loadedProjects.length} projects.`);
-
-            const pinsQuery = query(collection(db, "pins"), where("userId", "==", user.uid));
-            const pinsSnapshot = await getDocs(pinsQuery);
-            const loadedPins = pinsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pin));
-            setPins(loadedPins);
-            addLog(`Loaded ${loadedPins.length} pins.`);
-
-            const linesQuery = query(collection(db, "lines"), where("userId", "==", user.uid));
-            const linesSnapshot = await getDocs(linesQuery);
-            const loadedLines = linesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Line));
-            setLines(loadedLines);
-            addLog(`Loaded ${loadedLines.length} lines.`);
-
-            const areasQuery = query(collection(db, "areas"), where("userId", "==", user.uid));
-            const areasSnapshot = await getDocs(areasQuery);
-            const loadedAreas = areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area));
-            setAreas(loadedAreas);
-            addLog(`Loaded ${loadedAreas.length} areas.`);
-
-        } catch (error: any) {
-            addLog(`Error loading data: ${error.message}`);
-            toast({ variant: 'destructive', title: "Error loading data", description: "Could not load map data from the server."});
-        } finally {
-            setDataLoading(false);
-            addLog("Finished loading all data.");
-        }
-    };
-
     loadData();
   }, [user]);
   
@@ -339,9 +339,9 @@ export default function MapExplorer({ user }: { user: User }) {
       newPinData.projectId = finalProjectId;
     }
     
-    addLog(`Attempting to save pin: "${label}"`);
-    addLog('Entering try block for addDoc(pins)');
+    addLog(`Entering try block for addDoc(pins)`);
     try {
+      addLog(`Saving pin data: ${JSON.stringify(newPinData)}`);
       const docRef = await addDoc(collection(db, "pins"), newPinData);
       addLog(`✅ Firestore addDoc(pins) successful. New ID: ${docRef.id}`);
       const newPin = { id: docRef.id, ...newPinData };
@@ -362,9 +362,9 @@ export default function MapExplorer({ user }: { user: User }) {
         newLineData.projectId = finalProjectId;
       }
 
-      addLog(`Attempting to save line: "${label}"`);
-      addLog('Entering try block for addDoc(lines)');
+      addLog(`Entering try block for addDoc(lines)`);
       try {
+        addLog(`Saving line data: ${JSON.stringify(newLineData)}`);
         const docRef = await addDoc(collection(db, "lines"), newLineData);
         addLog(`✅ Firestore addDoc(lines) successful. New ID: ${docRef.id}`);
         const newLine = { id: docRef.id, ...newLineData };
@@ -385,9 +385,9 @@ export default function MapExplorer({ user }: { user: User }) {
       newAreaData.projectId = finalProjectId;
     }
     
-    addLog(`Attempting to save area: "${label}"`);
-    addLog('Entering try block for addDoc(areas)');
+    addLog(`Entering try block for addDoc(areas)`);
     try {
+      addLog(`Saving area data: ${JSON.stringify(newAreaData)}`);
       const docRef = await addDoc(collection(db, "areas"), newAreaData);
       addLog(`✅ Firestore addDoc(areas) successful. New ID: ${docRef.id}`);
       const newArea = { id: docRef.id, ...newAreaData };
@@ -401,17 +401,11 @@ export default function MapExplorer({ user }: { user: User }) {
   };
 
   const handleUpdatePin = async (id: string, label: string, notes: string, projectId?: string) => {
-    addLog(`Attempting to update pin ID: ${id}`);
     const pinRef = doc(db, "pins", id);
     const updatedData: any = { label, notes };
-    if (projectId) {
-      updatedData.projectId = projectId;
-    } else {
-      updatedData.projectId = null;
-    }
+    updatedData.projectId = projectId ? projectId : null;
     
-    addLog(`Updating pin with data...`);
-    addLog('Entering try block for updateDoc(pins)');
+    addLog(`Entering try block for updateDoc(pins) ID: ${id}`);
     try {
       await updateDoc(pinRef, updatedData);
       addLog(`✅ Firestore updateDoc(pins) successful for ID: ${id}`);
@@ -425,8 +419,7 @@ export default function MapExplorer({ user }: { user: User }) {
   };
 
   const handleDeletePin = async (id: string) => {
-    addLog(`Attempting to delete pin ID: ${id}`);
-    addLog('Entering try block for deleteDoc(pins)');
+    addLog(`Entering try block for deleteDoc(pins) ID: ${id}`);
     try {
       await deleteDoc(doc(db, "pins", id));
       addLog(`✅ Firestore deleteDoc(pins) successful for ID: ${id}`);
@@ -440,17 +433,11 @@ export default function MapExplorer({ user }: { user: User }) {
   };
   
   const handleUpdateLine = async (id: string, label: string, notes: string, projectId?: string) => {
-    addLog(`Attempting to update line ID: ${id}`);
     const lineRef = doc(db, "lines", id);
     const updatedData: any = { label, notes };
-     if (projectId) {
-      updatedData.projectId = projectId;
-    } else {
-      updatedData.projectId = null;
-    }
+    updatedData.projectId = projectId ? projectId : null;
 
-    addLog(`Updating line with data...`);
-    addLog('Entering try block for updateDoc(lines)');
+    addLog(`Entering try block for updateDoc(lines) ID: ${id}`);
     try {
       await updateDoc(lineRef, updatedData);
       addLog(`✅ Firestore updateDoc(lines) successful for ID: ${id}`);
@@ -464,8 +451,7 @@ export default function MapExplorer({ user }: { user: User }) {
   };
   
   const handleDeleteLine = async (id: string) => {
-    addLog(`Attempting to delete line ID: ${id}`);
-    addLog('Entering try block for deleteDoc(lines)');
+    addLog(`Entering try block for deleteDoc(lines) ID: ${id}`);
     try {
       await deleteDoc(doc(db, "lines", id));
       addLog(`✅ Firestore deleteDoc(lines) successful for ID: ${id}`);
@@ -479,17 +465,11 @@ export default function MapExplorer({ user }: { user: User }) {
   };
 
   const handleUpdateArea = async (id: string, label: string, notes: string, path: {lat: number, lng: number}[], projectId?: string) => {
-    addLog(`Attempting to update area ID: ${id}`);
     const areaRef = doc(db, "areas", id);
     const updatedData: any = { label, notes, path };
-    if (projectId) {
-      updatedData.projectId = projectId;
-    } else {
-      updatedData.projectId = null;
-    }
+    updatedData.projectId = projectId ? projectId : null;
 
-    addLog(`Updating area with data...`);
-    addLog('Entering try block for updateDoc(areas)');
+    addLog(`Entering try block for updateDoc(areas) ID: ${id}`);
     try {
       await updateDoc(areaRef, updatedData);
       addLog(`✅ Firestore updateDoc(areas) successful for ID: ${id}`);
@@ -503,8 +483,7 @@ export default function MapExplorer({ user }: { user: User }) {
   };
 
   const handleDeleteArea = async (id: string) => {
-    addLog(`Attempting to delete area ID: ${id}`);
-    addLog('Entering try block for deleteDoc(areas)');
+    addLog(`Entering try block for deleteDoc(areas) ID: ${id}`);
     try {
       await deleteDoc(doc(db, "areas", id));
       addLog(`✅ Firestore deleteDoc(areas) successful for ID: ${id}`);
@@ -608,37 +587,45 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handleCreateNewProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    addLog(`Attempting to create project: "${newProjectName}"`);
     if (!newProjectName) {
-        addLog('Project creation failed: name is empty.');
         toast({variant: 'destructive', title: 'Project Name Required'});
         return;
     }
-    const newProjectData = {
+    const data = {
         name: newProjectName,
         description: newProjectDescription,
-        createdAt: serverTimestamp(),
-        userId: user.uid,
     };
-    addLog(`Saving project data to Firestore...`);
-    addLog('Entering try block for addDoc(projects)');
+    
+    addLog("step 1: about to enter try");
     try {
-      const docRef = await addDoc(collection(db, "projects"), newProjectData);
-      addLog(`✅ Firestore addDoc(projects) successful. New ID: ${docRef.id}`);
-      const newProject = { id: docRef.id, ...newProjectData, createdAt: new Date() };
-      setProjects(prev => [...prev, newProject]);
-      setActiveProjectId(docRef.id);
-      setIsNewProjectDialogOpen(false);
-      setNewProjectName('');
-      setNewProjectDescription('');
-      toast({ title: "Project Created", description: `"${newProjectName}" has been created and set as active.` });
-      if (pendingAction) {
-        executePendingAction();
-      }
-    } catch (e: any) {
-      addLog(`❌ Error creating project: ${e.code} - ${e.message}`);
-      toast({variant: 'destructive', title: 'Failed to create project', description: e.message});
+        addLog("step 2: inside try, before addDoc");
+        const payload = {
+            ...data,
+            createdAt: serverTimestamp(),
+            userId: user.uid
+        };
+        addLog(`data payload: ${JSON.stringify(payload)}`);
+
+        const docRef = await addDoc(collection(db, "projects"), payload);
+        
+        addLog(`step 3: after await, got docRef.id = ${docRef.id}`);
+
+        const newProject = { ...payload, id: docRef.id, createdAt: new Date() };
+        setProjects(prev => [...prev, newProject]);
+        setActiveProjectId(docRef.id);
+        setIsNewProjectDialogOpen(false);
+        setNewProjectName('');
+        setNewProjectDescription('');
+        toast({ title: "Project Created", description: `"${newProjectName}" has been created and set as active.` });
+
+        if (pendingAction) {
+            executePendingAction();
+        }
+    } catch (err: any) {
+      addLog(`❌ step 4: caught an error: ${err.code} ${err.message}`);
+      toast({variant: 'destructive', title: 'Failed to create project', description: err.message});
     }
+    addLog("step 5: function complete");
   };
   
   const handleUpdateProject = async (e: React.FormEvent) => {
@@ -647,16 +634,14 @@ export default function MapExplorer({ user }: { user: User }) {
 
     const name = (e.currentTarget.elements.namedItem('name') as HTMLInputElement).value;
     const description = (e.currentTarget.elements.namedItem('description') as HTMLTextAreaElement).value;
-    addLog(`Attempting to update project ID: ${projectToEdit.id} with name: "${name}"`);
-
-    const projectRef = doc(db, "projects", projectToEdit.id);
-
+    
     if (!name) {
       toast({variant: 'destructive', title: 'Project Name Required'});
       return;
     }
-
-    addLog('Entering try block for updateDoc(projects)');
+    
+    const projectRef = doc(db, "projects", projectToEdit.id);
+    addLog(`Entering try block for updateDoc(projects) ID: ${projectToEdit.id}`);
     try {
       await updateDoc(projectRef, { name, description });
       addLog(`✅ Firestore updateDoc(projects) successful for ID: ${projectToEdit.id}`);
@@ -673,8 +658,7 @@ export default function MapExplorer({ user }: { user: User }) {
       const project = projects.find(p => p.id === projectId);
       if(!project) return;
       
-      addLog(`Attempting to delete project: "${project.name}" (ID: ${projectId})`);
-      addLog('Entering try block for batch delete');
+      addLog(`Entering try block for batch delete on project ID: ${projectId}`);
       try {
         const batch = writeBatch(db);
         
@@ -1125,7 +1109,7 @@ if (dataLoading) {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full shadow-lg bg-card/90">
+                                  <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-lg bg-card/90">
                                     <UserIcon className="h-6 w-6"/>
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -1257,7 +1241,7 @@ if (dataLoading) {
           <DialogHeader>
             <DialogTitle>Create First Project</DialogTitle>
             <DialogDescription>
-              A project is needed before you can add items to the map.
+              A project is needed to save map items.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
