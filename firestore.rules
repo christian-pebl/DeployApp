@@ -1,14 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // A user can read a project if they own it OR if a valid share document exists for it.
+    // Correctly checks if a project has been shared by querying the 'shares' collection
+    // for a document where the 'projectId' field matches.
     function isShared(projectId) {
-      return exists(/databases/$(database)/documents/shares/$(*), {projectId: projectId});
+      return exists(
+        /databases/$(database)/documents/shares?resource.data.projectId==projectId
+      );
     }
 
     match /projects/{projectId} {
@@ -16,16 +19,19 @@ service cloud.firestore {
       allow create: if isOwner(request.resource.data.userId);
       allow update, delete: if isOwner(resource.data.userId);
     }
+
     match /pins/{pinId} {
       allow read: if isOwner(resource.data.userId) || isShared(resource.data.projectId);
       allow create: if isOwner(request.resource.data.userId);
       allow update, delete: if isOwner(resource.data.userId);
     }
+
     match /lines/{lineId} {
       allow read: if isOwner(resource.data.userId) || isShared(resource.data.projectId);
       allow create: if isOwner(request.resource.data.userId);
       allow update, delete: if isOwner(resource.data.userId);
     }
+
     match /areas/{areaId} {
       allow read: if isOwner(resource.data.userId) || isShared(resource.data.projectId);
       allow create: if isOwner(request.resource.data.userId);
@@ -34,7 +40,7 @@ service cloud.firestore {
 
     match /shares/{shareId} {
       allow read: if request.auth != null;
-      allow create: if request.auth.uid == request.resource.data.originalOwnerId;
+      allow create: if isOwner(request.resource.data.originalOwnerId);
       allow update, delete: if false;
     }
   }
