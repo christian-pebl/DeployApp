@@ -405,8 +405,6 @@ export default function MapExplorer({ user }: { user: User }) {
     const updatedData: any = { label, notes };
     if (projectId) {
       updatedData.projectId = projectId;
-    } else {
-      updatedData.projectId = null;
     }
     
     addLog(`Entering try block for updateDoc(pins) ID: ${id}`);
@@ -441,8 +439,6 @@ export default function MapExplorer({ user }: { user: User }) {
     const updatedData: any = { label, notes };
     if (projectId) {
       updatedData.projectId = projectId;
-    } else {
-      updatedData.projectId = null;
     }
 
     addLog(`Entering try block for updateDoc(lines) ID: ${id}`);
@@ -477,8 +473,6 @@ export default function MapExplorer({ user }: { user: User }) {
     const updatedData: any = { label, notes, path };
     if (projectId) {
       updatedData.projectId = projectId;
-    } else {
-      updatedData.projectId = null;
     }
 
     addLog(`Entering try block for updateDoc(areas) ID: ${id}`);
@@ -608,20 +602,27 @@ export default function MapExplorer({ user }: { user: User }) {
         description: newProjectDescription,
     };
     
-    addLog("📍 step 1: entering addProject");
+    addLog(`[INIT] db instance: ${db}`);
+    addLog(`[INIT] Current user: ${auth.currentUser?.uid}`);
+    addLog(`[INIT] Target collection ref: ${collection(db, "projects")}`);
+    addLog(`[PAYLOAD] Raw data argument: ${JSON.stringify(data)}`);
+    
     const payload = {
-      ...data,
-      createdAt: serverTimestamp(),
-      userId: user.uid,
+        ...data,
+        createdAt: serverTimestamp(),
+        userId: auth.currentUser?.uid,
     };
-    addLog(`db instance is: ${db}`);
-    addLog(`collection ref is: ${collection(db, "projects")}`);
-    addLog(`data payload: ${JSON.stringify(payload)}`);
+    addLog(`[PAYLOAD] Final write payload: ${JSON.stringify(payload)}`);
+    
     const writePromise = addDoc(collection(db, "projects"), payload);
-    addLog(`writePromise is: ${writePromise}`);
+    addLog(`[PROMISE] addDoc() returned: ${writePromise}`);
+    addLog(`[NETWORK] navigator.onLine = ${navigator.onLine}`);
+
     try {
+      addLog("[AWAIT] About to await writePromise …");
       const docRef = await writePromise;
-      addLog(`✅ step 2: write resolved with ID: ${docRef.id}`);
+      addLog(`✅ [SUCCESS] Document created with ID: ${docRef.id}`);
+      
       const newProject = { ...payload, id: docRef.id, createdAt: new Date() };
       setProjects(prev => [...prev, newProject]);
       setActiveProjectId(docRef.id);
@@ -634,10 +635,11 @@ export default function MapExplorer({ user }: { user: User }) {
           executePendingAction();
       }
     } catch (err: any) {
-      addLog(`❌ step 3: write rejected: ${err.code} ${err.message}`);
+      addLog(`❌ [ERROR] addDoc failed: ${err.code} - ${err.message}`);
       toast({variant: 'destructive', title: 'Failed to create project', description: err.message});
+    } finally {
+        addLog("[COMPLETE] handleCreateNewProject() finished");
     }
-    addLog("📍 step 4: handler complete");
   };
   
   const handleUpdateProject = async (e: React.FormEvent) => {
@@ -1251,9 +1253,9 @@ if (dataLoading) {
       <Dialog open={isAssignProjectDialogOpen} onOpenChange={setIsAssignProjectDialogOpen}>
         <DialogContent className="z-[1003] sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Create Your First Project</DialogTitle>
+            <DialogTitle>Create Project</DialogTitle>
             <DialogDescription>
-              To save map items, you need a project to organize them in.
+              To save items, first create a project to organize them.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
