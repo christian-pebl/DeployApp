@@ -29,13 +29,13 @@ interface MapProps {
     onMapClick: (e: LeafletMouseEvent) => void;
     pendingAreaPath: LatLng[];
     pendingPin: LatLng | null;
-    onPinSave: (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => void;
+    onPinSave: (id: string, label: string, lat: number, lng: number, notes: string, tagId?: string) => void;
     onPinCancel: () => void;
     pendingLine: { path: LatLng[] } | null;
-    onLineSave: (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => void;
+    onLineSave: (id: string, label: string, path: LatLng[], notes: string, tagId?: string) => void;
     onLineCancel: () => void;
     pendingArea: { path: LatLng[] } | null;
-    onAreaSave: (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => void;
+    onAreaSave: (id: string, label: string, path: LatLng[], notes: string, tagId?: string) => void;
     onAreaCancel: () => void;
     onUpdatePin: (id: string, label: string, notes: string, projectId?: string, tagIds?: string[]) => void;
     onDeletePin: (id: string) => void;
@@ -634,28 +634,25 @@ const Map = ({
         }
     
         const formId = `form-${Date.now()}`;
-    
-        // Get unique labels for the current project
-        const projectPins = pins.filter(p => p.projectId === activeProjectId);
-        const projectLines = lines.filter(l => l.projectId === activeProjectId);
-        const projectAreas = areas.filter(a => a.projectId === activeProjectId);
-        const allLabels = [...projectPins, ...projectLines, ...projectAreas].map(item => item.label);
-        const uniqueLabels = [...new Set(allLabels)];
-    
-        const labelOptions = uniqueLabels.map(label => `<option value="${label}">${label}</option>`).join('');
+        
+        const activeProjectTags = tags.filter(t => t.projectId === activeProjectId);
+        const tagOptions = activeProjectTags.map(tag => `<option value="${tag.id}">${tag.name}</option>`).join('');
     
         const content = `
             <form id="${formId}" class="flex flex-col gap-2">
-                <div class="space-y-1">
-                    <label class="text-xs font-medium text-muted-foreground">Label</label>
-                    <select name="label-select" class="p-2 border rounded-md text-sm bg-background text-foreground border-border w-full">
-                        <option value="">-- Select Existing --</option>
-                        ${labelOptions}
-                        <option value="__new__">-- Create New --</option>
-                    </select>
-                    <input type="text" name="label-new" placeholder="Enter new label" class="p-2 border rounded-md text-sm bg-background text-foreground border-border w-full hidden" />
-                </div>
+                <input type="text" name="label" placeholder="Enter label" required class="p-2 border rounded-md text-sm bg-background text-foreground border-border" />
                 <textarea name="notes" placeholder="Add notes..." class="p-2 border rounded-md text-sm bg-background text-foreground border-border min-h-[60px]"></textarea>
+                
+                ${tagOptions ? `
+                <div class="space-y-1">
+                    <label for="tag-select" class="text-xs font-medium text-muted-foreground">Tag</label>
+                    <select name="tagId" id="tag-select" class="p-2 border rounded-md text-sm bg-background text-foreground border-border w-full">
+                        <option value="">-- No Tag --</option>
+                        ${tagOptions}
+                    </select>
+                </div>
+                ` : ''}
+
                 <div class="flex justify-end gap-2">
                     <button type="button" class="cancel-btn px-3 py-1 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Cancel</button>
                     <button type="submit" class="px-3 py-1 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
@@ -684,44 +681,24 @@ const Map = ({
         setTimeout(() => {
             const form = document.getElementById(formId);
             const cancelButton = form?.querySelector('.cancel-btn');
-            const labelSelect = form?.querySelector('select[name="label-select"]') as HTMLSelectElement;
-            const newLabelInput = form?.querySelector('input[name="label-new"]') as HTMLInputElement;
-    
-            labelSelect?.addEventListener('change', () => {
-                if (labelSelect.value === '__new__') {
-                    newLabelInput.classList.remove('hidden');
-                    newLabelInput.required = true;
-                } else {
-                    newLabelInput.classList.add('hidden');
-                    newLabelInput.required = false;
-                }
-            });
-    
+
             form?.addEventListener('submit', (ev) => {
                 ev.preventDefault();
                 cleanup();
                 const formElements = (ev.target as HTMLFormElement).elements;
-                let finalLabel = '';
-                if(labelSelect.value === '__new__') {
-                    finalLabel = newLabelInput.value;
-                } else {
-                    finalLabel = labelSelect.value;
-                }
-
-                if (!finalLabel) {
-                    alert("Please select or create a label.");
-                    return;
-                }
-
+                const labelInput = formElements.namedItem('label') as HTMLInputElement;
                 const notesInput = formElements.namedItem('notes') as HTMLTextAreaElement;
+                const tagSelect = formElements.namedItem('tagId') as HTMLSelectElement | null;
+                
                 const newId = `${type}-${Date.now()}`;
+                const tagId = tagSelect?.value || undefined;
                 
                 if (type === 'pin') {
-                    onPinSave(newId, finalLabel, latlng.lat, latlng.lng, notesInput.value);
+                    onPinSave(newId, labelInput.value, latlng.lat, latlng.lng, notesInput.value, tagId);
                 } else if (type === 'line' && path) {
-                    onLineSave(newId, finalLabel, path, notesInput.value);
+                    onLineSave(newId, labelInput.value, path, notesInput.value, tagId);
                 } else if (type === 'area' && path) {
-                    onAreaSave(newId, finalLabel, path, notesInput.value);
+                    onAreaSave(newId, labelInput.value, path, notesInput.value, tagId);
                 }
                 map.closePopup();
             });

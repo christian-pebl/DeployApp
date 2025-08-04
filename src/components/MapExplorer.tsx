@@ -204,16 +204,15 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const executePendingAction = () => {
     const action = pendingAction;
+    setPendingAction(null); 
     addLog(`Executing pending action: ${action}`);
     if (!action || !mapRef.current) {
-        if(action) addLog(`Action execution cancelled: map not ready.`);
-        setPendingAction(null);
+        if(action) addLog(`Action execution cancelled: map not ready or action cleared.`);
         return;
     }
 
     const center = mapRef.current.getCenter();
-    setPendingAction(null); // Clear pending action immediately
-
+    
     if (action === 'pin') {
         addLog(`Executing pending pin at: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
         setPendingPin(center);
@@ -358,15 +357,23 @@ export default function MapExplorer({ user }: { user: User }) {
     }
   };
 
-  const handlePinSave = async (id: string, label: string, lat: number, lng: number, notes: string, projectId?: string) => {
-    const finalProjectId = projectId ?? activeProjectId;
-    if (!finalProjectId) {
+  const handlePinSave = async (id: string, label: string, lat: number, lng: number, notes: string, tagId?: string) => {
+    if (!activeProjectId) {
         addLog(`❌ [ERROR] Pin save failed: No project ID provided or active.`);
         toast({variant: 'destructive', title: 'Cannot save pin', description: 'No active project selected.'});
         return;
     }
 
-    const newPinData: Omit<Pin, 'id' | 'createdAt'> = { lat, lng, label, labelVisible: true, notes, userId: user.uid, projectId: finalProjectId, tagIds: [] };
+    const newPinData: Omit<Pin, 'id' | 'createdAt'> = { 
+      lat, 
+      lng, 
+      label, 
+      labelVisible: true, 
+      notes, 
+      userId: user.uid, 
+      projectId: activeProjectId, 
+      tagIds: tagId ? [tagId] : [] 
+    };
     
     addLog(`[AWAIT] About to await addDoc(pins)`);
     try {
@@ -383,16 +390,23 @@ export default function MapExplorer({ user }: { user: User }) {
     }
   };
 
-  const handleLineSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
-      const finalProjectId = projectId ?? activeProjectId;
-      if (!finalProjectId) {
+  const handleLineSave = async (id: string, label: string, path: LatLng[], notes: string, tagId?: string) => {
+      if (!activeProjectId) {
         addLog(`❌ [ERROR] Line save failed: No project ID provided or active.`);
         toast({variant: 'destructive', title: 'Cannot save line', description: 'No active project selected.'});
         return;
       }
 
       const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-      const newLineData: Omit<Line, 'id' | 'createdAt'> = { path: pathData, label, labelVisible: true, notes, userId: user.uid, projectId: finalProjectId, tagIds: [] };
+      const newLineData: Omit<Line, 'id' | 'createdAt'> = { 
+        path: pathData, 
+        label, 
+        labelVisible: true, 
+        notes, 
+        userId: user.uid, 
+        projectId: activeProjectId, 
+        tagIds: tagId ? [tagId] : [] 
+      };
 
       addLog(`[AWAIT] About to await addDoc(lines)`);
       try {
@@ -409,15 +423,23 @@ export default function MapExplorer({ user }: { user: User }) {
       }
   };
   
-  const handleAreaSave = async (id: string, label: string, path: LatLng[], notes: string, projectId?: string) => {
-    const finalProjectId = projectId ?? activeProjectId;
-    if (!finalProjectId) {
+  const handleAreaSave = async (id: string, label: string, path: LatLng[], notes: string, tagId?: string) => {
+    if (!activeProjectId) {
       addLog(`❌ [ERROR] Area save failed: No project ID provided or active.`);
       toast({variant: 'destructive', title: 'Cannot save area', description: 'No active project selected.'});
       return;
     }
     const pathData = path.map(p => ({ lat: p.lat, lng: p.lng }));
-    const newAreaData: Omit<Area, 'id' | 'createdAt'> = { path: pathData, label, labelVisible: true, fillVisible: true, notes, userId: user.uid, projectId: finalProjectId, tagIds: [] };
+    const newAreaData: Omit<Area, 'id' | 'createdAt'> = { 
+      path: pathData, 
+      label, 
+      labelVisible: true, 
+      fillVisible: true, 
+      notes, 
+      userId: user.uid, 
+      projectId: activeProjectId,
+      tagIds: tagId ? [tagId] : []
+    };
     
     addLog(`[AWAIT] About to await addDoc(areas)`);
     try {
