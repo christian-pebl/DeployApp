@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, Settings as SettingsIcon, Save, Ban, LogOut } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, Settings as SettingsIcon, LogOut, Share2 } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -693,7 +693,7 @@ export default function MapExplorer({ user }: { user: User }) {
                     </TooltipProvider>
                     <div className="mt-auto pt-4 px-6 pb-2 border-t">
                       <div className="flex items-center justify-between">
-                         <p className="text-sm font-medium text-muted-foreground">Signed in as {user.email}</p>
+                         <p className="text-sm font-medium text-muted-foreground truncate" title={user.email || ''}>{user.email}</p>
                          <div className="flex gap-2">
                           <TooltipProvider>
                             <Tooltip>
@@ -728,7 +728,7 @@ export default function MapExplorer({ user }: { user: User }) {
                                 <Menu className="h-6 w-6" />
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent><p>Projects & Objects</p></TooltipContent>
+                        <TooltipContent><p>Project Menu</p></TooltipContent>
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -1028,7 +1028,7 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
               <div className="flex items-center gap-1">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8"><Eye className="h-4 w-4"/></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8"><Share2 className="h-4 w-4"/></Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
