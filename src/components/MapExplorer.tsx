@@ -32,7 +32,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useMapView, type MapView } from '@/hooks/use-map-view';
 import { useSettings } from '@/hooks/use-settings';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot, orderBy } from "firebase/firestore";
 import { db, auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -236,10 +236,11 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handleDrawLine = () => {
     if (mapRef.current) {
-        const center = mapRef.current.getCenter();
-        setLineStartPoint(center);
         setIsDrawingLine(true);
-        addLog('Started drawing line from center.');
+        if(!lineStartPoint) {
+            setLineStartPoint(mapRef.current.getCenter());
+             addLog('Started drawing line from center.');
+        }
     }
   };
   
@@ -548,7 +549,7 @@ export default function MapExplorer({ user }: { user: User }) {
 
           const collectionsToDelete = ["pins", "lines", "areas", "tags"];
           for (const colName of collectionsToDelete) {
-              const q = query(collection(db, colName), where("projectId", "==", projectId), where("userId", "==", user.uid));
+              const q = query(collection(db, colName), where("projectId", "==", projectId));
               const snapshot = await getDocs(q);
               snapshot.forEach(doc => batch.delete(doc.ref));
           }
@@ -1141,7 +1142,7 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
         }
         
         const shareData = shareSnap.data();
-        const { projectId: originalProjectId } = shareData;
+        const { projectId: originalProjectId, userId: originalUserId } = shareData;
         addLog(`[IMPORT_CLIENT] 2. Found share document for project ${originalProjectId}`);
 
         const projectRef = doc(db, 'projects', originalProjectId);
