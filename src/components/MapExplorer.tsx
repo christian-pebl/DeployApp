@@ -494,7 +494,7 @@ export default function MapExplorer({ user }: { user: User }) {
           for (const colName of collectionsToDelete) {
               const q = query(collection(db, colName), where("projectId", "==", projectId), where("userId", "==", user.uid));
               const snapshot = await getDocs(q);
-              snapshot.forEach(doc => batch.delete(doc.ref));
+              snapshot.forEach(originalDoc => batch.delete(originalDoc.ref));
           }
 
           await batch.commit();
@@ -821,7 +821,6 @@ export default function MapExplorer({ user }: { user: User }) {
                         isSearchExpanded ? "w-full max-w-sm p-2" : "w-12 h-12"
                     )}
                     >
-                    <AnimatePresence>
                         {isSearchExpanded ? (
                         <>
                             <Search className="h-5 w-5 text-muted-foreground mx-2" />
@@ -853,7 +852,6 @@ export default function MapExplorer({ user }: { user: User }) {
                             </Tooltip>
                         </TooltipProvider>
                         )}
-                    </AnimatePresence>
                 </div>
               <TooltipProvider>
                 <div className="flex flex-col gap-2 items-end">
