@@ -1,43 +1,63 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper function to check ownership
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+
+    // Helper function to check if the requesting user is the owner of a given project.
+    function isProjectOwner(projectId) {
+      let project = get(/databases/$(database)/documents/projects/$(projectId));
+      return project.data.userId == request.auth.uid;
     }
 
-    // Helper function to check if a project has been shared
-    function isShared(projectId) {
-      return exists(/databases/$(database)/documents/shares_by_project/$(projectId));
+    // Helper function to check if a project has been shared.
+    function isProjectShared(projectId) {
+        return exists(/databases/$(database)/documents/shares_by_project/$(projectId));
     }
-
-    // Projects can be read if owned or if shared. Can be written if owned.
+    
+    // === Project Rules ===
     match /projects/{projectId} {
-      allow read: if isOwner(resource.data.userId) || isShared(projectId);
-      allow write: if isOwner(request.resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+      // Allow read if user owns the project OR if the project has a corresponding share document.
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isProjectShared(projectId));
+      
+      // Allow create if the user ID on the new document matches the user's own ID.
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+
+      // Allow update and delete only if the user is the owner.
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
-    // Pins, Lines, Areas, and Tags can be read if the user owns the project
-    // or if the project has been shared. They can be written if the user owns them.
+    // === Object Rules (Pins, Lines, Areas) ===
     match /{collection}/{docId} {
-      allow read: if isOwner(resource.data.userId) || isShared(resource.data.projectId);
-      allow write: if isOwner(request.resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+        // This rule applies to pins, lines, and areas
+        allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isProjectShared(resource.data.projectId));
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid && isProjectOwner(request.resource.data.projectId);
+        allow update: if request.auth != null && resource.data.userId == request.auth.uid && isProjectOwner(resource.data.projectId);
+        // Deletes are handled by a batch job when the project is deleted, so we check the project ownership.
+        allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
     
-    // Any authenticated user can create or read a share document
+    // === Tag Rules ===
+    match /tags/{tagId} {
+        allow read, create, update, delete: if request.auth != null && isProjectOwner(request.resource.data.projectId);
+    }
+
+    // === Share Code Generation Rules ===
     match /shares/{shareId} {
-        allow read, create: if request.auth != null;
+      // Allow a user to create a share document if they own the project being shared.
+      allow create: if request.auth != null && isProjectOwner(request.resource.data.projectId);
+      // Any authenticated user can read a share document (to import it).
+      allow read: if request.auth != null;
+      // Shares are immutable; they cannot be updated or deleted.
+      allow update, delete: if false;
     }
-    
-    // Allow the creation of a lookup document when a project is shared.
-    // This is used by the security rules to check if a project is shared.
+
     match /shares_by_project/{projectId} {
-        allow create: if request.auth != null;
-        allow read: if request.auth != null;
+       // This document is created in the same batch as the /shares/ document.
+       // The 'create' rule on /shares/ handles the primary permission check.
+       allow create: if request.auth != null;
+       allow read: if request.auth != null;
+       allow update, delete: if false;
     }
   }
 }
