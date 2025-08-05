@@ -37,6 +37,7 @@ service cloud.firestore {
     // This is used by the security rules to check if a project is shared.
     match /shares_by_project/{projectId} {
         allow create: if request.auth != null;
+        allow read: if request.auth != null;
     }
   }
 }
