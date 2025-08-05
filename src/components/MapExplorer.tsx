@@ -949,7 +949,6 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
     setIsImporting(true);
     addLog(`[IMPORT_CLIENT] 1. Starting import for code: ${shareCode}`);
     try {
-        const shareRef = doc(db, 'shares', shareCode.trim());
         const shareSnap = await getDocs(query(collection(db, 'shares'), where('__name__', '==', shareCode.trim()), limit(1)));
 
         if (shareSnap.empty) {
@@ -990,12 +989,13 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
         for (const colName of collectionsToCopy) {
             const q = query(collection(db, colName), where("projectId", "==", originalProjectId), where("userId", "==", originalUserId));
             const snapshot = await getDocs(q);
-            snapshot.forEach(doc => {
-                const newDocId = doc.id;
+             // fixes TypeError: doc.data is not a function on line 1099
+            for (const originalDoc of snapshot.docs) {
+                const newDocId = originalDoc.id; // Keep original IDs for simplicity, might cause collisions if importing same project twice
                 const newDocRef = doc(db, colName, newDocId);
-                batch.set(newDocRef, { ...doc.data(), projectId: newProjectId, userId: user.uid });
+                batch.set(newDocRef, { ...originalDoc.data(), projectId: newProjectId, userId: user.uid });
                 totalItemsCopied++;
-            });
+            }
              addLog(`[IMPORT_CLIENT] 5a. Queued ${snapshot.size} items from ${colName} to be copied.`);
         }
         
@@ -1105,3 +1105,5 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
     </div>
   );
 }
+
+    
