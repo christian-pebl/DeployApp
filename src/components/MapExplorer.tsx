@@ -84,16 +84,24 @@ export default function MapExplorer({ user }: { user: User }) {
   const [isSearching, setIsSearching] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [editingGeometry, setEditingGeometry] = useState<Line | Area | null>(null);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 
   const { toast } = useToast();
   const router = useRouter();
   
   const mapRef = useRef<LeafletMap | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const addLog = (entry: string) => {
     setLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${entry}`]);
     console.log(`[LOG] ${entry}`);
   };
+
+  useEffect(() => {
+    if (isSearchExpanded) {
+      searchInputRef.current?.focus();
+    }
+  }, [isSearchExpanded]);
 
   useEffect(() => {
     if (!user) return;
@@ -807,18 +815,45 @@ export default function MapExplorer({ user }: { user: User }) {
             )}
 
             <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-                <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
-                    <Input
-                        type="text"
-                        placeholder="Search address or label..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
-                    />
-                    <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching} className="h-9 w-9">
-                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    </Button>
+                 <div
+                    className={cn(
+                        "flex items-center justify-end bg-background/90 backdrop-blur-sm rounded-full shadow-lg border transition-all duration-300 ease-in-out",
+                        isSearchExpanded ? "w-full max-w-sm p-2" : "w-12 h-12"
+                    )}
+                    >
+                    <AnimatePresence>
+                        {isSearchExpanded ? (
+                        <>
+                            <Search className="h-5 w-5 text-muted-foreground mx-2" />
+                            <Input
+                            ref={searchInputRef}
+                            type="text"
+                            placeholder="Search address or label..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent flex-1"
+                            />
+                            <Button type="submit" size="icon" variant="ghost" onClick={handleSearch} disabled={isSearching} className="h-9 w-9">
+                                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>}
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => setIsSearchExpanded(false)} className="h-9 w-9">
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </>
+                        ) : (
+                        <TooltipProvider>
+                            <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full" onClick={() => setIsSearchExpanded(true)}>
+                                <Search className="h-5 w-5" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left"><p>Search</p></TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        )}
+                    </AnimatePresence>
                 </div>
               <TooltipProvider>
                 <div className="flex flex-col gap-2 items-end">
