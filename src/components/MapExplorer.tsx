@@ -102,9 +102,9 @@ export default function MapExplorer({ user }: { user: User }) {
     const dataQuery = (collectionName: string) => query(collection(db, collectionName), where("userId", "==", user.uid));
 
     const unsubscribers = [
-      onSnapshot(dataQuery("projects"), snapshot => {
+      onSnapshot(query(collection(db, 'projects'), where("userId", "==", user.uid), orderBy("createdAt", "desc")), snapshot => {
         const userProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-        setProjects(userProjects.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds));
+        setProjects(userProjects);
         addLog(`Loaded ${userProjects.length} projects.`);
         
         const lastActiveId = localStorage.getItem(`last-active-project-${user.uid}`);
@@ -136,10 +136,8 @@ export default function MapExplorer({ user }: { user: User }) {
       }),
     ];
     
-    Promise.all(unsubscribers).then(() => {
-      setIsDataLoading(false);
-      addLog('Finished loading all data.');
-    });
+    setIsDataLoading(false);
+    addLog('Finished loading all data.');
 
     return () => unsubscribers.forEach(unsub => unsub());
   }, [user]);
@@ -895,6 +893,7 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
   const [shareCode, setShareCode] = useState('');
   const [isSharing, setIsSharing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -989,11 +988,10 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
         for (const colName of collectionsToCopy) {
             const q = query(collection(db, colName), where("projectId", "==", originalProjectId), where("userId", "==", originalUserId));
             const snapshot = await getDocs(q);
-             // fixes TypeError: doc.data is not a function on line 1099
             for (const originalDoc of snapshot.docs) {
-                const newDocId = originalDoc.id; // Keep original IDs for simplicity, might cause collisions if importing same project twice
+                const newDocId = doc(collection(db, colName)).id;
                 const newDocRef = doc(db, colName, newDocId);
-                batch.set(newDocRef, { ...originalDoc.data(), projectId: newProjectId, userId: user.uid });
+                batch.set(newDocRef, { ...originalDoc.data(), id: newDocId, projectId: newProjectId, userId: user.uid });
                 totalItemsCopied++;
             }
              addLog(`[IMPORT_CLIENT] 5a. Queued ${snapshot.size} items from ${colName} to be copied.`);
@@ -1004,6 +1002,7 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
         addLog(`[IMPORT_CLIENT] 6. Successfully imported project with ${totalItemsCopied} items.`);
         toast({ title: "Import Successful", description: `"${originalProjectData.name}" has been added to your projects.` });
         setShareCode('');
+        setIsImportDialogOpen(false);
         
     } catch (e) {
         const error = e as Error;
@@ -1080,7 +1079,7 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
             </form>
           </DialogContent>
         </Dialog>
-        <Dialog>
+        <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" className="flex-1">Import</Button>
           </DialogTrigger>
