@@ -625,7 +625,7 @@ export default function MapExplorer({ user }: { user: User }) {
             />
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none">
-                {!isDrawingLine && !isDrawingArea && !editingGeometry && <Plus className="h-8 w-8 text-blue-500 opacity-70" />}
+                <Plus className="h-8 w-8 text-blue-500 opacity-70" />
             </div>
 
             {isObjectListOpen && (
