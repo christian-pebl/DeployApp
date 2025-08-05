@@ -138,14 +138,18 @@ const Map = ({
     // Expose a method to save geometry via the mapRef
     useEffect(() => {
       if (mapRef.current) {
-        (mapRef.current as any).saveEditedGeometry = () => {
+        (mapRef.current as any).getEditedPath = () => {
           if (editingGeometry && editingLayerRef.current) {
-            const newPath = (editingLayerRef.current as any)._newPath;
-            onUpdateGeometry(editingGeometry.id, newPath);
+             const layer = editingLayerRef.current.getLayers()[0] as any;
+             if(layer) {
+                const latlngs = layer.getLatLngs();
+                return Array.isArray(latlngs) ? latlngs.map(p => ({ lat: p.lat, lng: p.lng })) : [];
+             }
           }
+          return [];
         };
       }
-    }, [mapRef, editingGeometry, onUpdateGeometry]);
+    }, [mapRef, editingGeometry]);
 
 
     const showEditPopup = (item: Pin | Line | Area) => {
@@ -590,39 +594,39 @@ const Map = ({
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
-
+    
         const cleanupDrawing = () => {
             if (previewLineRef.current) {
                 previewLineRef.current.remove();
                 previewLineRef.current = null;
             }
-            if (distanceTooltipRef.current && map.hasLayer(distanceTooltipRef.current)) {
-                map.removeLayer(distanceTooltipRef.current);
+            if (distanceTooltipRef.current) {
+                distanceTooltipRef.current.remove();
                 distanceTooltipRef.current = null;
             }
         };
-
+    
         if (isDrawingLine && lineStartPoint) {
-            const updatePreviewLine = (e?: LeafletMouseEvent) => {
-                const targetPoint = e ? e.latlng : map.getCenter();
+            const updatePreviewLine = () => {
+                const center = map.getCenter();
                 if (previewLineRef.current) {
-                    previewLineRef.current.setLatLngs([lineStartPoint, targetPoint]);
+                    previewLineRef.current.setLatLngs([lineStartPoint, center]);
                 } else {
-                    previewLineRef.current = L.polyline([lineStartPoint, targetPoint], {
+                    previewLineRef.current = L.polyline([lineStartPoint, center], {
                         color: 'hsl(var(--primary))',
                         weight: 4,
                         opacity: 0.8,
                         dashArray: '5, 10',
                     }).addTo(map);
                 }
-
-                const distanceMeters = lineStartPoint.distanceTo(targetPoint);
+    
+                const distanceMeters = lineStartPoint.distanceTo(center);
                 const distance = settings.units === 'imperial' ? toFeet(distanceMeters) : distanceMeters;
                 const unitLabel = settings.units === 'imperial' ? 'feet' : 'meters';
                 const tooltipContent = `${distance.toFixed(2)} ${unitLabel}`;
-
+    
                 if (distanceTooltipRef.current) {
-                    distanceTooltipRef.current.setLatLng(targetPoint).setContent(tooltipContent);
+                    distanceTooltipRef.current.setLatLng(center).setContent(tooltipContent);
                 } else {
                     distanceTooltipRef.current = L.tooltip({
                         permanent: true,
@@ -630,20 +634,17 @@ const Map = ({
                         offset: [10, 0],
                         className: 'distance-tooltip'
                     })
-                    .setLatLng(targetPoint)
+                    .setLatLng(center)
                     .setContent(tooltipContent)
                     .addTo(map);
                 }
             };
             
-            const moveHandler = () => updatePreviewLine();
-            map.on('mousemove', updatePreviewLine);
-            map.on('move', moveHandler);
+            map.on('move', updatePreviewLine);
             updatePreviewLine(); // Initial draw
-
+    
             return () => {
-                map.off('mousemove', updatePreviewLine);
-                map.off('move', moveHandler);
+                map.off('move', updatePreviewLine);
                 cleanupDrawing();
             };
         } else {
@@ -740,16 +741,15 @@ const Map = ({
             const updateShape = () => {
                 const shapeLayer = layer.getLayers().find(l => l instanceof L.Polyline || l instanceof L.Polygon);
                 if (shapeLayer) {
-                    (shapeLayer as Polyline).setLatLngs(currentPath);
+                    (shapeLayer as any).setLatLngs(currentPath);
                 }
             };
             
-            // Store the path on the layer for the parent to retrieve
-            (layer as any)._newPath = currentPath.map(p => ({ lat: p.lat, lng: p.lng }));
-
             const shape = isArea 
                 ? L.polygon(currentPath, { color: 'hsl(var(--primary))', weight: 3, dashArray: '5, 5' }).addTo(layer)
                 : L.polyline(currentPath, { color: 'hsl(var(--primary))', weight: 3, dashArray: '5, 5' }).addTo(layer);
+
+            (shape as any)._path = currentPath;
 
             const markers = currentPath.map((latlng, index) => {
                 const marker = L.circleMarker(latlng, {
@@ -761,14 +761,14 @@ const Map = ({
                 }).addTo(layer);
 
                 (marker as any)._index = index;
+                (marker as any).dragging.enable();
+
                 marker.on('drag', (e) => {
                     const newLatLng = (e.target as Marker).getLatLng();
                     currentPath[index] = newLatLng;
                     updateShape();
-                     (layer as any)._newPath = currentPath.map(p => ({ lat: p.lat, lng: p.lng }));
                 });
                 
-                (marker as any).dragging.enable();
                 return marker;
             });
         }

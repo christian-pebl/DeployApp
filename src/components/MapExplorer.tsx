@@ -236,11 +236,27 @@ export default function MapExplorer({ user }: { user: User }) {
   };
 
   const handleDrawLine = () => {
-    setIsDrawingLine(true);
-    setLineStartPoint(null); // Reset start point
-    addLog('Started drawing line. Click on the map to set the start point.');
+    if (currentMapCenter) {
+      setLineStartPoint(currentMapCenter);
+      setIsDrawingLine(true);
+      addLog('Started drawing line from center.');
+    }
   };
   
+  const handleConfirmLine = () => {
+    if (lineStartPoint && currentMapCenter) {
+      setPendingLine({ path: [lineStartPoint, currentMapCenter] });
+      setIsDrawingLine(false);
+      setLineStartPoint(null);
+    }
+  };
+
+  const handleDrawArea = () => {
+    setIsDrawingArea(true);
+    setPendingAreaPath([]);
+    addLog('Started drawing area.');
+  };
+
   const handleConfirmArea = () => {
     if (pendingAreaPath.length < 3) {
         toast({ variant: "destructive", title: "Area Incomplete", description: "An area must have at least 3 points."});
@@ -251,24 +267,10 @@ export default function MapExplorer({ user }: { user: User }) {
     setPendingAreaPath([]);
   };
 
-  const handleDrawArea = () => {
-    setIsDrawingArea(true);
-    setPendingAreaPath([]);
-    addLog('Started drawing area.');
-  };
-
   const handleMapClick = (e: LeafletMouseEvent) => {
     if (editingGeometry) return;
     if (isDrawingArea) {
       setPendingAreaPath(prev => [...prev, e.latlng]);
-    } else if (isDrawingLine) {
-        if (lineStartPoint) {
-            setPendingLine({ path: [lineStartPoint, e.latlng] });
-            setIsDrawingLine(false);
-            setLineStartPoint(null);
-        } else {
-            setLineStartPoint(e.latlng);
-        }
     }
   };
 
@@ -585,7 +587,10 @@ export default function MapExplorer({ user }: { user: User }) {
               currentLocation={currentLocation}
               onLocationFound={handleLocationFound}
               onLocationError={handleLocationError}
-              onMove={(center, zoom) => setView({center, zoom})}
+              onMove={(center, zoom) => {
+                setView({center, zoom});
+                setCurrentMapCenter(center);
+              }}
               isDrawingLine={isDrawingLine}
               lineStartPoint={lineStartPoint}
               isDrawingArea={isDrawingArea}
@@ -792,29 +797,23 @@ export default function MapExplorer({ user }: { user: User }) {
                     </Button>
                 </div>
             )}
-            
-            {isDrawingLine && !lineStartPoint && (
-                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2 bg-card p-2 rounded-lg shadow-lg">
-                    <p className="text-sm p-2">Click on the map to set the start point of the line.</p>
-                     <Button 
-                        variant="ghost"
+
+            {isDrawingLine && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2 bg-card p-2 rounded-lg shadow-lg">
+                    <p className="text-sm p-2">Move map to position the end of the line</p>
+                    <Button 
                         className="h-10 rounded-md"
-                        onClick={() => setIsDrawingLine(false)}
+                        onClick={handleConfirmLine}
                     >
-                        <X className="mr-2 h-5 w-5" /> Cancel
+                        <Check className="mr-2 h-5 w-5" /> Confirm Line
                     </Button>
-                </div>
-            )}
-            
-            {isDrawingLine && lineStartPoint && (
-                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2 bg-card p-2 rounded-lg shadow-lg">
-                    <p className="text-sm p-2">Click on the map to set the end point of the line.</p>
-                     <Button 
+                    <Button 
                         variant="ghost"
-                        className="h-10 rounded-md"
+                        size="icon"
+                        className="h-10 w-10"
                         onClick={() => { setIsDrawingLine(false); setLineStartPoint(null); }}
                     >
-                        <X className="mr-2 h-5 w-5" /> Cancel
+                        <X className="h-5 w-5" />
                     </Button>
                 </div>
             )}
@@ -1019,7 +1018,7 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
         }
         
         const shareData = shareSnap.data();
-        const { projectId: originalProjectId, userId: originalUserId } = shareData;
+        const { projectId: originalProjectId } = shareData;
         addLog(`[IMPORT_CLIENT] 2. Found share document for project ${originalProjectId}`);
 
         const projectRef = doc(db, 'projects', originalProjectId);
