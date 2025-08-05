@@ -813,45 +813,44 @@ export default function MapExplorer({ user }: { user: User }) {
                         {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                     </Button>
                 </div>
-              <TooltipProvider>
-                <div className="flex gap-2 justify-end">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="default" 
-                        size="icon" 
-                        className="h-12 w-12 rounded-full shadow-lg"
-                        onClick={handleLocateMe}
-                        disabled={isLocating}
-                      >
-                        {isLocating && !currentLocation ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Center on Me</p>
-                    </TooltipContent>
-                  </Tooltip>
-
-                  <div className="flex flex-col gap-1 bg-background rounded-full shadow-lg border">
-                     <Tooltip>
-                      <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={handleZoomIn}>
-                              <ZoomIn className="h-5 w-5" />
+                <TooltipProvider>
+                  <div className="flex flex-col gap-2 items-end">
+                    <div className="flex flex-col gap-1 bg-background/80 backdrop-blur-sm rounded-full shadow-lg border">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-t-full" onClick={handleZoomIn}>
+                                <ZoomIn className="h-5 w-5" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left"><p>Zoom In</p></TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-b-full" onClick={handleZoomOut}>
+                              <ZoomOut className="h-5 w-5" />
                           </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="left"><p>Zoom In</p></TooltipContent>
-                    </Tooltip>
+                        </TooltipTrigger>
+                        <TooltipContent side="left"><p>Zoom Out</p></TooltipContent>
+                      </Tooltip>
+                    </div>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={handleZoomOut}>
-                            <ZoomOut className="h-5 w-5" />
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-12 w-12 rounded-full shadow-lg bg-background/80 backdrop-blur-sm border"
+                          onClick={handleLocateMe}
+                          disabled={isLocating}
+                        >
+                          {isLocating && !currentLocation ? <Loader2 className="h-6 w-6 animate-spin text-blue-500" /> : <Crosshair className="h-6 w-6 text-blue-500" />}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="left"><p>Zoom Out</p></TooltipContent>
+                      <TooltipContent side="left">
+                        <p>Center on Me</p>
+                      </TooltipContent>
                     </Tooltip>
                   </div>
-                </div>
-              </TooltipProvider>
+                </TooltipProvider>
             </div>
 
             <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
@@ -1104,3 +1103,4 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
     </div>
   );
 }
+
