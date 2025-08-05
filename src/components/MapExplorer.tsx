@@ -1020,39 +1020,41 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
   return (
     <div className="space-y-4 px-6">
       <h3 className="text-lg font-semibold">Projects</h3>
-      <ul className="space-y-2 max-h-48 overflow-y-auto pr-2">
-        {projects.map(project => (
-          <li key={project.id} className="flex items-center justify-between p-2 rounded-md border" data-active={activeProjectId === project.id}>
-            <span className="font-medium truncate pr-2">{project.name}</span>
-            <div className="flex items-center gap-1">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8"><Eye className="h-4 w-4"/></Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{project.name}</DialogTitle>
-                    <DialogDescription>{project.description || "No description."}</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                     <Button onClick={() => generateShareCode(project.id)} disabled={isSharing} className="w-full">
-                       {isSharing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                       Generate Share Code
-                     </Button>
-                     {shareCode && <Input value={shareCode} readOnly />}
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Tooltip><TooltipTrigger asChild>
-                <Button variant={activeProjectId === project.id ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => onSetActiveProject(project.id)}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={activeProjectId === project.id ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                </Button>
-              </TooltipTrigger><TooltipContent><p>Set Active</p></TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDeleteProject(project.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <TooltipProvider>
+        <ul className="space-y-2 max-h-48 overflow-y-auto pr-2">
+          {projects.map(project => (
+            <li key={project.id} className="flex items-center justify-between p-2 rounded-md border" data-active={activeProjectId === project.id}>
+              <span className="font-medium truncate pr-2">{project.name}</span>
+              <div className="flex items-center gap-1">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8"><Eye className="h-4 w-4"/></Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{project.name}</DialogTitle>
+                      <DialogDescription>{project.description || "No description."}</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                       <Button onClick={() => generateShareCode(project.id)} disabled={isSharing} className="w-full">
+                         {isSharing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                         Generate Share Code
+                       </Button>
+                       {shareCode && <Input value={shareCode} readOnly />}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <Tooltip><TooltipTrigger asChild>
+                  <Button variant={activeProjectId === project.id ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => onSetActiveProject(project.id)}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={activeProjectId === project.id ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                  </Button>
+                </TooltipTrigger><TooltipContent><p>Set Active</p></TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDeleteProject(project.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </TooltipProvider>
       <Dialog>
         <DialogTrigger asChild>
           <Button className="w-full">Create New Project</Button>
@@ -1103,4 +1105,3 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
     </div>
   );
 }
-
