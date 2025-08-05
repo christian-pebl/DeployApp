@@ -9,7 +9,8 @@ service cloud.firestore {
     }
     
     function isProjectOwner(projectId) {
-      return isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.userId);
+      return exists(/databases/$(database)/documents/projects/$(projectId)) &&
+             isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.userId);
     }
     
     function canImportProject(projectId) {
