@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, Settings as SettingsIcon, Save, Ban } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, Settings as SettingsIcon, Save, Ban, LogOut } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -22,7 +22,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useMapView, type MapView } from '@/hooks/use-map-view';
 import { useSettings } from '@/hooks/use-settings';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot, orderBy, limit } from "firebase/firestore";
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { ProjectData, PinData, LineData, AreaData, TagData } from '@/ai/flows/share-project';
 import {
@@ -190,7 +191,7 @@ export default function MapExplorer({ user }: { user: User }) {
         description: <pre className="text-xs whitespace-pre-wrap max-h-60 overflow-y-auto">{logContent}</pre>,
         duration: 10000,
     });
-  }
+  };
 
   const handleZoomIn = () => {
     mapRef.current?.zoomIn();
@@ -538,6 +539,11 @@ export default function MapExplorer({ user }: { user: User }) {
       addLog(`Updated geometry for ${itemId}`);
   };
 
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
+
   const filteredPins = pins.filter(p => p.projectId === activeProjectId);
   const filteredLines = lines.filter(l => l.projectId === activeProjectId);
   const filteredAreas = areas.filter(a => a.projectId === activeProjectId);
@@ -613,7 +619,7 @@ export default function MapExplorer({ user }: { user: User }) {
                       </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto">
+                <CardContent className="flex-1 overflow-y-auto flex flex-col">
                     <ProjectPanel 
                         projects={projects} 
                         activeProjectId={activeProjectId} 
@@ -631,7 +637,7 @@ export default function MapExplorer({ user }: { user: User }) {
                     <Separator className="my-4" />
                     <h3 className="text-lg font-semibold mb-2 px-6">Objects in Active Project</h3>
                     <TooltipProvider>
-                      <ScrollArea className="flex-1 h-[calc(100%-220px)] px-6">
+                      <ScrollArea className="flex-1 h-px px-6">
                           <h4 className="text-md font-semibold mb-2 mt-4">Pins</h4>
                           {filteredPins.length > 0 ? (
                               <ul className="space-y-2">
@@ -685,6 +691,31 @@ export default function MapExplorer({ user }: { user: User }) {
                           ) : <p className="text-sm text-muted-foreground">No areas drawn yet.</p>}
                       </ScrollArea>
                     </TooltipProvider>
+                    <div className="mt-auto pt-4 px-6 pb-2 border-t">
+                      <div className="flex items-center justify-between">
+                         <p className="text-sm font-medium text-muted-foreground">Signed in as {user.email}</p>
+                         <div className="flex gap-2">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
+                                  <SettingsIcon className="h-5 w-5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Settings</p></TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={handleLogout}>
+                                  <LogOut className="h-5 w-5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Log Out</p></TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                         </div>
+                      </div>
+                    </div>
                 </CardContent>
               </Card>
             )}
@@ -784,21 +815,6 @@ export default function MapExplorer({ user }: { user: User }) {
                 </div>
               <TooltipProvider>
                 <div className="flex gap-2 justify-end">
-                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="default" 
-                        size="icon" 
-                        className="h-12 w-12 rounded-full shadow-lg"
-                        onClick={() => router.push('/settings')}
-                      >
-                        <SettingsIcon className="h-6 w-6" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Account & Settings</p>
-                    </TooltipContent>
-                  </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button 
