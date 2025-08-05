@@ -23,7 +23,7 @@ const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "24rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3.5rem"
+const SIDEBAR_WIDTH_ICON = "0rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContext = {
@@ -57,7 +57,7 @@ const SidebarProvider = React.forwardRef<
 >(
   (
     {
-      defaultOpen = true,
+      defaultOpen = false,
       open: openProp,
       onOpenChange: setOpenProp,
       className,
@@ -234,7 +234,7 @@ const Sidebar = React.forwardRef<
         />
         <div
           className={cn(
-            "duration-200 fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear md:flex",
+            "duration-200 fixed inset-y-0 z-20 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear md:flex",
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -293,6 +293,7 @@ const SidebarRail = React.forwardRef<
   React.ComponentProps<"button">
 >(({ className, ...props }, ref) => {
   const { toggleSidebar, state } = useSidebar()
+  const Arrow = state === 'collapsed' ? ChevronRight : ChevronLeft;
 
   return (
     <button
@@ -313,7 +314,9 @@ const SidebarRail = React.forwardRef<
       )}
       {...props}
     >
-      <div className="h-8 w-1.5 rounded-full bg-transparent group-hover:bg-primary transition-colors" />
+      <div className="h-8 w-1.5 rounded-full bg-transparent group-hover:bg-primary transition-colors flex items-center justify-center">
+         <Arrow className="h-5 w-5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
     </button>
   )
 })

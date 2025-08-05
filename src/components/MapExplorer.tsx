@@ -29,7 +29,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from "@/hooks/use-toast";
 import { geocodeAddress } from '@/ai/flows/geocode-address';
-import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy, Share2, Download, Tag, CornerUpLeft, Edit, PanelLeft } from 'lucide-react';
+import { Loader2, Crosshair, MapPin, Check, Menu, ZoomIn, ZoomOut, Plus, Eye, Pencil, Trash2, X, Search, FolderPlus, User as UserIcon, LogOut, Settings, Star, Copy, Share2, Download, Tag, CornerUpLeft, Edit, PanelLeft, ChevronLeft } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -79,7 +79,7 @@ import { cn } from '@/lib/utils';
 import type { ProjectData, PinData, LineData, AreaData, TagData } from '@/ai/flows/share-project';
 import { useSettings } from '@/hooks/use-settings';
 import { useMapView } from '@/hooks/use-map-view';
-import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarProvider, SidebarRail, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 
 const Map = dynamic(() => import('@/components/Map'), {
   ssr: false,
@@ -94,6 +94,138 @@ type Tag = TagData;
 
 type PendingAction = 'pin' | 'line' | 'area' | null;
 
+const MapActionButtons = () => {
+    const { state } = useSidebar();
+
+    const { 
+      handleAddPin,
+      handleDrawLine,
+      handleDrawArea,
+      isDrawingLine,
+      isDrawingArea,
+      editingGeometry,
+      handleCancelDrawing,
+      handleConfirmLine,
+      handleUndoAreaPoint,
+      handleAddAreaCorner,
+      handleConfirmArea,
+      handleEditGeometry,
+      pendingAreaPath,
+    } = useMapActions();
+
+    const isDrawing = isDrawingLine || isDrawingArea || editingGeometry;
+
+    return (
+        <>
+            <div className={cn("absolute z-[1001] flex gap-2 transition-all duration-300", 
+                state === 'expanded' ? 'top-4 left-1/2 -translate-x-1/2' : 'top-4 right-4 flex-col'
+            )}>
+              {!isDrawing && (
+                <TooltipProvider>
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                          <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleAddPin}>
+                              <MapPin className="h-6 w-6" />
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side={state === 'expanded' ? 'bottom' : 'left'}><p>Add a Pin</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                          <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawLine}>
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 stroke-current">
+                                  <path d="M4 20L20 4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  <circle cx="3.5" cy="20.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
+                                  <circle cx="20.5" cy="3.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
+                              </svg>
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side={state === 'expanded' ? 'bottom' : 'left'}><p>Draw a Line</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                           <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawArea}>
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6">
+                                  <path d="M2.57141 6.28571L8.2857 2.57143L20.5714 8.28571L14.8571 21.4286L2.57141 15.7143L2.57141 6.28571Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                              </svg>
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side={state === 'expanded' ? 'bottom' : 'left'}><p>Draw an Area</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+
+            {isDrawing && (
+                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2">
+                    {editingGeometry ? (
+                        <>
+                         <Button 
+                             className="h-12 rounded-md shadow-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                             onClick={() => handleEditGeometry(null)}
+                         >
+                             <X className="mr-2 h-5 w-5" /> Cancel
+                         </Button>
+                          <Button 
+                             className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
+                             onClick={() => (useMapActions as any).mapRef.current?.saveEditedGeometry()}
+                         >
+                             <Check className="mr-2 h-5 w-5" /> Save Shape
+                         </Button>
+                        </>
+                    ) : (
+                        <>
+                           <Button 
+                               className="h-12 rounded-md shadow-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                               onClick={handleCancelDrawing}
+                           >
+                               <X className="mr-2 h-5 w-5" /> Cancel
+                           </Button>
+
+                           {isDrawingLine && (
+                               <Button 
+                                   className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
+                                   onClick={handleConfirmLine}
+                               >
+                                   <Check className="mr-2 h-5 w-5" /> Confirm Line
+                               </Button>
+                           )}
+
+                           {isDrawingArea && (
+                               <>
+                                  <Button
+                                       className="h-12 rounded-md shadow-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                                       onClick={handleUndoAreaPoint}
+                                       disabled={pendingAreaPath.length === 0}
+                                  >
+                                      <CornerUpLeft className="mr-2 h-5 w-5"/> Undo Point
+                                  </Button>
+                                   <Button 
+                                       className="h-12 rounded-md shadow-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                                       onClick={handleAddAreaCorner}
+                                   >
+                                       <Plus className="mr-2 h-5 w-5" /> Add Corner
+                                   </Button>
+                                   <Button 
+                                       className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
+                                       onClick={handleConfirmArea}
+                                       disabled={pendingAreaPath.length < 3}
+                                   >
+                                       <Check className="mr-2 h-5 w-5" /> Finish Area
+                                   </Button>
+                               </>
+                           )}
+                        </>
+                    )}
+                 </div>
+             )}
+        </>
+    );
+};
+
+// This is a bit of a hack to share the action handlers with the MapActionButtons component
+// without prop-drilling or creating a new context provider.
+let useMapActions: any = {};
 
 export default function MapExplorer({ user }: { user: User }) {
   const [log, setLog] = useState<string[]>(['App Initialized']);
@@ -710,6 +842,23 @@ const handleToggleFill = async (id: string) => {
     }
   };
 
+  useMapActions = {
+    handleAddPin,
+    handleDrawLine,
+    handleDrawArea,
+    isDrawingLine,
+    isDrawingArea,
+    editingGeometry,
+    handleCancelDrawing,
+    handleConfirmLine,
+    handleUndoAreaPoint,
+    handleAddAreaCorner,
+    handleConfirmArea,
+    handleEditGeometry,
+    pendingAreaPath,
+    mapRef
+  };
+
 
   const handleSearch = async () => {
     if (!searchQuery) return;
@@ -1234,7 +1383,7 @@ if (dataLoading || !settings || !view) {
           <SidebarHeader>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">Map Explorer</h2>
-              <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
+              <SidebarTrigger/>
             </div>
           </SidebarHeader>
           <SidebarContent>
@@ -1422,6 +1571,40 @@ if (dataLoading || !settings || !view) {
                   </ScrollArea>
                 </TooltipProvider>
           </SidebarContent>
+           <SidebarFooter>
+                <div className="flex items-center gap-2 p-2 border-t">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="w-full justify-start gap-2">
+                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                                    <UserIcon className="h-5 w-5" />
+                                </div>
+                                <div className="text-left group-data-[collapsible=icon]:hidden">
+                                    <p className="font-semibold text-sm">{user.email}</p>
+                                </div>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56 mb-2" align="end">
+                            <DropdownMenuLabel className="font-normal">
+                                <div className="flex flex-col space-y-1">
+                                    <p className="text-sm font-medium leading-none">My Account</p>
+                                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                                </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => router.push('/settings')}>
+                                <Settings className="mr-2 h-4 w-4" />
+                                <span>Settings</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={handleLogout}>
+                                <LogOut className="mr-2 h-4 w-4" />
+                                <span>Log out</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+           </SidebarFooter>
         </Sidebar>
 
         <SidebarInset>
@@ -1492,155 +1675,27 @@ if (dataLoading || !settings || !view) {
                           {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                       </Button>
                     </div>
-                     <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleAddPin}>
-                                    <MapPin className="h-6 w-6" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Add a Pin</p></TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawLine}>
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 stroke-current">
-                                        <path d="M4 20L20 4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        <circle cx="3.5" cy="20.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
-                                        <circle cx="20.5" cy="3.5" r="2.5" fill="currentColor" stroke="currentColor" strokeWidth="1.5"/>
-                                    </svg>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Draw a Line</p></TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                 <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawArea}>
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6">
-                                        <path d="M2.57141 6.28571L8.2857 2.57143L20.5714 8.28571L14.8571 21.4286L2.57141 15.7143L2.57141 6.28571Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
-                                    </svg>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Draw an Area</p></TooltipContent>
-                        </Tooltip>
-                         <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="default" 
-                                size="icon" 
-                                className="h-12 w-12 rounded-full shadow-lg"
-                                onClick={handleLocateMe}
-                                disabled={isLocating && !currentLocation}
-                              >
-                                {isLocating && !currentLocation ? <Loader2 className="h-6 w-6 animate-spin" /> : <Crosshair className="h-6 w-6" />}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Center on Me</p>
-                            </TooltipContent>
-                          </Tooltip>
-                    </TooltipProvider>
                 </div>
 
-                {(isDrawingLine || isDrawingArea || editingGeometry) && (
-                     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2">
-                        {editingGeometry ? (
-                            <>
-                             <Button 
-                                 className="h-12 rounded-md shadow-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                 onClick={() => handleEditGeometry(null)}
-                             >
-                                 <X className="mr-2 h-5 w-5" /> Cancel
-                             </Button>
-                              <Button 
-                                 className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
-                                 onClick={() => (mapRef.current as any)?.saveEditedGeometry()}
-                             >
-                                 <Check className="mr-2 h-5 w-5" /> Save Shape
-                             </Button>
-                            </>
-                        ) : (
-                            <>
-                               <Button 
-                                   className="h-12 rounded-md shadow-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                   onClick={handleCancelDrawing}
-                               >
-                                   <X className="mr-2 h-5 w-5" /> Cancel
-                               </Button>
-
-                               {isDrawingLine && (
-                                   <Button 
-                                       className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
-                                       onClick={handleConfirmLine}
-                                   >
-                                       <Check className="mr-2 h-5 w-5" /> Confirm Line
-                                   </Button>
-                               )}
-
-                               {isDrawingArea && (
-                                   <>
-                                      <Button
-                                           className="h-12 rounded-md shadow-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                                           onClick={handleUndoAreaPoint}
-                                           disabled={pendingAreaPath.length === 0}
-                                      >
-                                          <CornerUpLeft className="mr-2 h-5 w-5"/> Undo Point
-                                      </Button>
-                                       <Button 
-                                           className="h-12 rounded-md shadow-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                                           onClick={handleAddAreaCorner}
-                                       >
-                                           <Plus className="mr-2 h-5 w-5" /> Add Corner
-                                       </Button>
-                                       <Button 
-                                           className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
-                                           onClick={handleConfirmArea}
-                                           disabled={pendingAreaPath.length < 3}
-                                       >
-                                           <Check className="mr-2 h-5 w-5" /> Finish Area
-                                       </Button>
-                                   </>
-                               )}
-                            </>
-                        )}
-                     </div>
-                 )}
-
+                <MapActionButtons />
 
                 <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end gap-2">
                      <TooltipProvider>
-                        <DropdownMenu>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-lg bg-card/90">
-                                        <UserIcon className="h-6 w-6"/>
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                </TooltipTrigger>
-                                <TooltipContent><p>Account</p></TooltipContent>
-                            </Tooltip>
-                            <DropdownMenuContent className="w-56" align="end">
-                                <DropdownMenuLabel className="font-normal">
-                                    <div className="flex flex-col space-y-1">
-                                        <p className="text-sm font-medium leading-none">My Account</p>
-                                        <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-                                    </div>
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => router.push('/settings')}>
-                                    <Settings className="mr-2 h-4 w-4" />
-                                    <span>Settings</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={handleLogout}>
-                                    <LogOut className="mr-2 h-4 w-4" />
-                                    <span>Log out</span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-
                       <div className="flex flex-col gap-1 bg-background/90 backdrop-blur-sm rounded-full shadow-lg border p-1">
+                         <Tooltip>
+                          <TooltipTrigger asChild>
+                           <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-10 w-10 rounded-full"
+                              onClick={handleLocateMe}
+                              disabled={isLocating && !currentLocation}
+                            >
+                              {isLocating && !currentLocation ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crosshair className="h-5 w-5" />}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left"><p>Center on Me</p></TooltipContent>
+                        </Tooltip>
                          <Tooltip>
                           <TooltipTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={handleZoomIn}>
