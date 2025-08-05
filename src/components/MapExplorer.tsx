@@ -236,31 +236,9 @@ export default function MapExplorer({ user }: { user: User }) {
   };
 
   const handleDrawLine = () => {
-    if (mapRef.current) {
-        setLineStartPoint(mapRef.current.getCenter());
-        setIsDrawingLine(true);
-        addLog('Started drawing line.');
-    }
-  };
-  
-  const handleConfirmLine = () => {
-    if (lineStartPoint && currentMapCenter) {
-      setPendingLine({ path: [lineStartPoint, currentMapCenter] });
-      setIsDrawingLine(false);
-      setLineStartPoint(null);
-    }
-  };
-
-  const handleDrawArea = () => {
-    setIsDrawingArea(true);
-    setPendingAreaPath([]);
-    addLog('Started drawing area.');
-  };
-  
-  const handleAddAreaCorner = () => {
-    if(currentMapCenter) {
-      setPendingAreaPath(prev => [...prev, currentMapCenter]);
-    }
+    setIsDrawingLine(true);
+    setLineStartPoint(null); // Reset start point
+    addLog('Started drawing line. Click on the map to set the start point.');
   };
   
   const handleConfirmArea = () => {
@@ -273,12 +251,18 @@ export default function MapExplorer({ user }: { user: User }) {
     setPendingAreaPath([]);
   };
 
+  const handleDrawArea = () => {
+    setIsDrawingArea(true);
+    setPendingAreaPath([]);
+    addLog('Started drawing area.');
+  };
+
   const handleMapClick = (e: LeafletMouseEvent) => {
     if (editingGeometry) return;
     if (isDrawingArea) {
       setPendingAreaPath(prev => [...prev, e.latlng]);
-    } else if(isDrawingLine) {
-        if(lineStartPoint) {
+    } else if (isDrawingLine) {
+        if (lineStartPoint) {
             setPendingLine({ path: [lineStartPoint, e.latlng] });
             setIsDrawingLine(false);
             setLineStartPoint(null);
@@ -808,6 +792,32 @@ export default function MapExplorer({ user }: { user: User }) {
                     </Button>
                 </div>
             )}
+            
+            {isDrawingLine && !lineStartPoint && (
+                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2 bg-card p-2 rounded-lg shadow-lg">
+                    <p className="text-sm p-2">Click on the map to set the start point of the line.</p>
+                     <Button 
+                        variant="ghost"
+                        className="h-10 rounded-md"
+                        onClick={() => setIsDrawingLine(false)}
+                    >
+                        <X className="mr-2 h-5 w-5" /> Cancel
+                    </Button>
+                </div>
+            )}
+            
+            {isDrawingLine && lineStartPoint && (
+                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2 bg-card p-2 rounded-lg shadow-lg">
+                    <p className="text-sm p-2">Click on the map to set the end point of the line.</p>
+                     <Button 
+                        variant="ghost"
+                        className="h-10 rounded-md"
+                        onClick={() => { setIsDrawingLine(false); setLineStartPoint(null); }}
+                    >
+                        <X className="mr-2 h-5 w-5" /> Cancel
+                    </Button>
+                </div>
+            )}
 
             {isDrawingArea && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2">
@@ -834,7 +844,7 @@ export default function MapExplorer({ user }: { user: User }) {
                         isSearchExpanded ? "w-full max-w-sm p-2" : "w-12 h-12"
                     )}
                     >
-                    {isSearchExpanded ? (
+                        {isSearchExpanded ? (
                         <>
                             <Search className="h-5 w-5 text-muted-foreground mx-2" />
                             <Input
@@ -1177,3 +1187,5 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
     </div>
   );
 }
+
+    
