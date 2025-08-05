@@ -539,37 +539,43 @@ export default function MapExplorer({ user }: { user: User }) {
 
 
   const handleDeleteProject = async (projectId: string) => {
-      if (!user) return;
-      addLog(`Attempting to delete project ${projectId}`);
-      try {
-          const batch = writeBatch(db);
+    if (!user) return;
+    addLog(`Attempting to delete project ${projectId}`);
+    try {
+        const batch = writeBatch(db);
 
-          const projectRef = doc(db, "projects", projectId);
-          batch.delete(projectRef);
+        // Delete the project document itself
+        const projectRef = doc(db, "projects", projectId);
+        batch.delete(projectRef);
 
-          const collectionsToDelete = ["pins", "lines", "areas", "tags"];
-          for (const colName of collectionsToDelete) {
-              const q = query(collection(db, colName), where("projectId", "==", projectId));
-              const snapshot = await getDocs(q);
-              snapshot.forEach(doc => batch.delete(doc.ref));
-          }
+        // Find and delete all associated items
+        const collectionsToDelete = ["pins", "lines", "areas", "tags"];
+        for (const colName of collectionsToDelete) {
+            const q = query(
+                collection(db, colName),
+                where("projectId", "==", projectId),
+                where("userId", "==", user.uid) // Ensure user can only delete their own items
+            );
+            const snapshot = await getDocs(q);
+            snapshot.forEach(doc => batch.delete(doc.ref));
+        }
 
-          await batch.commit();
+        await batch.commit();
 
-          addLog(`Successfully deleted project ${projectId} and its associated objects.`);
-          
-          if(activeProjectId === projectId) {
-              const remainingProjects = projects.filter(p => p.id !== projectId);
-              setActiveProjectId(remainingProjects.length > 0 ? remainingProjects[0].id : null);
-          }
-      } catch (error) {
-          addLog(`Error deleting project: ${(error as Error).message}`);
-          toast({
-              variant: "destructive",
-              title: "Delete Failed",
-              description: `Could not delete project. ${(error as Error).message}`,
-          });
-      }
+        addLog(`Successfully deleted project ${projectId} and its associated objects.`);
+        
+        if(activeProjectId === projectId) {
+            const remainingProjects = projects.filter(p => p.id !== projectId);
+            setActiveProjectId(remainingProjects.length > 0 ? remainingProjects[0].id : null);
+        }
+    } catch (error) {
+        addLog(`Error deleting project: ${(error as Error).message}`);
+        toast({
+            variant: "destructive",
+            title: "Delete Failed",
+            description: `Could not delete project. ${(error as Error).message}`,
+        });
+    }
   };
   
   const handleSetActiveProject = (projectId: string | null) => {
@@ -1310,5 +1316,7 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
     </div>
   );
 }
+
+    
 
     
