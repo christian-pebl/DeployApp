@@ -84,8 +84,6 @@ export default function MapExplorer({ user }: { user: User }) {
   const [isSearching, setIsSearching] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [editingGeometry, setEditingGeometry] = useState<Line | Area | null>(null);
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-
 
   const { toast } = useToast();
   const router = useRouter();
@@ -108,7 +106,6 @@ export default function MapExplorer({ user }: { user: User }) {
       onSnapshot(query(collection(db, 'projects'), where("userId", "==", user.uid)), snapshot => {
         const userProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         
-        // Sort projects by createdAt timestamp, newest first.
         userProjects.sort((a, b) => {
             const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
             const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
@@ -406,12 +403,7 @@ export default function MapExplorer({ user }: { user: User }) {
     setItemToEdit(item);
   }
 
-  const handleSearch = async (e?: React.MouseEvent<HTMLButtonElement>) => {
-    if (!isSearchExpanded) {
-        setIsSearchExpanded(true);
-        e?.preventDefault();
-        return;
-    }
+  const handleSearch = async () => {
     if (!searchQuery) return;
     addLog(`Searching for: ${searchQuery}`);
     setIsSearching(true);
@@ -768,7 +760,7 @@ export default function MapExplorer({ user }: { user: User }) {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button variant="default" size="icon" className="h-12 w-12 rounded-full shadow-lg" onClick={handleDrawArea} disabled={!!editingGeometry}>
-                                <svg width="24" height="24" viewBox="0 0 24" view-box="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6">
                                     <path d="M2.57141 6.28571L8.2857 2.57143L20.5714 8.28571L14.8571 21.4286L2.57141 15.7143L2.57141 6.28571Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
                                 </svg>
                             </Button>
@@ -814,43 +806,24 @@ export default function MapExplorer({ user }: { user: User }) {
                 </div>
             )}
 
-            <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2 items-end">
-                <div
-                    className={cn(
-                        "flex items-center bg-background/90 backdrop-blur-sm shadow-lg border rounded-full transition-all duration-300 ease-in-out",
-                        isSearchExpanded ? "w-full max-w-sm p-2" : "w-12 h-12 justify-center"
-                    )}
-                >
-                    <AnimatePresence>
-                        {isSearchExpanded && (
-                            <motion.div
-                                initial={{ opacity: 0, width: 0 }}
-                                animate={{ opacity: 1, width: 'auto' }}
-                                exit={{ opacity: 0, width: 0 }}
-                                className="flex-1"
-                            >
-                                <Input
-                                    type="text"
-                                    placeholder="Search address or label..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                    className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
-                                    autoFocus
-                                    onBlur={() => !searchQuery && setIsSearchExpanded(false)}
-                                />
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                    <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching} className={cn("rounded-full h-9 w-9 flex-shrink-0", isSearchExpanded && "bg-transparent")}>
+            <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+                <div className="flex w-full max-w-sm items-center space-x-2 bg-background/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
+                    <Input
+                        type="text"
+                        placeholder="Search address or label..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                        className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                    />
+                    <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching} className="h-9 w-9">
                         {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                     </Button>
                 </div>
-
-                <TooltipProvider>
-                  <div className="flex flex-col gap-2 items-end">
+              <TooltipProvider>
+                <div className="flex flex-col gap-2 items-end">
                     <div className="flex flex-col gap-1 bg-background/80 backdrop-blur-sm rounded-full shadow-lg border">
-                      <Tooltip>
+                       <Tooltip>
                         <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-10 w-10 rounded-t-full" onClick={handleZoomIn}>
                                 <ZoomIn className="h-5 w-5" />
@@ -867,7 +840,7 @@ export default function MapExplorer({ user }: { user: User }) {
                         <TooltipContent side="left"><p>Zoom Out</p></TooltipContent>
                       </Tooltip>
                     </div>
-                    <Tooltip>
+                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button 
                           variant="ghost" 
@@ -883,8 +856,8 @@ export default function MapExplorer({ user }: { user: User }) {
                         <p>Center on Me</p>
                       </TooltipContent>
                     </Tooltip>
-                  </div>
-                </TooltipProvider>
+                </div>
+              </TooltipProvider>
             </div>
 
             <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
@@ -1139,7 +1112,3 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
     </div>
   );
 }
-
-    
-
-    
