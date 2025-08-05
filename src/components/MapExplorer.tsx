@@ -16,6 +16,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -823,7 +834,7 @@ export default function MapExplorer({ user }: { user: User }) {
                         isSearchExpanded ? "w-full max-w-sm p-2" : "w-12 h-12"
                     )}
                     >
-                        {isSearchExpanded ? (
+                    {isSearchExpanded ? (
                         <>
                             <Search className="h-5 w-5 text-muted-foreground mx-2" />
                             <Input
@@ -998,7 +1009,7 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
         }
         
         const shareData = shareSnap.data();
-        const { projectId: originalProjectId } = shareData;
+        const { projectId: originalProjectId, userId: originalUserId } = shareData;
         addLog(`[IMPORT_CLIENT] 2. Found share document for project ${originalProjectId}`);
 
         const projectRef = doc(db, 'projects', originalProjectId);
@@ -1089,7 +1100,26 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={activeProjectId === project.id ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                   </Button>
                 </TooltipTrigger><TooltipContent><p>Set Active</p></TooltipContent></Tooltip>
-                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDeleteProject(project.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the
+                        "{project.name}" project and all of its associated pins, lines, areas, and tags.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => onDeleteProject(project.id)}>
+                        Continue
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </li>
           ))}

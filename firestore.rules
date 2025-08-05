@@ -1,52 +1,47 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check ownership
+  
+    // Helpers
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-
-    // Helper function to check if a project is shared
-    // It checks the /shares_by_project/{projectId} path
-    function isProjectShared(projectId) {
+    
+    function isProjectOwner(projectId) {
+      return isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.userId);
+    }
+    
+    function canImportProject(projectId) {
       return exists(/databases/$(database)/documents/shares_by_project/$(projectId));
     }
     
     // Project documents
     match /projects/{projectId} {
-      allow read: if isOwner(resource.data.userId) || isProjectShared(projectId);
+      allow read: if isOwner(resource.data.userId) || canImportProject(projectId);
       allow create: if isOwner(request.resource.data.userId);
-      // Allow update and delete if the user is the owner
       allow update, delete: if isOwner(resource.data.userId);
     }
-
-    // Pins, Lines, Areas, Tags collections
-    match /{collection}/{docId} {
-      // Allow read if the user is the owner OR if the project it belongs to is shared
-      allow read: if isOwner(resource.data.userId) || isProjectShared(resource.data.projectId);
-      // Allow write (create, update, delete) only if the user is the owner
-      allow write: if isOwner(request.auth.uid);
-    }
     
-    // Share documents are created by a user for their own project.
+    // Share documents
     match /shares/{shareId} {
       allow read: if request.auth != null;
-      // Allow creation if the user owns the project they are trying to share
-      allow create: if isOwner(get(/databases/$(database)/documents/projects/$(request.resource.data.projectId)).data.userId);
-      // Shares are immutable and cannot be changed or deleted by clients for safety
+      allow create: if isProjectOwner(request.resource.data.projectId);
       allow update, delete: if false; 
     }
     
-    // This collection is a simple map to find a shareId from a projectId
     match /shares_by_project/{projectId} {
-      allow read: if true; // Anyone can check if a project has a share document
-      // Creation is protected by the same rule as the /shares document
-      allow create: if isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.userId);
-       // Shares are immutable
-      allow update, delete: if false;
+       allow read: if false; // Should not be read directly
+       allow create: if isProjectOwner(projectId);
+       allow update, delete: if isProjectOwner(projectId);
+    }
+    
+    // Data documents (Pins, Lines, Areas, Tags)
+    match /{collection}/{docId} {
+      allow read: if isOwner(resource.data.userId) || canImportProject(resource.data.projectId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
     }
   }
 }
