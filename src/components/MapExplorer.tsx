@@ -102,8 +102,16 @@ export default function MapExplorer({ user }: { user: User }) {
     const dataQuery = (collectionName: string) => query(collection(db, collectionName), where("userId", "==", user.uid));
 
     const unsubscribers = [
-      onSnapshot(query(collection(db, 'projects'), where("userId", "==", user.uid), orderBy("createdAt", "desc")), snapshot => {
+      onSnapshot(query(collection(db, 'projects'), where("userId", "==", user.uid)), snapshot => {
         const userProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        
+        // Sort projects by createdAt timestamp, newest first.
+        userProjects.sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+            return dateB.getTime() - dateA.getTime();
+        });
+        
         setProjects(userProjects);
         addLog(`Loaded ${userProjects.length} projects.`);
         
