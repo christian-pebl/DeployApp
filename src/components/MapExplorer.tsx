@@ -613,7 +613,7 @@ export default function MapExplorer({ user }: { user: User }) {
               <Card className="absolute top-4 left-4 z-[1001] w-[350px] sm:w-[400px] h-[calc(100%-2rem)] flex flex-col bg-card/90 backdrop-blur-sm">
                 <CardHeader>
                   <div className="flex justify-between items-center">
-                    <CardTitle>Map Objects</CardTitle>
+                    <CardTitle>Project Menu</CardTitle>
                       <Button variant="ghost" size="icon" onClick={() => setIsObjectListOpen(false)} className="h-8 w-8">
                           <X className="h-4 w-4" />
                       </Button>
@@ -1055,53 +1055,55 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
           ))}
         </ul>
       </TooltipProvider>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button className="w-full">Create New Project</Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>Give your new project a name and an optional description.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div>
-              <Label htmlFor="project-name">Project Name</Label>
-              <Input id="project-name" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} required />
-            </div>
-            <div>
-              <Label htmlFor="project-desc">Description</Label>
-              <Input id="project-desc" value={newProjectDesc} onChange={e => setNewProjectDesc(e.target.value)} />
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                 <Button type="submit">Create Project</Button>
-              </DialogClose>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline" className="w-full">Import Project</Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Import Shared Project</DialogTitle>
-            <DialogDescription>Enter a share code to import a project.</DialogDescription>
-          </DialogHeader>
-           <div className="space-y-4">
-              <Label htmlFor="share-code">Share Code</Label>
-              <Input id="share-code" value={shareCode} onChange={e => setShareCode(e.target.value)} />
-           </div>
-           <DialogFooter>
-              <Button onClick={importSharedProject} disabled={isImporting}>
-                {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                Import
-              </Button>
-           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <div className="flex gap-2">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="flex-1">Create New</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Project</DialogTitle>
+              <DialogDescription>Give your new project a name and an optional description.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <Label htmlFor="project-name">Project Name</Label>
+                <Input id="project-name" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} required />
+              </div>
+              <div>
+                <Label htmlFor="project-desc">Description</Label>
+                <Input id="project-desc" value={newProjectDesc} onChange={e => setNewProjectDesc(e.target.value)} />
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                   <Button type="submit">Create Project</Button>
+                </DialogClose>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="flex-1">Import</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Import Shared Project</DialogTitle>
+              <DialogDescription>Enter a share code to import a project.</DialogDescription>
+            </DialogHeader>
+             <div className="space-y-4">
+                <Label htmlFor="share-code">Share Code</Label>
+                <Input id="share-code" value={shareCode} onChange={e => setShareCode(e.target.value)} />
+             </div>
+             <DialogFooter>
+                <Button onClick={importSharedProject} disabled={isImporting}>
+                  {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                  Import
+                </Button>
+             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 }
