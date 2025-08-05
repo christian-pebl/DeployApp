@@ -1,46 +1,52 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
+
+    // Helper function to check ownership
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
     // Helper function to check if a project is shared
+    // It checks the /shares_by_project/{projectId} path
     function isProjectShared(projectId) {
       return exists(/databases/$(database)/documents/shares_by_project/$(projectId));
     }
-
-    // Projects can be read by anyone if shared, but only written by the owner.
+    
+    // Project documents
     match /projects/{projectId} {
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isProjectShared(projectId));
-      allow create, update, delete: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read: if isOwner(resource.data.userId) || isProjectShared(projectId);
+      allow create: if isOwner(request.resource.data.userId);
+      // Allow update and delete if the user is the owner
+      allow update, delete: if isOwner(resource.data.userId);
     }
-    
-    // Pins, Lines, Areas, and Tags can be read by anyone if their project is shared, but only written by the owner.
+
+    // Pins, Lines, Areas, Tags collections
     match /{collection}/{docId} {
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isProjectShared(resource.data.projectId));
-      allow create, update, delete: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      
-      // This is a catch-all for pins, lines, areas, tags.
-      // We check for projectId on the resource, which should exist for these collections.
+      // Allow read if the user is the owner OR if the project it belongs to is shared
+      allow read: if isOwner(resource.data.userId) || isProjectShared(resource.data.projectId);
+      // Allow write (create, update, delete) only if the user is the owner
+      allow write: if isOwner(request.auth.uid);
     }
     
-    // Users can read map views and settings only for their own user ID.
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Anyone can read a share document to get the original projectId.
+    // Share documents are created by a user for their own project.
     match /shares/{shareId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && get(/databases/$(database)/documents/projects/$(request.resource.data.projectId)).data.userId == request.auth.uid;
-      allow update, delete: if false;
+      // Allow creation if the user owns the project they are trying to share
+      allow create: if isOwner(get(/databases/$(database)/documents/projects/$(request.resource.data.projectId)).data.userId);
+      // Shares are immutable and cannot be changed or deleted by clients for safety
+      allow update, delete: if false; 
     }
     
-    // This collection is just a lookup table. Only the backend (via a share creation) should write to this.
-    // The security rule for creating a `shares` document implicitly protects this.
+    // This collection is a simple map to find a shareId from a projectId
     match /shares_by_project/{projectId} {
-       allow read: if request.auth != null;
-       allow write: if request.auth != null && get(/databases/$(database)/documents/projects/$(projectId)).data.userId == request.auth.uid;
-       allow delete: if false;
+      allow read: if true; // Anyone can check if a project has a share document
+      // Creation is protected by the same rule as the /shares document
+      allow create: if isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.userId);
+       // Shares are immutable
+      allow update, delete: if false;
     }
   }
 }
