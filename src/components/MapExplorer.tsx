@@ -632,6 +632,7 @@ export default function MapExplorer({ user }: { user: User }) {
                         tags={tags}
                         user={user}
                         addLog={addLog}
+                        toast={toast}
                     />
 
                     <Separator className="my-4" />
@@ -863,7 +864,7 @@ export default function MapExplorer({ user }: { user: User }) {
                           onClick={handleShowLog}
                           className="h-12 w-12 rounded-full shadow-lg bg-card"
                       >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
                       </Button>
                   </TooltipTrigger>
                   <TooltipContent side="left">
@@ -879,18 +880,15 @@ export default function MapExplorer({ user }: { user: User }) {
 }
 
 
-function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateProject, onDeleteProject, pins, lines, areas, tags, user, addLog }: { 
+function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateProject, onDeleteProject, user, addLog, toast }: { 
   projects: Project[], 
   activeProjectId: string | null,
   onSetActiveProject: (id: string | null) => void,
   onCreateProject: (name: string, description: string) => void,
   onDeleteProject: (id: string) => void,
-  pins: Pin[],
-  lines: Line[],
-  areas: Area[],
-  tags: Tag[],
   user: User,
   addLog: (log: string) => void,
+  toast: (options: { title: string; description: string; variant?: "default" | "destructive" | null | undefined; }) => void,
 }) {
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
