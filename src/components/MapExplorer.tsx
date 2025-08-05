@@ -21,7 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useMapView, type MapView } from '@/hooks/use-map-view';
 import { useSettings } from '@/hooks/use-settings';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot, orderBy, limit } from "firebase/firestore";
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { db, auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+
 
 const Map = dynamic(() => import('@/components/Map'), {
   ssr: false,
@@ -114,6 +115,7 @@ export default function MapExplorer({ user }: { user: User }) {
       onSnapshot(query(collection(db, 'projects'), where("userId", "==", user.uid)), snapshot => {
         const userProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         
+        // This sorting is now done on the client
         userProjects.sort((a, b) => {
             const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
             const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
@@ -494,7 +496,7 @@ export default function MapExplorer({ user }: { user: User }) {
           for (const colName of collectionsToDelete) {
               const q = query(collection(db, colName), where("projectId", "==", projectId), where("userId", "==", user.uid));
               const snapshot = await getDocs(q);
-              snapshot.forEach(originalDoc => batch.delete(originalDoc.ref));
+              snapshot.forEach(doc => batch.delete(doc.ref));
           }
 
           await batch.commit();
@@ -989,14 +991,14 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
     setIsImporting(true);
     addLog(`[IMPORT_CLIENT] 1. Starting import for code: ${shareCode}`);
     try {
-        const shareSnap = await getDocs(query(collection(db, 'shares'), where('__name__', '==', shareCode.trim()), limit(1)));
+        const shareSnap = await getDoc(doc(db, 'shares', shareCode.trim()));
 
-        if (shareSnap.empty) {
+        if (!shareSnap.exists()) {
             throw new Error("Share code not found.");
         }
         
-        const shareData = shareSnap.docs[0].data();
-        const { projectId: originalProjectId, userId: originalUserId } = shareData;
+        const shareData = shareSnap.data();
+        const { projectId: originalProjectId } = shareData;
         addLog(`[IMPORT_CLIENT] 2. Found share document for project ${originalProjectId}`);
 
         const projectRef = doc(db, 'projects', originalProjectId);
@@ -1027,7 +1029,7 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
         let totalItemsCopied = 0;
 
         for (const colName of collectionsToCopy) {
-            const q = query(collection(db, colName), where("projectId", "==", originalProjectId), where("userId", "==", originalUserId));
+            const q = query(collection(db, colName), where("projectId", "==", originalProjectId));
             const snapshot = await getDocs(q);
             for (const originalDoc of snapshot.docs) {
                 const newDocId = doc(collection(db, colName)).id;
