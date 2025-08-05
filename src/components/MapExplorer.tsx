@@ -16,17 +16,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -275,15 +264,10 @@ export default function MapExplorer({ user }: { user: User }) {
   };
 
   const handleMapClick = (e: LeafletMouseEvent) => {
-    if (isDrawingLine) {
-        if (!lineStartPoint) {
-            setLineStartPoint(e.latlng);
-        } else {
-            setPendingLine({ path: [lineStartPoint, e.latlng] });
-            setIsDrawingLine(false);
-            setLineStartPoint(null);
-        }
-    } else if (isDrawingArea) {
+    if (isObjectListOpen) {
+      setIsObjectListOpen(false);
+    }
+    if (isDrawingArea) {
       setPendingAreaPath(prev => [...prev, e.latlng]);
     }
   };
@@ -364,8 +348,8 @@ export default function MapExplorer({ user }: { user: User }) {
     setItemToEdit(null);
   };
 
-  const handleDeletePin = async (id: string) => {
-    await deleteFromFirestore('pins', id);
+  const handleDeletePin = (id: string) => {
+    deleteFromFirestore('pins', id);
     setItemToEdit(null);
   };
   
@@ -375,8 +359,8 @@ export default function MapExplorer({ user }: { user: User }) {
     setItemToEdit(null);
   };
   
-  const handleDeleteLine = async (id: string) => {
-    await deleteFromFirestore('lines', id);
+  const handleDeleteLine = (id: string) => {
+    deleteFromFirestore('lines', id);
     setItemToEdit(null);
   };
 
@@ -386,8 +370,8 @@ export default function MapExplorer({ user }: { user: User }) {
     setItemToEdit(null);
   };
 
-  const handleDeleteArea = async (id: string) => {
-    await deleteFromFirestore('areas', id);
+  const handleDeleteArea = (id: string) => {
+    deleteFromFirestore('areas', id);
     setItemToEdit(null);
   };
 
@@ -728,7 +712,7 @@ export default function MapExplorer({ user }: { user: User }) {
                                           <div className="flex items-center gap-1">
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(pin)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(pin)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePin(pin.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePin(pin.id)}><Trash2 className="h-4 w-4"/></Button>
                                           </div>
                                       </li>
                                   ))}
@@ -746,7 +730,7 @@ export default function MapExplorer({ user }: { user: User }) {
                                           <div className="flex items-center gap-1">
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(line)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(line)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(line.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(line.id)}><Trash2 className="h-4 w-4"/></Button>
                                           </div>
                                       </li>
                                   ))}
@@ -764,7 +748,7 @@ export default function MapExplorer({ user }: { user: User }) {
                                           <div className="flex items-center gap-1">
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(area)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(area)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteArea(area.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteArea(area.id)}><Trash2 className="h-4 w-4"/></Button>
                                           </div>
                                       </li>
                                   ))}
@@ -1185,26 +1169,7 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={activeProjectId === project.id ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                   </Button>
                 </TooltipTrigger><TooltipContent><p>Set Active</p></TooltipContent></Tooltip>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the
-                        "{project.name}" project and all of its associated pins, lines, areas, and tags.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => onDeleteProject(project.id)}>
-                        Continue
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDeleteProject(project.id)}><Trash2 className="h-4 w-4"/></Button>
               </div>
             </li>
           ))}
@@ -1266,3 +1231,4 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
     
 
     
+
