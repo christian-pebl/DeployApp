@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -681,7 +682,7 @@ const Map = ({
                 fillOpacity: 1
             };
 
-            const updatePreview = (e?: LeafletMouseEvent) => {
+            const updatePreview = () => {
                 cleanupLayers();
                 
                 if (previewAreaPointsRef.current) {
@@ -701,8 +702,8 @@ const Map = ({
     
                 const lastPoint = pendingAreaPath[pendingAreaPath.length - 1];
                 if (lastPoint) {
-                    const targetPoint = e ? e.latlng : map.getCenter();
-                    const linePath = [lastPoint, targetPoint];
+                    const center = map.getCenter();
+                    const linePath = [lastPoint, center];
                     previewAreaLineRef.current = L.polyline(linePath, {
                         color: `hsl(${secondaryFgColor})`,
                         weight: 2,
@@ -711,14 +712,11 @@ const Map = ({
                 }
             };
     
-            const moveHandler = () => updatePreview();
-            map.on('mousemove', updatePreview);
-            map.on('move', moveHandler);
+            map.on('move', updatePreview);
             updatePreview();
     
             return () => {
-                map.off('mousemove', updatePreview);
-                map.off('move', moveHandler);
+                map.off('move', updatePreview);
                 cleanupLayers();
             };
         } else {

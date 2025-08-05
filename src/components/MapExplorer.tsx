@@ -256,9 +256,15 @@ export default function MapExplorer({ user }: { user: User }) {
     setPendingAreaPath([]);
     addLog('Started drawing area.');
   };
+  
+  const handleAddAreaCorner = () => {
+    if(currentMapCenter) {
+      setPendingAreaPath(prev => [...prev, currentMapCenter]);
+    }
+  };
 
   const handleConfirmArea = () => {
-    if (pendingAreaPath.length < 3) {
+    if(pendingAreaPath.length < 3) {
         toast({ variant: "destructive", title: "Area Incomplete", description: "An area must have at least 3 points."});
         return;
     }
@@ -269,9 +275,6 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handleMapClick = (e: LeafletMouseEvent) => {
     if (editingGeometry) return;
-    if (isDrawingArea) {
-      setPendingAreaPath(prev => [...prev, e.latlng]);
-    }
   };
 
   const writeToFirestore = async (collectionName: string, data: any) => {
@@ -664,7 +667,25 @@ export default function MapExplorer({ user }: { user: User }) {
                                           <div className="flex items-center gap-1">
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(pin)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(pin)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePin(pin.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                              <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                  <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete Pin?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                      This will permanently delete the pin "{pin.label}". This action cannot be undone.
+                                                    </AlertDialogDescription>
+                                                  </AlertDialogHeader>
+                                                  <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeletePin(pin.id)}>
+                                                      Delete
+                                                    </AlertDialogAction>
+                                                  </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                              </AlertDialog>
                                           </div>
                                       </li>
                                   ))}
@@ -682,7 +703,25 @@ export default function MapExplorer({ user }: { user: User }) {
                                           <div className="flex items-center gap-1">
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(line)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(line)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(line.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                              <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                  <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete Line?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                      This will permanently delete the line "{line.label}". This action cannot be undone.
+                                                    </AlertDialogDescription>
+                                                  </AlertDialogHeader>
+                                                  <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteLine(line.id)}>
+                                                      Delete
+                                                    </AlertDialogAction>
+                                                  </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                              </AlertDialog>
                                           </div>
                                       </li>
                                   ))}
@@ -700,7 +739,25 @@ export default function MapExplorer({ user }: { user: User }) {
                                           <div className="flex items-center gap-1">
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewItem(area)}><Eye className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>View</p></TooltipContent></Tooltip>
                                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditItem(area)}><Pencil className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
-                                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteArea(area.id)}><Trash2 className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                                               <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                  <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete Area?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                      This will permanently delete the area "{area.label}". This action cannot be undone.
+                                                    </AlertDialogDescription>
+                                                  </AlertDialogHeader>
+                                                  <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteArea(area.id)}>
+                                                      Delete
+                                                    </AlertDialogAction>
+                                                  </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                              </AlertDialog>
                                           </div>
                                       </li>
                                   ))}
@@ -799,8 +856,8 @@ export default function MapExplorer({ user }: { user: User }) {
             )}
 
             {isDrawingLine && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2 bg-card p-2 rounded-lg shadow-lg">
-                    <p className="text-sm p-2">Move map to position the end of the line</p>
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2 bg-card p-2 rounded-lg shadow-lg items-center">
+                    <p className="text-sm px-2">Move map to position the end of the line</p>
                     <Button 
                         className="h-10 rounded-md"
                         onClick={handleConfirmLine}
@@ -819,19 +876,27 @@ export default function MapExplorer({ user }: { user: User }) {
             )}
 
             {isDrawingArea && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2">
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex gap-2 bg-card p-2 rounded-lg shadow-lg items-center">
                     <Button 
-                        className="h-12 rounded-md shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
+                        className="h-10 rounded-md"
+                        onClick={handleAddAreaCorner}
+                    >
+                        <Plus className="mr-2 h-5 w-5" /> Add Corner
+                    </Button>
+                    <Button 
+                        className="h-10 rounded-md"
                         onClick={handleConfirmArea}
+                        disabled={pendingAreaPath.length < 3}
                     >
                         <Check className="mr-2 h-5 w-5" /> Finish Area
                     </Button>
                      <Button 
                         variant="ghost"
-                        className="h-12 rounded-md shadow-lg bg-card"
+                        size="icon"
+                        className="h-10 w-10"
                         onClick={() => { setIsDrawingArea(false); setPendingAreaPath([]); }}
                     >
-                        <X className="mr-2 h-5 w-5" /> Cancel
+                        <X className="h-5 w-5" />
                     </Button>
                 </div>
             )}
@@ -947,6 +1012,10 @@ function ProjectPanel({ projects, activeProjectId, onSetActiveProject, onCreateP
   onSetActiveProject: (id: string | null) => void,
   onCreateProject: (name: string, description: string) => void,
   onDeleteProject: (id: string) => void,
+  pins: Pin[],
+  lines: Line[],
+  areas: Area[],
+  tags: Tag[],
   user: User,
   addLog: (log: string) => void,
   toast: (options: { title: string; description: string; variant?: "default" | "destructive" | null | undefined; }) => void,
