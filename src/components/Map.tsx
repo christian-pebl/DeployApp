@@ -84,6 +84,16 @@ const createCustomIcon = (color: string) => {
     return L.divIcon(iconOptions as any);
 };
 
+const createDraggableVertexIcon = () => {
+    const iconHtml = `<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" style="background: hsl(var(--primary)); border-radius: 50%; border: 2px solid hsl(var(--primary-foreground)); box-shadow: 0 0 5px rgba(0,0,0,0.5);"><circle cx="8" cy="8" r="8" fill="transparent"/></svg>`;
+    return L.divIcon({
+        html: iconHtml,
+        className: 'bg-transparent border-0',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+    });
+};
+
 // Shoelace formula implementation for area calculation
 function calculatePolygonArea(path: { lat: number; lng: number }[]): number {
     if (path.length < 3) {
@@ -135,22 +145,16 @@ const Map = ({
     const previewAreaPointsRef = useRef<LayerGroup | null>(null);
     const distanceTooltipRef = useRef<LeafletTooltip | null>(null);
     const editingLayerRef = useRef<LayerGroup | null>(null);
+    const [editedPath, setEditedPath] = useState<{lat: number, lng: number}[] | null>(null);
 
     // Expose a method to save geometry via the mapRef
     useEffect(() => {
       if (mapRef.current) {
         (mapRef.current as any).getEditedPath = () => {
-          if (editingGeometry && editingLayerRef.current) {
-             const layer = editingLayerRef.current.getLayers()[0] as any;
-             if(layer) {
-                const latlngs = layer.getLatLngs();
-                return Array.isArray(latlngs) ? latlngs.map(p => ({ lat: p.lat, lng: p.lng })) : [];
-             }
-          }
-          return [];
+           return editedPath;
         };
       }
-    }, [mapRef, editingGeometry]);
+    }, [mapRef, editedPath]);
 
 
     const showEditPopup = (item: Pin | Line | Area) => {
@@ -602,7 +606,7 @@ const Map = ({
                 previewLineRef.current = null;
             }
             if (distanceTooltipRef.current) {
-                distanceTooltipRef.current.remove();
+                map.removeLayer(distanceTooltipRef.current);
                 distanceTooltipRef.current = null;
             }
         };
@@ -731,9 +735,11 @@ const Map = ({
         if (!map || !layer) return;
 
         layer.clearLayers();
-
+        
         if (editingGeometry) {
             let currentPath = editingGeometry.path.map(p => L.latLng(p.lat, p.lng));
+            setEditedPath(editingGeometry.path); // Initialize edited path state
+
             const isArea = 'fillVisible' in editingGeometry;
 
             const updateShape = () => {
@@ -747,26 +753,24 @@ const Map = ({
                 ? L.polygon(currentPath, { color: 'hsl(var(--primary))', weight: 3, dashArray: '5, 5' }).addTo(layer)
                 : L.polyline(currentPath, { color: 'hsl(var(--primary))', weight: 3, dashArray: '5, 5' }).addTo(layer);
 
-            (shape as any)._path = currentPath;
+            const vertexIcon = createDraggableVertexIcon();
 
             const markers = currentPath.map((latlng, index) => {
-                const marker = L.circleMarker(latlng, {
-                    radius: 8,
-                    color: 'hsl(var(--primary-foreground))',
-                    fillColor: 'hsl(var(--primary))',
-                    fillOpacity: 1,
-                    weight: 2,
+                const marker = L.marker(latlng, {
+                    icon: vertexIcon,
+                    draggable: true,
                 }).addTo(layer);
-
-                (marker as any)._index = index;
-                (marker as any).dragging.enable();
-
+            
                 marker.on('drag', (e) => {
-                    const newLatLng = (e.target as Marker).getLatLng();
-                    currentPath[index] = newLatLng;
+                    currentPath[index] = (e.target as Marker).getLatLng();
                     updateShape();
                 });
-                
+            
+                marker.on('dragend', () => {
+                    const newPath = currentPath.map(p => ({ lat: p.lat, lng: p.lng }));
+                    setEditedPath(newPath); // Update the state for saving
+                });
+            
                 return marker;
             });
         }
