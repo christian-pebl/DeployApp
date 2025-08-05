@@ -111,7 +111,7 @@ const MapActionButtons = () => {
       handleConfirmArea,
       handleEditGeometry,
       pendingAreaPath,
-    } = useMapActions();
+    } = useMapActions;
 
     const isDrawing = isDrawingLine || isDrawingArea || editingGeometry;
 
@@ -832,7 +832,7 @@ const handleToggleFill = async (id: string) => {
         if ('fillVisible' in item) {
             setAreas(prev => prev.map(a => a.id === itemId ? { ...a, path: newPath } : a));
         } else {
-            setLines(prev => prev.map(l => l.id === itemId ? { ...l, path: newPath } : l));
+            setLines(prev => prev.map(l => l.id === itemId ? { ...l, path: newPath } : a));
         }
         toast({ title: 'Shape Updated' });
     } catch (e: any) {
