@@ -123,26 +123,25 @@ export default function MapExplorer({ user }: { user: User }) {
     const dataQuery = (collectionName: string) => query(collection(db, collectionName), where("userId", "==", user.uid));
 
     const unsubscribers = [
-      onSnapshot(query(collection(db, 'projects'), where("userId", "==", user.uid)), snapshot => {
-        const userProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-        
-        // This sorting is now done on the client
-        userProjects.sort((a, b) => {
-            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
-            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-            return dateB.getTime() - dateA.getTime();
-        });
-        
-        setProjects(userProjects);
-        addLog(`Loaded ${userProjects.length} projects.`);
-        
-        const lastActiveId = localStorage.getItem(`last-active-project-${user.uid}`);
-        if(lastActiveId && userProjects.some(p => p.id === lastActiveId)) {
-          setActiveProjectId(lastActiveId);
-        } else if (userProjects.length > 0) {
-          setActiveProjectId(userProjects[0].id);
-        }
-      }),
+        onSnapshot(query(collection(db, 'projects'), where("userId", "==", user.uid)), snapshot => {
+            const userProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+            
+            userProjects.sort((a, b) => {
+                const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+                const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+                return dateB.getTime() - dateA.getTime();
+            });
+            
+            setProjects(userProjects);
+            addLog(`Loaded ${userProjects.length} projects.`);
+            
+            const lastActiveId = localStorage.getItem(`last-active-project-${user.uid}`);
+            if(lastActiveId && userProjects.some(p => p.id === lastActiveId)) {
+              setActiveProjectId(lastActiveId);
+            } else if (userProjects.length > 0) {
+              setActiveProjectId(userProjects[0].id);
+            }
+        }),
       onSnapshot(dataQuery("pins"), snapshot => {
         const userPins = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pin));
         setPins(userPins);
@@ -236,10 +235,11 @@ export default function MapExplorer({ user }: { user: User }) {
   };
 
   const handleDrawLine = () => {
-    if (currentMapCenter) {
-      setLineStartPoint(currentMapCenter);
-      setIsDrawingLine(true);
-      addLog('Started drawing line from center.');
+    if (mapRef.current) {
+        const center = mapRef.current.getCenter();
+        setLineStartPoint(center);
+        setIsDrawingLine(true);
+        addLog('Started drawing line from center.');
     }
   };
   
@@ -274,8 +274,19 @@ export default function MapExplorer({ user }: { user: User }) {
   };
 
   const handleMapClick = (e: LeafletMouseEvent) => {
-    if (editingGeometry) return;
+    if (isDrawingLine) {
+        if (!lineStartPoint) {
+            setLineStartPoint(e.latlng);
+        } else {
+            setPendingLine({ path: [lineStartPoint, e.latlng] });
+            setIsDrawingLine(false);
+            setLineStartPoint(null);
+        }
+    } else if (isDrawingArea) {
+      setPendingAreaPath(prev => [...prev, e.latlng]);
+    }
   };
+
 
   const writeToFirestore = async (collectionName: string, data: any) => {
     try {
@@ -470,18 +481,61 @@ export default function MapExplorer({ user }: { user: User }) {
 
   const handleCreateProject = async (name: string, description: string) => {
     if (!user) return;
-    const id = doc(collection(db, "projects")).id;
+    const newProjectId = doc(collection(db, "projects")).id;
     const newProject: Project = {
-      id,
-      name,
-      description,
-      userId: user.uid,
-      createdAt: serverTimestamp(),
+        id: newProjectId,
+        name,
+        description,
+        userId: user.uid,
+        createdAt: serverTimestamp(),
     };
-    await writeToFirestore("projects", newProject);
-    setActiveProjectId(id);
-    addLog(`Created new project: ${name}`);
-  };
+
+    const unallocatedPins = pins.filter(p => !p.projectId);
+    const unallocatedLines = lines.filter(l => !l.projectId);
+    const unallocatedAreas = areas.filter(a => !a.projectId);
+    const itemsToAllocate = unallocatedPins.length + unallocatedLines.length + unallocatedAreas.length;
+
+    try {
+        const batch = writeBatch(db);
+
+        // 1. Create the new project
+        const projectRef = doc(db, "projects", newProjectId);
+        batch.set(projectRef, newProject);
+
+        // 2. Allocate existing shapes to this new project
+        unallocatedPins.forEach(pin => {
+            const pinRef = doc(db, "pins", pin.id);
+            batch.update(pinRef, { projectId: newProjectId });
+        });
+        unallocatedLines.forEach(line => {
+            const lineRef = doc(db, "lines", line.id);
+            batch.update(lineRef, { projectId: newProjectId });
+        });
+        unallocatedAreas.forEach(area => {
+            const areaRef = doc(db, "areas", area.id);
+            batch.update(areaRef, { projectId: newProjectId });
+        });
+
+        await batch.commit();
+
+        setActiveProjectId(newProjectId);
+        addLog(`Created new project: ${name}. Allocated ${itemsToAllocate} items.`);
+        if (itemsToAllocate > 0) {
+            toast({
+                title: "Project Created",
+                description: `Successfully created "${name}" and assigned ${itemsToAllocate} unallocated item(s) to it.`,
+            });
+        }
+    } catch (error) {
+        addLog(`Error creating project and allocating items: ${(error as Error).message}`);
+        toast({
+            variant: "destructive",
+            title: "Creation Failed",
+            description: `Could not create project. ${(error as Error).message}`,
+        });
+    }
+};
+
 
   const handleDeleteProject = async (projectId: string) => {
       if (!user) return;
@@ -560,9 +614,9 @@ export default function MapExplorer({ user }: { user: User }) {
     router.push('/login');
   };
 
-  const filteredPins = pins.filter(p => p.projectId === activeProjectId);
-  const filteredLines = lines.filter(l => l.projectId === activeProjectId);
-  const filteredAreas = areas.filter(a => a.projectId === activeProjectId);
+  const filteredPins = pins.filter(p => p.projectId === activeProjectId || (!p.projectId && !activeProjectId));
+  const filteredLines = lines.filter(l => l.projectId === activeProjectId || (!l.projectId && !activeProjectId));
+  const filteredAreas = areas.filter(a => a.projectId === activeProjectId || (!a.projectId && !activeProjectId));
 
   if (!view || !settings) {
     return (
