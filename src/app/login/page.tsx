@@ -1,90 +1,75 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { useAuth, signInWithGoogle } from '@/hooks/use-auth'
+import { Loader2 } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
-  const { toast } = useToast();
+  const router = useRouter()
+  const { user, loading } = useAuth()
+  const [signingIn, setSigningIn] = useState(false)
+  const { toast } = useToast()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  useEffect(() => {
+    if (!loading && user) {
+      router.push('/')
+    }
+  }, [user, loading, router])
+
+  const handleGoogleSignIn = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/');
+      setSigningIn(true)
+      await signInWithGoogle()
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Login Failed',
-        description: error.message,
-      });
-      setLoading(false);
+        title: 'Sign In Failed',
+        description: error.message || 'An error occurred while signing in',
+      })
+      setSigningIn(false)
     }
-  };
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Welcome Back!</CardTitle>
-          <CardDescription>Enter your credentials to access your maps.</CardDescription>
+          <CardTitle className="text-2xl text-center">Welcome to Map Explorer</CardTitle>
+          <p className="text-center text-muted-foreground">Sign in to start creating and sharing maps</p>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Login
-            </Button>
-          </form>
-          <div className="mt-4 text-center text-sm">
-            <p>
-              Don't have an account?{' '}
-              <Link href="/signup" className="underline">
-                Sign up
-              </Link>
-            </p>
-            <p>
-              <Link href="/reset-password" passHref className="text-xs text-muted-foreground hover:underline">
-                  Forgot your password?
-              </Link>
-            </p>
-          </div>
+        <CardContent className="space-y-4">
+          <Button 
+            onClick={handleGoogleSignIn}
+            className="w-full"
+            size="lg"
+            disabled={signingIn}
+          >
+            {signingIn ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Continue with Google'
+            )}
+          </Button>
+          <p className="text-xs text-center text-muted-foreground">
+            Powered by Supabase Authentication
+          </p>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

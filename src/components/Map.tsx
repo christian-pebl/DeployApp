@@ -2,8 +2,12 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import L from 'leaflet';
 import type { LatLngExpression, Map as LeafletMap, LatLng, DivIconOptions, CircleMarker, Polyline, Polygon, LayerGroup, Popup, LocationEvent, LeafletMouseEvent, CircleMarkerOptions, Tooltip as LeafletTooltip, Marker } from 'leaflet';
 import type { Settings } from '@/hooks/use-settings';
+
+// Import Leaflet CSS
+import 'leaflet/dist/leaflet.css';
 
 type Project = { id: string; name: string; description?: string; createdAt: any; };
 type Tag = { id: string; name: string; color: string; projectId: string; };
@@ -159,7 +163,7 @@ const Map = ({
 
     const showEditPopup = (item: Pin | Line | Area) => {
         const map = mapRef.current;
-        if (!map || typeof window.L === 'undefined') return;
+        if (!map) return;
 
         if (popupRef.current && popupRef.current.isOpen()) {
             map.closePopup();
@@ -386,8 +390,6 @@ const Map = ({
     }, [itemToEdit, projects, tags, settings])
 
     useEffect(() => {
-        if (typeof window.L === 'undefined') return;
-
         if (mapContainerRef.current && !mapRef.current) {
             const map = L.map(mapContainerRef.current, {
                 center: center,
@@ -436,13 +438,13 @@ const Map = ({
 
     useEffect(() => {
         if (mapRef.current && (mapRef.current.getZoom() !== zoom || JSON.stringify(mapRef.current.getCenter()) !== JSON.stringify(center))) {
-            mapRef.current.setView(center, zoom, { animate: true, pan: { duration: 1 } });
+            mapRef.current.setView(center, zoom, { animate: true });
         }
     }, [center, zoom]);
 
 
     useEffect(() => {
-        if (pinLayerRef.current && typeof window.L !== 'undefined') {
+        if (pinLayerRef.current) {
             const layer = pinLayerRef.current;
             layer.clearLayers();
             const defaultAccentColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--accent')})`;
@@ -471,7 +473,7 @@ const Map = ({
     }, [pins, onEditItem, tags]);
 
     useEffect(() => {
-        if (lineLayerRef.current && typeof window.L !== 'undefined') {
+        if (lineLayerRef.current) {
             const layer = lineLayerRef.current;
             layer.clearLayers();
             const defaultPrimaryColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--primary')})`;
@@ -511,7 +513,7 @@ const Map = ({
     }, [lines, onEditItem, tags]);
 
     useEffect(() => {
-        if (areaLayerRef.current && typeof window.L !== 'undefined' && mapRef.current) {
+        if (areaLayerRef.current && mapRef.current) {
             const layer = areaLayerRef.current;
             layer.clearLayers();
             const defaultSecondaryFgColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--secondary-foreground')})`;
@@ -573,7 +575,7 @@ const Map = ({
 
 
     useEffect(() => {
-        if (mapRef.current && typeof window.L !== 'undefined' && currentLocation) {
+        if (mapRef.current && currentLocation) {
             const map = mapRef.current;
             const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
             const circleOptions = {

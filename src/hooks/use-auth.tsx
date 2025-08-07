@@ -1,51 +1,92 @@
 'use client';
 
-import { useEffect, useState, useContext, createContext } from 'react';
-import type { User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createSupabaseClient } from '@/lib/supabase/client'
+import type { User } from '@supabase/supabase-js'
 
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-}
-
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-});
-
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export const useAuth = () => {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(user => {
-      setUser(user);
-      setLoading(false);
-    });
+    // Only run on client side
+    if (typeof window === 'undefined') return
 
-    return () => unsubscribe();
-  }, []);
+    const supabase = createSupabaseClient()
+    if (!supabase) {
+      setLoading(false)
+      return
+    }
 
-  return (
-    <AuthContext.Provider value={{ user, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+    // Get initial session
+    const getInitialSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        setUser(session?.user ?? null)
+      } catch (error) {
+        console.error('Error getting session:', error)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
+    }
 
-export const useAuth = () => useContext(AuthContext);
+    getInitialSession()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event: any, session: any) => {
+        setUser(session?.user ?? null)
+        setLoading(false)
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  return {
+    user,
+    loading,
+    signOut: () => signOut(),
+  }
+}
 
 export const useRequireAuth = () => {
-    const { user, loading } = useAuth();
-    const router = useRouter();
-  
-    useEffect(() => {
-      if (!loading && !user) {
-        router.push('/login');
-      }
-    }, [user, loading, router]);
-  
-    return { user, loading };
-};
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login')
+    }
+  }, [user, loading, router])
+
+  return { user, loading }
+}
+
+// Auth actions
+export const signInWithGoogle = async () => {
+  const supabase = createSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not available')
+  }
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`
+    }
+  })
+  if (error) throw error
+}
+
+export const signOut = async () => {
+  const supabase = createSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not available')
+  }
+
+  const { error } = await supabase.auth.signOut()
+  if (error) throw error
+}
